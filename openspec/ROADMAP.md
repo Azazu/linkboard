@@ -15,7 +15,7 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 1 | `bootstrap-dev-environment` | Docker Compose (php-fpm, nginx, postgres, redis, worker), Makefile targets, CI running `make check EXEC=` on the empty app | low |
+| 1 | `bootstrap-dev-environment` | Docker Compose (php-fpm, nginx, postgres, redis, worker), Makefile targets, CI fix (`detect` job) and CI green on the empty app | high |
 | 2 | `scaffold-symfony-app` | `symfony/skeleton`, Doctrine + migrations, API Platform under `/api/v1` with docs, problem-details errors, `/health`, PHPUnit/PHPStan/php-cs-fixer wired into `make check`, bounded-context `src/` layout | medium |
 | 3 | `add-users-and-security` | `users`, registration (web + API), form-login firewall for the web, JWT firewall for the API, `app:user:promote/demote`, user blocking, voters skeleton, auth rate limit | high |
 | 4 | `add-link-crud` | `links` entity (slug rules, target URL policy, expires_at, max_clicks, is_active, UTM), API Platform resource with owner voters, `shortUrl`, hard delete | high |

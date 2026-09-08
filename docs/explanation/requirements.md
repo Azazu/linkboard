@@ -375,7 +375,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 
 | # | Change id | Scope | Tier | Exit criterion |
 |---|---|---|---|---|
-| 1 | `bootstrap-dev-environment` | Docker Compose (php-fpm, nginx, postgres, redis, worker service), Makefile targets of `AGENTS.md`, CI running `make check EXEC=` on an empty app | low | `make init` and CI green on a clean clone |
+| 1 | `bootstrap-dev-environment` | Docker Compose (php-fpm, nginx, postgres, redis, worker service), php image and nginx config, Makefile targets of `AGENTS.md`, CI workflow parseable with the `php` job self-skipping while `composer.json` is absent | high (CI infrastructure trigger) | `make up` brings postgres and redis healthy and nginx/php running on a clean clone; CI `workflow` job green, `php` job skipped by `detect` |
 | 2 | `scaffold-symfony-app` | `symfony/skeleton`, Doctrine + migrations, API Platform under `/api/v1` with docs, problem-details errors, `/health`, PHPUnit/PHPStan/CS-Fixer wired, bounded-context `src/` layout, `symfony/uid` | medium | `GET /health` and `/api/docs` work; `make check` green with a sample test per layer |
 | 3 | `add-users-and-security` | `users`, registration (web + API), form-login firewall for the web, JWT firewall for the API, `app:user:promote/demote`, blocking, voters skeleton, auth rate limit | high | matrix test owner/stranger/admin/blocked; auth endpoints 429 after 10/min |
 | 4 | `add-link-crud` | `links` entity and migration, slug rules, URL policy, UTM, API Platform resource with voters, `shortUrl`, hard delete | high | FR-LNK-1…11 tests green; every rejected URL class has a failing input |
