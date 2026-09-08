@@ -73,10 +73,13 @@ jobs:
           extensions: pdo_pgsql, intl, mbstring, redis, gd
           coverage: none
       - run: composer install --no-interaction --prefer-dist
-      - name: make check (native)
+      - name: make test-db + make check (native)
         env:
           APP_ENV: test
-          DATABASE_URL: postgresql://app:app@127.0.0.1:5432/app_test?serverVersion=16&charset=utf8
+          # doctrine.yaml appends _test to the database name in the test env
+          DATABASE_URL: postgresql://app:app@127.0.0.1:5432/app?serverVersion=16&charset=utf8
           REDIS_URL: redis://127.0.0.1:6379
           MESSENGER_TRANSPORT_DSN: in-memory://
-        run: make check EXEC=
+        run: |
+          make test-db EXEC=
+          make check EXEC=

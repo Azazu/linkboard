@@ -20,3 +20,13 @@ api_v1_docs:
     defaults:
         _format: null
         _api_respond: true
+
+when@test:
+    # Throws on purpose so tests can assert the 500 problem-details shape
+    # (tests/Api/ProblemDetailsTest). Never registered outside the test env.
+    _test_boom:
+        path: /api/v1/_test/boom
+        controller: App\Tests\Api\Fixture\BoomController
+        methods: [GET]
+        defaults:
+            _api_respond: true

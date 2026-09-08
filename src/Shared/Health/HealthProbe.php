@@ -43,19 +43,24 @@ final readonly class HealthProbe
         }
 
         $dsn = \sprintf(
-            'pgsql:host=%s;port=%d;dbname=%s;connect_timeout=%d',
+            'pgsql:host=%s;port=%d;dbname=%s',
             $parts['host'],
             $parts['port'] ?? 5432,
             ltrim($parts['path'] ?? '', '/'),
-            self::TIMEOUT_SECONDS,
         );
 
         try {
+            // pdo_pgsql maps ATTR_TIMEOUT to libpq's connect_timeout; a
+            // connect_timeout key inside the DSN string is ignored (measured:
+            // 30 s against an unroutable host without this option).
             $pdo = new \PDO($dsn, $parts['user'] ?? null, $parts['pass'] ?? null, [
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_TIMEOUT => self::TIMEOUT_SECONDS,
             ]);
 
-            return 1 === (int) $pdo->query('SELECT 1')->fetchColumn();
+            $statement = $pdo->query('SELECT 1');
+
+            return false !== $statement && 1 === (int) $statement->fetchColumn();
         } catch (\PDOException) {
             return false;
         }

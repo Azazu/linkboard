@@ -12,7 +12,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * GET /health          liveness: the kernel answers, nothing else is touched
- * GET /health?deep=1   dependency probe (database, redis); 503 when any fails
+ * GET /health?deep=1   dependency probe (database, redis); 503 when any fails.
  *
  * Outside the API contour on purpose: not in the OpenAPI document, no
  * authentication, never cached. The deep probe is refused in prod until an
