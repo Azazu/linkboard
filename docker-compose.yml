@@ -1,0 +1,55 @@
+# Local development dependencies. Every published port binds to loopback
+# and comes from .env (see .env.example). The php image/Dockerfile and
+# nginx config arrive with the bootstrap change (.docker/).
+services:
+  php:
+    build:
+      context: .docker/php
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8082}:80"
+    volumes:
+      - .:/app:ro
+      - .docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:?required}
+      POSTGRES_USER: ${DB_USER:?required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?required}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${FORWARD_DB_PORT:-5434}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${FORWARD_REDIS_PORT:-6382}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pg_data:

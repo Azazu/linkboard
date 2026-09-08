@@ -1,0 +1,61 @@
+# CI: strict OpenSpec validation, the workflow verifier's own suite,
+# and `make check` run natively (EXEC= bypasses docker compose).
+name: ci
+
+on:
+  push:
+    branches: [main, "change/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install OpenSpec CLI (pinned)
+        run: npm install -g @fission-ai/openspec@1.11.0
+      - name: OpenSpec strict validation
+        run: openspec validate --all --strict
+      - name: Script suites (every scripts/*_test.sh)
+        run: for t in scripts/*_test.sh; do sh "$t" || exit 1; done
+      - name: Shell syntax
+        run: for f in scripts/*.sh; do sh -n "$f"; done
+
+  php:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('composer.json') != '' }}
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: app_test
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app -d app_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_pgsql, intl, mbstring, redis, gd
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - name: make check (native)
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql://app:app@127.0.0.1:5432/app_test?serverVersion=16&charset=utf8
+          REDIS_URL: redis://127.0.0.1:6379
+          MESSENGER_TRANSPORT_DSN: in-memory://
+        run: make check EXEC=
