@@ -1,17 +1,18 @@
 # Handoff — write-requirements-spec
 
 **Updated:** 2026-09-08 · claude
-**State:** awaiting-gate-1
+**State:** ready-to-merge
 **Branch:** change/write-requirements-spec
 
 ## Done this session
-- Change started; proposal and tasks written (docs-only, `skip_specs: true`, design.md deliberately omitted).
-- Gate 1 Round 1 recorded: changes-requested, one blocker (incomplete decision record).
-- Fix: full Decision record D1–D20 added to `proposal.md`; task 1.1 now verifies row-by-row traceability; finding #1 set to `fixed`.
-- Confirmation of Round 1 requested.
+- Gate 1: Round 1 changes-requested (incomplete decision record) → fixed → Confirmation 1 confirmed.
+- `docs/explanation/requirements.md` rewritten as the full technical specification (FR-*/NFR-* ids, data model, API table, stages 1–4 + stretch, Appendix A traceability D1–D20).
+- `AGENTS.md` layout and redirect rule synced (src/Web, templates, assets, tests/Web; "302 (never 301)").
+- `openspec/ROADMAP.md` reconciled with §7; `openspec/config.yaml` context updated.
+- Low tier: no Gate 2 required.
 
 ## Next step
-User runs Codex with the printed confirmation prompt, then `scripts/gate-run.sh write-requirements-spec 1 record`. On `confirmed`: `/opsx:apply write-requirements-spec` — write the specification, then reconcile the roadmap.
+User reviews the roadmap delta (API Platform in scaffold, `add-web-ui`, `polish-api-and-openapi`, stretch rows 15–16), then `/git:merge write-requirements-spec`, then `/opsx:archive write-requirements-spec`.
 
 ## Blockers
 None.
