@@ -1,11 +1,35 @@
-# Local development dependencies. Every published port binds to loopback
-# and comes from .env (see .env.example). The php image/Dockerfile and
-# nginx config arrive with the bootstrap change (.docker/).
+# Local development stack. Every published port binds to loopback and
+# comes from .env (committed, defaults only; overrides via shell variables —
+# Compose does not read .env.local). The php image and the nginx config
+# live in .docker/. The worker is a profile: start it with
+# `docker compose --profile worker up -d` once the application exists.
 services:
   php:
     build:
       context: .docker/php
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
     working_dir: /app
+    volumes:
+      - .:/app
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .docker/php
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+    profiles: ["worker"]
+    working_dir: /app
+    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=256M"]
+    restart: unless-stopped
     volumes:
       - .:/app
     env_file: .env
@@ -43,8 +67,13 @@ services:
 
   redis:
     image: redis:7-alpine
+    # AOF persistence: the click-limit counter must survive a restart
+    # (specification FR-RED-3).
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${FORWARD_REDIS_PORT:-6382}:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -53,3 +82,4 @@ services:
 
 volumes:
   pg_data:
+  redis_data:
