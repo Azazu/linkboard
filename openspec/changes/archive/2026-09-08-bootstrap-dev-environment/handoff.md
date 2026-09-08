@@ -1,7 +1,7 @@
 # Handoff — bootstrap-dev-environment
 
 **Updated:** 2026-09-08 · claude
-**State:** ready-to-merge
+**State:** merged
 **Branch:** change/bootstrap-dev-environment
 
 ## Done this session
