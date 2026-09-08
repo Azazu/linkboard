@@ -13,7 +13,7 @@ Linkboard is a short-link service with smart routing and click analytics, built 
 
 What it demonstrates:
 
-- **Symfony 7 / PHP 8.3** as the application framework, with a proper service layer and DI container.
+- **Symfony 8.1 / PHP 8.4** as the application framework, with a proper service layer and DI container (decision and trade-off against 7.4 LTS: `docs/adr/ADR-001-symfony-8-on-php-8.4.md`).
 - **Doctrine ORM as a DataMapper** — entities without persistence logic, repositories behind interfaces — as a deliberate contrast with ActiveRecord-style ORMs (Eloquent, Yii AR).
 - **API Platform** for a versioned REST API with generated OpenAPI documentation and Swagger UI.
 - **PostgreSQL 16**: JSONB routing rules validated on write, window functions and `date_trunc` for analytics, optional table partitioning.
@@ -285,7 +285,7 @@ Anti-overengineering rule (`openspec/config.yaml`): every component below names 
 
 | Component | Role | Why this, not something already present |
 |---|---|---|
-| PHP 8.3, Symfony 7.x (`symfony/skeleton` + Flex) | runtime and framework | project premise |
+| PHP 8.4, Symfony 8.1 (`symfony/skeleton` + Flex) | runtime and framework | project premise; current majors of the Doctrine bundles and PHPUnit require PHP ≥ 8.4 (ADR-001) |
 | Doctrine ORM 3 / DBAL 4 / Migrations | persistence as DataMapper, reviewed schema changes | project premise; contrast with ActiveRecord is a stated goal |
 | API Platform 4 | REST resources, OpenAPI, Swagger UI, problem details, pagination | replaces hand-written controllers, serializers and docs for every resource |
 | `lexik/jwt-authentication-bundle` | JWT issuance and validation for the API firewall | Symfony has access tokens but no JWT signer/issuer; writing one is security-sensitive code with no portfolio value |
@@ -376,7 +376,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | # | Change id | Scope | Tier | Exit criterion |
 |---|---|---|---|---|
 | 1 | `bootstrap-dev-environment` | Docker Compose (php-fpm, nginx, postgres, redis, worker service), php image and nginx config, Makefile targets of `AGENTS.md`, CI workflow parseable with the `php` job self-skipping while `composer.json` is absent | high (CI infrastructure trigger) | `make up` brings postgres and redis healthy and nginx/php running on a clean clone; CI `workflow` job green, `php` job skipped by `detect` |
-| 2 | `scaffold-symfony-app` | `symfony/skeleton`, Doctrine + migrations, API Platform under `/api/v1` with docs, problem-details errors, `/health`, PHPUnit/PHPStan/CS-Fixer wired, bounded-context `src/` layout, `symfony/uid` | medium | `GET /health` and `/api/docs` work; `make check` green with a sample test per layer |
+| 2 | `scaffold-symfony-app` | `symfony/skeleton` 8.1 on PHP 8.4, Doctrine + migrations, API Platform under `/api/v1` with docs, problem-details errors, `/health`, PHPUnit/PHPStan/CS-Fixer wired, bounded-context `src/` layout, `symfony/uid` | medium | `GET /health` and `/api/docs` work; `make check` green with a sample test per layer |
 | 3 | `add-users-and-security` | `users`, registration (web + API), form-login firewall for the web, JWT firewall for the API, `app:user:promote/demote`, blocking, voters skeleton, auth rate limit | high | matrix test owner/stranger/admin/blocked; auth endpoints 429 after 10/min |
 | 4 | `add-link-crud` | `links` entity and migration, slug rules, URL policy, UTM, API Platform resource with voters, `shortUrl`, hard delete | high | FR-LNK-1…11 tests green; every rejected URL class has a failing input |
 | 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table and a synchronous insert as the baseline, per-IP redirect limit | medium | redirect matrix test; click row written per redirect |

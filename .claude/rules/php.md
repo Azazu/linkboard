@@ -1,7 +1,7 @@
 ## PHP / Symfony specifics
 - Verify bundle and API Platform behavior against `vendor/` source or
   `bin/console debug:*` (`debug:router`, `debug:container`,
-  `debug:messenger`, `debug:config`), not memory — Symfony 7 and API
+  `debug:messenger`, `debug:config`), not memory — Symfony 8 and API
   Platform 4 removed and renamed things across majors
 - Run PHP through the container: `make composer ARGS=…`,
   `make console ARGS=…`, `make test`; never call a host `php` (there is

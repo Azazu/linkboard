@@ -71,5 +71,5 @@ it yourself.
   --strict` fails for a change that has no artifacts yet; it turns green
   with `/opsx:propose`. Known limitation, not a defect of your change.
 - **`make check` differs from CI** — CI runs `make check EXEC=` natively
-  with PHP 8.3 and `MESSENGER_TRANSPORT_DSN=in-memory://`; make sure
+  with PHP 8.4 and `MESSENGER_TRANSPORT_DSN=in-memory://`; make sure
   `composer.json` pins the same platform.
