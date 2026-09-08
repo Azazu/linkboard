@@ -341,9 +341,12 @@ src/
   Analytics/     read model: query services over window functions, cached report DTOs
   Auth/          users, API keys, security voters
   Shared/        kernel-level: value objects, exceptions, problem-details normalizer, clock
+  Web/           Twig controllers and forms of the server-rendered UI (same services and voters as the API)
 migrations/      doctrine/migrations classes (reviewed, reversible)
 public/          docroot (index.php)
-tests/           Unit/ (pure PHP), Integration/ (Kernel + DB), Api/ (ApiTestCase)
+templates/       Twig templates
+assets/          AssetMapper: Stimulus controllers, CSS (no Node build step)
+tests/           Unit/ (pure PHP), Integration/ (Kernel + DB), Api/ (ApiTestCase), Web/ (WebTestCase)
 var/             cache, logs (gitignored)
 ```
 
@@ -377,8 +380,8 @@ var/             cache, logs (gitignored)
   order is explicit (device → country → language → default), A/B split
   is deterministic per visitor where possible.
 - The redirect never waits for the database write of the click: it
-  dispatches `ClickRecorded` to the async transport and responds 302 /
-  307. Failure to log never turns into a failed redirect.
+  dispatches `ClickRecorded` to the async transport and responds 302
+  (never 301). Failure to log never turns into a failed redirect.
 - Analytics aggregates come from SQL (window functions, `date_trunc`),
   not from PHP loops; hot reports cached in Redis with explicit TTL and
   invalidation on link change.
