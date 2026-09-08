@@ -6,9 +6,10 @@
 
 ## Done this session
 - Change started: branch and scaffold created.
+- Stack decision with the user: PHP 8.4 + Symfony 8.1 (Packagist: current majors of Doctrine bundles and PHPUnit require PHP ≥ 8.4). Proposal, three delta specs (health-check, api-error-format, api-docs), design, tasks written; tier medium (Gate 2 only).
 
 ## Next step
-`/opsx:propose scaffold-symfony-app` — `symfony/skeleton`, Doctrine + migrations, API Platform under `/api/v1` with docs, problem-details errors, `/health`, PHPUnit/PHPStan/php-cs-fixer wired into `make check`, bounded-context `src/` layout (roadmap Stage 1, row 2; exit criterion in `docs/explanation/requirements.md` §7).
+`/opsx:apply scaffold-symfony-app` — task 1.1 (php 8.4 image + CI) first, then the skeleton. Config keys for API Platform and the dama extension are discovered from the installed packages during apply (design decisions 3, 7).
 
 ## Blockers
 None.
