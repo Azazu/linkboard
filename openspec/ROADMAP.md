@@ -9,6 +9,12 @@ Derived from the Linkboard brief (`docs/explanation/requirements.md`),
 stages 1–4. Each row is a summary; the change's `proposal.md` carries
 the full scope, exit criteria and the declared tier.
 
+## Stage 0 — specification
+
+| # | Change id | Scope (summary) | Tier |
+|---|---|---|---|
+| 0 | `write-requirements-spec` | Expand the brief into a full technical specification (roles, functional requirements, data model, API, non-functional requirements, stages); reconcile this roadmap against it | low |
+
 ## Stage 1 — Symfony skeleton, links, synchronous redirect
 
 | # | Change id | Scope (summary) | Tier |
