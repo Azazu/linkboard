@@ -7,7 +7,6 @@ namespace App\Shared\Health;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -35,7 +34,17 @@ final class HealthController
         }
 
         if ('prod' === $this->environment) {
-            throw new NotFoundHttpException('The deep health probe is not exposed in this environment.');
+            // Explicit RFC 9457 body: /health is outside the API contour, so no
+            // framework error renderer is guaranteed to produce problem+json here.
+            $response = $this->json([
+                'type' => '/errors/404',
+                'title' => 'Not Found',
+                'status' => 404,
+                'detail' => 'The deep health probe is not exposed in this environment.',
+            ], 404);
+            $response->headers->set('Content-Type', 'application/problem+json');
+
+            return $response;
         }
 
         $report = $this->probe->run();

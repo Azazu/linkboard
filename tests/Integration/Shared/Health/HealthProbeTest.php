@@ -54,6 +54,23 @@ final class HealthProbeTest extends KernelTestCase
         self::assertLessThan(HealthProbe::TIMEOUT_SECONDS + 1.5, $elapsed, 'the database check must be bounded by its timeout');
     }
 
+    public function testASlowQueryOnTheProbeConnectionIsCancelledByTheStatementTimeout(): void
+    {
+        self::bootKernel();
+        $probe = self::getContainer()->get(HealthProbe::class);
+
+        $started = microtime(true);
+        try {
+            $probe->databaseConnection()->query('SELECT pg_sleep(10)');
+            self::fail('a query longer than the statement timeout must be cancelled');
+        } catch (\PDOException $e) {
+            self::assertStringContainsString('statement timeout', $e->getMessage());
+        }
+        $elapsed = microtime(true) - $started;
+
+        self::assertLessThan(HealthProbe::TIMEOUT_SECONDS + 1.0, $elapsed, 'the statement timeout must bound a hanging query');
+    }
+
     public function testMalformedUrlsAreFailuresNotExceptions(): void
     {
         $probe = new HealthProbe('not a url', '');

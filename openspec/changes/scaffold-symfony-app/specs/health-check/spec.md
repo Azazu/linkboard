@@ -29,9 +29,13 @@ The system SHALL answer `GET /health?deep=1` with a JSON body that reports each 
 - **WHEN** the Redis host is reachable but the service does not answer (process paused) and a client requests `GET /health?deep=1` outside `prod`
 - **THEN** the response arrives within 3 seconds with status 503 and `redis` reported as `fail`
 
+#### Scenario: Database accepts connections but does not answer
+- **WHEN** the database accepts the connection but a query on the probe's connection does not complete within 2 seconds
+- **THEN** the query is cancelled by a server-side statement timeout and the `database` check reports `fail` within 3 seconds
+
 #### Scenario: Deep probe in production without authorization
 - **WHEN** the application runs with `APP_ENV=prod` and a client requests `GET /health?deep=1`
-- **THEN** the response status is 404 with a problem-details body
+- **THEN** the response status is 404, the content type is `application/problem+json`, the body carries `type`, `title`, `status: 404` and `detail`, and the response has `Cache-Control: no-store`
 
 ### Requirement: Health endpoint is outside the API contour
 `/health` SHALL NOT be listed in the OpenAPI document, SHALL NOT require authentication, and SHALL send `Cache-Control: no-store`.

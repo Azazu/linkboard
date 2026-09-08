@@ -37,33 +37,47 @@ final readonly class HealthProbe
 
     private function checkDatabase(): bool
     {
+        try {
+            $statement = $this->databaseConnection()->query('SELECT 1');
+
+            return false !== $statement && 1 === (int) $statement->fetchColumn();
+        } catch (\PDOException|\InvalidArgumentException) {
+            return false;
+        }
+    }
+
+    /**
+     * The connection the database check runs on: connect timeout AND
+     * server-side statement timeout are both bounded, so a server that
+     * accepts the TCP connection and then stops answering fails the probe
+     * within the budget instead of hanging it. Public so the hang case can
+     * be tested with a slow query on exactly this connection.
+     *
+     * @throws \PDOException             when the server is unreachable or refuses
+     * @throws \InvalidArgumentException when the DSN cannot be parsed
+     */
+    public function databaseConnection(): \PDO
+    {
         $parts = parse_url($this->databaseUrl);
         if (false === $parts || !isset($parts['host'])) {
-            return false;
+            throw new \InvalidArgumentException('DATABASE_URL is not a parseable URL.');
         }
 
         $dsn = \sprintf(
-            'pgsql:host=%s;port=%d;dbname=%s',
+            "pgsql:host=%s;port=%d;dbname=%s;options='-c statement_timeout=%d'",
             $parts['host'],
             $parts['port'] ?? 5432,
             ltrim($parts['path'] ?? '', '/'),
+            self::TIMEOUT_SECONDS * 1000,
         );
 
-        try {
-            // pdo_pgsql maps ATTR_TIMEOUT to libpq's connect_timeout; a
-            // connect_timeout key inside the DSN string is ignored (measured:
-            // 30 s against an unroutable host without this option).
-            $pdo = new \PDO($dsn, $parts['user'] ?? null, $parts['pass'] ?? null, [
-                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                \PDO::ATTR_TIMEOUT => self::TIMEOUT_SECONDS,
-            ]);
-
-            $statement = $pdo->query('SELECT 1');
-
-            return false !== $statement && 1 === (int) $statement->fetchColumn();
-        } catch (\PDOException) {
-            return false;
-        }
+        // pdo_pgsql maps ATTR_TIMEOUT to libpq's connect_timeout (a
+        // connect_timeout key inside the DSN string is ignored — measured);
+        // the statement_timeout above is applied server-side per session.
+        return new \PDO($dsn, $parts['user'] ?? null, $parts['pass'] ?? null, [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_TIMEOUT => self::TIMEOUT_SECONDS,
+        ]);
     }
 
     private function checkRedis(): bool

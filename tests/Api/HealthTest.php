@@ -6,6 +6,8 @@ namespace App\Tests\Api;
 
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Spec: health-check — the endpoint is outside the API contour, so it is
@@ -35,6 +37,30 @@ final class HealthTest extends WebTestCase
             '{"status":"ok","checks":{"database":"ok","redis":"ok"}}',
             $client->getResponse()->getContent(),
         );
+    }
+
+    public function testDeepProbeIsRefusedInProductionWithProblemDetails(): void
+    {
+        // The prod kernel has no test client (framework.test is off there), so
+        // the request goes through the kernel directly. It needs a non-empty
+        // secret; .env leaves APP_SECRET empty on purpose. The prod container is
+        // cached without resource tracking, so a stale var/cache/prod from an
+        // earlier configuration would test the wrong thing: start from scratch.
+        (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
+        $_SERVER['APP_SECRET'] = $_ENV['APP_SECRET'] = 'test-only-secret-for-the-prod-kernel';
+        $kernel = self::bootKernel(['environment' => 'prod', 'debug' => false]);
+
+        $response = $kernel->handle(Request::create('/health?deep=1'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->headers->get('Content-Type'));
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $problem = json_decode((string) $response->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($problem);
+        self::assertSame(404, $problem['status']);
+        foreach (['type', 'title', 'detail'] as $member) {
+            self::assertArrayHasKey($member, $problem);
+        }
     }
 
     public function testHealthIsNotPartOfTheOpenApiDocument(): void
