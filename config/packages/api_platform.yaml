@@ -1,0 +1,58 @@
+# API Platform 4.3 — see `bin/console config:dump-reference api_platform`.
+# Behavior fixed by the specification (§4, delta specs api-docs and
+# api-error-format): operations under /api/v1, docs at /api/docs and
+# /api/docs.json, JSON only, RFC 9457 problem details for every error.
+api_platform:
+    title: Linkboard API
+    version: 1.0.0
+    description: Short links with smart routing and click analytics.
+    show_webby: false
+
+    # Operations get the /v1 segment; the route prefix /api itself comes from
+    # config/routes/api_platform.yaml, so documentation stays at /api/docs.
+    defaults:
+        route_prefix: /v1
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']
+
+    # JSON only: no JSON-LD/Hydra, HAL or JSON:API surfaces.
+    formats:
+        json: ['application/json']
+    patch_formats:
+        json: ['application/merge-patch+json']
+    # html first: a bare GET /api/docs (no Accept header) gets Swagger UI;
+    # /api/docs.json and Accept: application/json get the OpenAPI document.
+    docs_formats:
+        html: ['text/html']
+        json: ['application/json']
+        jsonopenapi: ['application/vnd.openapi+json']
+    error_formats:
+        jsonproblem: ['application/problem+json']
+
+    # Errors raised by Symfony itself under /api (unknown route, wrong
+    # method) are rendered as problem details too.
+    handle_symfony_errors: true
+
+    enable_swagger_ui: true
+    enable_re_doc: false
+    enable_scalar: false
+    enable_docs: true
+    # The Hydra/JSON-LD entrypoint document cannot be expressed in plain JSON;
+    # the versioned base path /api/v1 serves the documentation instead
+    # (config/routes.yaml).
+    enable_entrypoint: false
+
+    # Not part of the specification; off to keep the surface minimal.
+    mcp:
+        enabled: false
+    graphql:
+        enabled: false
+
+    # Uniform error type URIs; validation errors get their own resource
+    # class when the first validated input arrives (add-link-crud).
+    openapi:
+        contact:
+            name: Linkboard
+        license:
+            name: proprietary

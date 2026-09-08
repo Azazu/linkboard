@@ -6,12 +6,13 @@ Authoritative live source: `make help`.
 
 | Command | Purpose |
 |---|---|
-| `make init` | first run: build, up, composer install, migrate |
+| `make init` | first run: build, up, composer install, migrate, test-db |
 | `make up` / `make down` / `make ps` / `make logs` | container lifecycle |
 | `make sh` | shell in the php container |
 | `make composer ARGS='…'` | composer inside the container |
 | `make console ARGS='…'` | `bin/console` inside the container |
 | `make migrate` / `make migration` | apply migrations / generate a diff migration |
+| `make test-db` | create and migrate the test database (`<DATABASE_URL db>_test`); called by `make init` |
 | `make worker` | consume the async Messenger transport (foreground) |
 | `docker compose --profile worker up -d` | the same consumer as a background compose service (profile `worker`, not started by `make up`) |
 | `make test` / `make stan` / `make cs` / `make cs-fix` | PHPUnit / PHPStan / style check / style fix |

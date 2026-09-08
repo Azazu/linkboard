@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=../vendor/symfony/routing/Loader/schema/routing.schema.json
+
+# This file is the entry point to configure the routes of your app.
+# Methods with the #[Route] attribute are automatically imported.
+# See also https://symfony.com/doc/current/routing.html
+
+# To list all registered routes, run the following command:
+#   bin/console debug:router
+
+controllers:
+    resource: routing.controllers
+
+# The versioned base path answers with the documentation: Swagger UI for a
+# browser, the OpenAPI document for Accept: application/json. Same
+# controller as API Platform's `api_doc` (/api/docs.{_format}).
+api_v1_docs:
+    path: /api/v1
+    controller: api_platform.action.documentation
+    methods: [GET, HEAD]
+    defaults:
+        _format: null
+        _api_respond: true
+
+when@test:
+    # Throws on purpose so tests can assert the 500 problem-details shape
+    # (tests/Api/ProblemDetailsTest). Never registered outside the test env.
+    _test_boom:
+        path: /api/v1/_test/boom
+        controller: App\Tests\Api\Fixture\BoomController
+        methods: [GET]
+        defaults:
+            _api_respond: true

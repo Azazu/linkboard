@@ -5,7 +5,7 @@ this repository. Both agents load this file automatically; when in
 doubt it wins over default agent behavior. Process record:
 `docs/adr/ADR-000-agent-workflow.md`.
 
-Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 7, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
+Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 8, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
 
 **Review mode:** manual
 
@@ -310,7 +310,7 @@ obligation. One-off incidents are fixed, not legislated.
 <!-- STACK:BEGIN -->
 ## Stack
 
-PHP 8.3 · Symfony 7 · API Platform · Doctrine ORM · Messenger ·
+PHP 8.4 · Symfony 8.1 · API Platform 4 · Doctrine ORM 3 · Messenger ·
 PostgreSQL 16 · Redis 7 · Docker Compose. Full requirements:
 `docs/explanation/requirements.md` (the original brief); ordered plan:
 `openspec/ROADMAP.md`.

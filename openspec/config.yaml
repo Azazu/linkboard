@@ -1,12 +1,12 @@
 schema: spec-driven
 
 context: |
-  Linkboard — Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 7, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
+  Linkboard — Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 8, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
   Stage: scaffold; application code arrives through OpenSpec changes
   listed in openspec/ROADMAP.md.
 
   Target stack:
-  - PHP 8.3, Symfony 7.x (symfony/skeleton + flex recipes), API Platform 4,
+  - PHP 8.4, Symfony 8.1 (symfony/skeleton + flex recipes; ADR-001), API Platform 4,
     Doctrine ORM 3 + DBAL 4 + doctrine/migrations (DataMapper — deliberate
     contrast with Eloquent/ActiveRecord), Symfony Messenger (async click
     logging, Redis transport), Symfony RateLimiter, Cache (Redis adapter)

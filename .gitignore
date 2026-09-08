@@ -30,4 +30,16 @@ composer.phar
 # Symfony convention overrides the template rule above: .env and .env.test
 # are committed (defaults, no secrets); .env.local / .env.*.local stay ignored
 !.env
+!.env.dev
 !.env.test
+/.env.local.php
+
+###> friendsofphp/php-cs-fixer ###
+/.php-cs-fixer.php
+/.php-cs-fixer.cache
+###< friendsofphp/php-cs-fixer ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###

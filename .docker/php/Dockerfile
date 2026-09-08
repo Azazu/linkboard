@@ -2,7 +2,7 @@
 # Local development image for Linkboard (PHP-FPM behind nginx).
 # Every external input is pinned by tag AND digest (resolved 2026-09-08);
 # bumping one is a reviewed change.
-FROM php:8.3.33-fpm-alpine@sha256:bf90236449d333cef008b1f01c72a3d4f11a6470a74629665e4c6b6158f03fc8
+FROM php:8.4.25-fpm-alpine@sha256:49734670eccf414af884c2a0c2e558401e228615f8028f1c9fca30a0d4fb1bc2
 
 # Extension installer: compiles/enables extensions with their build deps
 # and removes the deps afterwards (build-time only, no runtime footprint).

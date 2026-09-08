@@ -1,6 +1,6 @@
 # Linkboard
 
-Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 7, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
+Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 8, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
 
 **Stage:** scaffold — agent workflow, documentation layout and CI are
 in place; application code arrives through reviewed OpenSpec changes
