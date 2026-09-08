@@ -18,8 +18,8 @@
 
 ## 3a. Makefile guard (scope added after the first Gate 2 floor run)
 
-- [x] 3a.1 Add the Make-level conditional to `Makefile` (`ifeq ($(wildcard composer.json),)` → `APP_MISSING`; `ifdef APP_MISSING … else … endif` around the recipes of `cs`, `stan`, `test`, so each recipe is either the SKIP echo or the real tool line, never both). Verify: without `composer.json`, `make check` exits 0 and prints `[SKIP] no composer.json — application not scaffolded yet` three times then `check: all green`; with a throwaway `composer.json` (`echo '{}' > composer.json`, removed afterwards) `make cs EXEC=` no longer prints SKIP and fails on the missing `vendor/bin/php-cs-fixer` — the failing input that shows the guard is inert once the application exists. Record both outputs in the commit body.
-- [ ] 3a.2 `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` reports `make check` OK. Verify: the FAIL line is gone from its output.
+- [x] 3a.1 Add the Make-level conditional to `Makefile` (`ifeq ($(wildcard composer.json),)` → `APP_MISSING`; `ifdef APP_MISSING … else … endif` around the recipes of `cs`, `stan`, `test`, so each recipe is either the SKIP echo or the real tool line, never both). Verify: without a composer.json, `make check` exits 0 and prints `[SKIP] no composer.json — application not scaffolded yet` three times then `check: all green`; with a throwaway composer.json (`echo '{}' > composer.json`, removed afterwards) `make cs EXEC=` no longer prints SKIP and fails on the missing php-cs-fixer binary — the failing input that shows the guard is inert once the application exists. Record both outputs in the commit body.
+- [x] 3a.2 `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` reports `make check` OK. Verify: the FAIL line is gone from its output.
 
 ## 4. Documentation and plan
 
@@ -29,4 +29,4 @@
 ## 5. Wrap-up
 
 - [x] 5.1 Commit per block (`ci:` for task 1, `chore(docker):` for 2–3, `docs:` for 4) with the agent trailer, each body naming the verification outputs. Verify: `git log --oneline main..HEAD`.
-- [ ] 5.2 `openspec validate bootstrap-dev-environment --strict` passes; `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` passes (with the guard of 3a, `make check` is green-with-SKIP; the handoff tells the Gate 2 reviewer so); request Gate 2.
+- [x] 5.2 `openspec validate bootstrap-dev-environment --strict` passes; `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` passes (with the guard of 3a, `make check` is green-with-SKIP; the handoff tells the Gate 2 reviewer so); request Gate 2.

@@ -1,7 +1,7 @@
 # Handoff — bootstrap-dev-environment
 
 **Updated:** 2026-09-08 · claude
-**State:** awaiting-gate-1
+**State:** awaiting-gate-2
 **Branch:** change/bootstrap-dev-environment
 
 ## Done this session
@@ -12,10 +12,11 @@
 - Implemented tasks 1.1–1.2, 2.1–2.3, 3.1–3.3, 4.1–4.2, 5.1 (commits 0f07eb1, 58bc391, d62c4a6). First Gate 2 floor run: `make check` cannot pass without an application.
 - Scope added with the user's decision: Makefile guard (proposal item 6, design decision 9, tasks 3a) — Gate 1 re-requested for the scope change; the guard is implemented only after it is approved.
 - Gate 1 Round 2: changes-requested (per-line shell guard would not stop later recipe lines). Fixed in design/tasks: Make-level `ifeq`/`ifdef` conditional so each recipe is either SKIP or the real tool. Confirmation requested.
+- Gate 1 Round 2 confirmed (c5a48c4). Guard implemented (e103cbd): `make check` is green-with-SKIP on the empty app, failing input recorded in the commit body. Gate 2 floor passes; Gate 2 requested.
 - Task 1.3 accepted: CI run https://github.com/Azazu/linkboard/actions/runs/34252812345 on bb4e446 — workflow success, detect success, php skipped.
 
 ## Next step
-User runs Codex for the Round 2 confirmation, then `scripts/gate-run.sh bootstrap-dev-environment 1 record`. On approval: implement tasks 3a.1–3a.2, record the pushed CI run URL for task 1.3, request Gate 2. Security-relevant surface: CI workflow (`.github/workflows/ci.yml`) — flagged for review per AGENTS.md.
+User runs Codex for Gate 2 (code diff `git diff main...change/bootstrap-dev-environment`), then `scripts/gate-run.sh bootstrap-dev-environment 2 record`. On approval: `/git:merge bootstrap-dev-environment`, then `/opsx:archive`. Note for the reviewer: `make check` passes via the Makefile SKIP guard — no PHP application exists yet (arrives with `scaffold-symfony-app`). Security-relevant surface: CI workflow (`.github/workflows/ci.yml`), Docker image and compose (`.docker/`, `docker-compose.yml`) — flagged per AGENTS.md.
 
 ## Blockers
 None.
