@@ -14,11 +14,17 @@ context: |
     optional partitioning of clicks by date), Redis 7 (counters, rate
     limiting, hot-report cache, Messenger transport), Docker Compose
   - Tests: PHPUnit + symfony/test-pack (WebTestCase, KernelTestCase),
-    api-platform/test-pack for API resources; static analysis: PHPStan
+    API Platform's ApiTestCase for API resources; static analysis: PHPStan
     (level 8 + phpstan-symfony + phpstan-doctrine); style: PHP-CS-Fixer
     (@Symfony + strict_types)
   - Runtime: PHP-FPM behind nginx locally; messenger workers as separate
     processes (`messenger:consume`)
+  - Auth: session form login for the web UI, lexik/jwt-authentication-bundle
+    (JWT) plus hashed API keys for /api/v1; admin role via console command
+  - Web UI: Twig + Symfony UX (Turbo, Stimulus, ux-chartjs) + AssetMapper,
+    no Node build; detection: matomo/device-detector (device/OS/bot),
+    geoip2/geoip2 with GeoLite2 behind a CountryResolver interface;
+    QR: endroid/qr-code
   Domain: Linkboard — a short-link service with smart routing and
   analytics (deliberately echoes the author's production experience with
   device-aware link routing):
@@ -28,7 +34,9 @@ context: |
   analytics (clicks by time/country/device/referer) as a separate read
   model (CQRS-lite) computed with PostgreSQL window functions and cached
   in Redis; API keys, rate limiting, versioned /api/v1 through API
-  Platform with generated OpenAPI; roles guest/user/admin.
+  Platform with generated OpenAPI; roles guest/user/admin; a
+  server-rendered web UI with a dashboard. Normative specification with
+  requirement ids (FR-*/NFR-*): docs/explanation/requirements.md.
 
   Conventions:
   - English for code, docs, commits (chat with the user is in Russian)
