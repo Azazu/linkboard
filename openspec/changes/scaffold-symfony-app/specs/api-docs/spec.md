@@ -4,11 +4,15 @@ Generated, always-current API documentation and a fixed versioned base path, so 
 ## ADDED Requirements
 
 ### Requirement: Versioned base path
-All API operations SHALL be served under the base path `/api/v1`. No operation is served directly under `/api/` except the documentation endpoints.
+All API operations SHALL be served under the base path `/api/v1`. The base path itself SHALL answer with the API documentation: the OpenAPI document for `Accept: application/json`, the interactive documentation page for `Accept: text/html`. No operation is served directly under `/api/` except the documentation endpoints.
 
-#### Scenario: Base path applies to the entrypoint
+#### Scenario: Base path serves the OpenAPI document to API clients
 - **WHEN** a client requests `GET /api/v1` with `Accept: application/json`
-- **THEN** the response status is 200 and the body is a JSON entrypoint document listing the available resources (empty until resources exist)
+- **THEN** the response status is 200 and the body is the same OpenAPI document as `GET /api/docs.json`
+
+#### Scenario: Every documented path is versioned
+- **WHEN** a client requests `GET /api/docs.json`
+- **THEN** every key of `paths` starts with `/api/v1/` (vacuously true while no resource exists; asserted from the first resource on)
 
 ### Requirement: OpenAPI document and Swagger UI
 The system SHALL serve an OpenAPI 3.1 document at `GET /api/docs.json` (`application/json`) and an interactive Swagger UI at `GET /api/docs` (`text/html`), both generated from the registered resources and reflecting the `/api/v1` base path.

@@ -15,7 +15,7 @@ The system SHALL answer `GET /health` with HTTP 200 and the JSON body `{"status"
 - **THEN** the response is still 200 with `{"status":"ok"}`
 
 ### Requirement: Deep dependency probe
-The system SHALL answer `GET /health?deep=1` with a JSON body that reports each dependency (`database`, `redis`) as `"ok"` or `"fail"`, with HTTP 200 when all are `"ok"` and HTTP 503 when any is `"fail"`. The probe MUST time out per dependency within 2 seconds so a hung dependency cannot hang the probe. In the `prod` environment the deep probe SHALL be refused with 404 until an authorization boundary exists (introduced by the users-and-security change).
+The system SHALL answer `GET /health?deep=1` with a JSON body that reports each dependency (`database`, `redis`) as `"ok"` or `"fail"`, with HTTP 200 when all are `"ok"` and HTTP 503 when any is `"fail"`. Connecting to and querying each dependency MUST time out within 2 seconds so a hung dependency (reachable host, unresponsive service) cannot hang the probe; host name resolution happens before that timeout and is bounded by the platform resolver. In the `prod` environment the deep probe SHALL be refused with 404 until an authorization boundary exists (introduced by the users-and-security change).
 
 #### Scenario: All dependencies reachable
 - **WHEN** PostgreSQL and Redis accept connections and a client requests `GET /health?deep=1` outside `prod`
@@ -24,6 +24,10 @@ The system SHALL answer `GET /health?deep=1` with a JSON body that reports each 
 #### Scenario: One dependency unreachable
 - **WHEN** Redis refuses connections and a client requests `GET /health?deep=1` outside `prod`
 - **THEN** the response status is 503 and the body is `{"status":"fail","checks":{"database":"ok","redis":"fail"}}`
+
+#### Scenario: One dependency hangs
+- **WHEN** the Redis host is reachable but the service does not answer (process paused) and a client requests `GET /health?deep=1` outside `prod`
+- **THEN** the response arrives within 3 seconds with status 503 and `redis` reported as `fail`
 
 #### Scenario: Deep probe in production without authorization
 - **WHEN** the application runs with `APP_ENV=prod` and a client requests `GET /health?deep=1`

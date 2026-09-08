@@ -10,6 +10,8 @@
         "ext-intl": "*",
         "ext-pdo_pgsql": "*",
         "ext-redis": "*",
+        "api-platform/doctrine-orm": "*",
+        "api-platform/symfony": "*",
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.7",
@@ -22,6 +24,7 @@
         "symfony/monolog-bundle": "^4.0",
         "symfony/redis-messenger": "8.1.*",
         "symfony/runtime": "8.1.*",
+        "symfony/twig-bundle": "8.1.*",
         "symfony/uid": "8.1.*",
         "symfony/yaml": "8.1.*"
     },
