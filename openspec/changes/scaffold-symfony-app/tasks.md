@@ -6,9 +6,9 @@
 
 ## 2. Skeleton
 
-- [ ] 2.1 `make up`, then `make composer ARGS='create-project symfony/skeleton:"8.1.*" /tmp/skeleton --no-interaction'`; copy the generated tree into `/app` except `.env`, `.gitignore`, `README.md`; merge the generated `.env` lines into the committed `.env` and compare `.gitignore`. Verify: `git status --short` shows the expected new files; `make console ARGS='about'` prints Symfony 8.1.x and PHP 8.4.25; the commit body lists the merged `.env` lines.
-- [ ] 2.2 `composer.json`: `"php": ">=8.4"`, `ext-redis`, `ext-pdo_pgsql`, `ext-intl`, `config.platform.php: "8.4.25"`, `extra.symfony.require: "8.1.*"`. Verify: `make composer ARGS='validate --strict'` passes.
-- [ ] 2.3 Create the bounded-context directories `src/Link src/Redirect src/Click src/Analytics src/Auth src/Shared src/Web` with `.gitkeep`; `config/services.yaml` excludes `Entity/`, `Dto/`, `Message/` sub-directories. Verify: `make console ARGS='debug:container --env=dev'` runs without errors; `ls src/` lists the seven directories.
+- [x] 2.1 `make up`, then `make composer ARGS='create-project symfony/skeleton:"8.1.*" /tmp/skeleton --no-interaction'`; copy the generated tree into `/app` except `.env`, `.gitignore`, `README.md`; merge the generated `.env` lines into the committed `.env` and compare `.gitignore`. Verify: `git status --short` shows the expected new files; `make console ARGS='about'` prints Symfony 8.1.x and PHP 8.4.25; the commit body lists the merged `.env` lines.
+- [x] 2.2 `composer.json`: `"php": ">=8.4"`, `ext-redis`, `ext-pdo_pgsql`, `ext-intl`, `config.platform.php: "8.4.25"`, `extra.symfony.require: "8.1.*"`. Verify: `make composer ARGS='validate --strict'` passes.
+- [x] 2.3 Create the bounded-context directories `src/Link src/Redirect src/Click src/Analytics src/Auth src/Shared src/Web` with `.gitkeep`; `config/services.yaml` excludes `Entity/`, `Dto/`, `Message/` sub-directories. Verify: `make console ARGS='debug:container --env=dev'` runs without errors; `ls src/` lists the seven directories.
 
 ## 3. Persistence, messaging, logging
 
