@@ -78,7 +78,7 @@ Requirement ids (`FR-<AREA>-<n>`) are stable references for specs, tasks and tes
 - **FR-LNK-7** `expires_at` (timestamp with time zone, must be in the future on write) and `max_clicks` (positive integer) SHALL be enforced at redirect time (2.4), never by a scheduled job. Both are optional and independent.
 - **FR-LNK-8** A link has `is_active`; the owner and admins MAY toggle it. Inactive links respond 404 on redirect and keep their data and analytics.
 - **FR-LNK-9** A user SHALL list their own links with pagination (default 30, max 100 per page), filter by `is_active` and by slug substring, and order by `created_at` (default desc) or `click_count`.
-- **FR-LNK-10** The owner and admins SHALL be able to delete a link. Deletion is hard: the link row and its clicks are removed (`ON DELETE CASCADE`) and the slug becomes available again; the Redis counter and cached reports are dropped. The web UI asks for confirmation. Deletion is a `high`-tier operation in the workflow sense.
+- **FR-LNK-10** The owner and admins SHALL be able to delete a link. Deletion is hard: the link row and its clicks are removed (`ON DELETE CASCADE`) and the slug becomes available again; the Redis counter and cached reports are dropped. `ClickRecorded` messages still in the queue for the deleted link are discarded by the handler without retry (FR-CLK-5). The web UI asks for confirmation. Deletion is a `high`-tier operation in the workflow sense.
 - **FR-LNK-11** Every link response SHALL include the denormalized `click_count` (eventually consistent, maintained by the click handler, see 2.5) and the `short_url` built from the configured public base URL (`APP_PUBLIC_URL`).
 
 ### 2.3 Routing rules (RUL)
@@ -111,9 +111,9 @@ Requirement ids (`FR-<AREA>-<n>`) are stable references for specs, tasks and tes
 
 ### 2.4 Redirect (RED)
 
-- **FR-RED-1** `GET /{slug}` is public, outside the API firewall and outside `/api`. Response codes: unknown slug or `is_active = false` → 404; `expires_at` in the past or click limit reached → 410 Gone; otherwise 302 Found with `Location` = resolved target with UTM appended. 301 is never used. 404 and 410 bodies are small HTML pages (web) or problem details when `Accept: application/json`.
+- **FR-RED-1** `GET /{slug}` is public, outside the API firewall and outside `/api`. Response codes: unknown slug or `is_active = false` → 404; `expires_at` in the past or click limit reached → 410 Gone; otherwise 302 Found with `Location` = resolved target with UTM appended. 301 is never used; 503 occurs only in the Redis-down case of FR-RED-3. 404 and 410 bodies are small HTML pages (web) or problem details when `Accept: application/json`.
 - **FR-RED-2** The hot path SHALL perform at most one SQL `SELECT` (link by slug, indexed) and at most one Redis operation for the click counter; it SHALL NOT perform any SQL write. Rule evaluation, UTM composition and message dispatch are in-process.
-- **FR-RED-3** The click limit SHALL be enforced against a Redis counter `link:{id}:clicks` incremented atomically on every successful redirect (`INCR`), seeded from `links.click_count` when the key is absent. If Redis is unavailable the redirect proceeds using `links.click_count` and logs at `warning`; the limit may then be exceeded by the number of clicks in flight, which is accepted and documented.
+- **FR-RED-3** The click limit SHALL be enforced against a Redis counter `link:{id}:clicks` incremented atomically on every successful redirect (`INCR`); the counter, not `links.click_count`, is the authority for the limit because `click_count` is maintained asynchronously by the worker (FR-CLK-3) and lags by the queue backlog. Links without `max_clicks` do not touch Redis on the hot path. If Redis is unavailable, a link **with** `max_clicks` SHALL respond 503 with `Retry-After: 5` (problem details or a small HTML page) and log at `warning`; a link without a limit redirects normally. Guarantee boundary: the limit holds exactly while the counter key exists. When the key is absent (first redirect after a Redis data loss) it is seeded from `links.click_count`, so the limit may be overshot by the clicks not yet persisted by the worker at seeding time; this is bounded by the queue backlog, stated in the README, and Redis persistence (AOF) is enabled in the Compose setup to make key loss exceptional.
 - **FR-RED-4** On every 302 the controller SHALL dispatch a `ClickRecorded` message (2.5) to the async transport after building the response. Dispatch failure (transport down) SHALL be caught and logged at `error`; the redirect is still returned. "Failure to log never turns into a failed redirect" is a tested property.
 - **FR-RED-5** Redirect responses SHALL carry `Cache-Control: no-store` and `Referrer-Policy: no-referrer-when-downgrade`, and SHALL NOT set cookies.
 - **FR-RED-6** Anonymous redirects SHALL be rate limited per client IP (default 60/min, sliding window); over the limit → 429 with `Retry-After`.
@@ -124,7 +124,7 @@ Requirement ids (`FR-<AREA>-<n>`) are stable references for specs, tasks and tes
 - **FR-CLK-2** The handler SHALL derive and persist one `clicks` row: `country` (via `CountryResolver`), `device_type`, `os`, `browser`, `is_bot` (from device detection), `referer_host` (host part of `Referer`, null when absent or same-origin), `visitor_hash` = hex SHA-256 of `VISITOR_HASH_SALT ‖ client_ip ‖ user_agent`, `variant`, `resolved_by`, `occurred_at`. The raw IP is never persisted and never logged at `info` or above.
 - **FR-CLK-3** The handler SHALL increment `links.click_count` in the same transaction as the insert (`UPDATE … SET click_count = click_count + 1`).
 - **FR-CLK-4** Handling SHALL be idempotent per message: `ClickRecorded` carries a UUID `click_id` used as the `clicks` primary key; a redelivered message hits the unique constraint and is acknowledged without a second increment.
-- **FR-CLK-5** Failed messages SHALL be retried (3 attempts, exponential backoff, multiplier 2, starting at 1 s) and then routed to the `failed` transport (Doctrine, `messenger_messages` table) for inspection with `messenger:failed:show` / `:retry`. Handler exceptions never affect a redirect (they happen in the worker).
+- **FR-CLK-5** Failed messages SHALL be retried (3 attempts, exponential backoff, multiplier 2, starting at 1 s) and then routed to the `failed` transport (Doctrine, `messenger_messages` table) for inspection with `messenger:failed:show` / `:retry`. Exception: a message whose `link_id` no longer exists (link deleted after the redirect, FR-LNK-10) is acknowledged and discarded on the first attempt with a log line at `info` — via Messenger's unrecoverable-exception mechanism or an early return — never retried and never sent to `failed`. The delete-then-consume race is a required test. Handler exceptions never affect a redirect (they happen in the worker).
 - **FR-CLK-6** Bots (`is_bot = true`) SHALL be stored but excluded from reports by default (2.6).
 
 ### 2.6 Analytics (ANL)
@@ -327,7 +327,7 @@ Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encor
 
 ### 6.3 Reliability
 
-- **NFR-REL-1** Redirect availability does not depend on the worker, on the Redis transport or on the cache: each failure is caught and degrades (FR-RED-3, FR-RED-4), covered by tests that stub each dependency as failing.
+- **NFR-REL-1** Redirect availability does not depend on the worker, on the Redis transport or on the cache: each failure is caught and degrades (FR-RED-4), covered by tests that stub each dependency as failing. The one deliberate dependency is the click-limit counter: links with `max_clicks` answer 503 while Redis is down rather than exceed their limit (FR-RED-3); unlimited links are unaffected.
 - **NFR-REL-2** Click persistence is at-least-once with idempotent handling (FR-CLK-4, FR-CLK-5); nothing is lost while Redis retains the stream; the failed transport is the last resort and is monitored by `messenger:failed:show` in the README runbook.
 - **NFR-REL-3** All migrations have a working `down()`, tested by `doctrine:migrations:migrate prev` in CI on the test database.
 - **NFR-REL-4** `/health` exists from the first stage and is used by Docker healthchecks and CI smoke tests.
@@ -349,10 +349,10 @@ Layers as in `AGENTS.md`: `tests/Unit` (no kernel), `tests/Integration` (kernel 
 
 - slug generation, validation, reserved words, case-sensitive uniqueness;
 - URL policy: every rejected class has a test input; every accepted store URL form is a fixture;
-- expiry and click limit at redirect (404/410/302 matrix), Redis-unavailable fallback;
+- expiry and click limit at redirect (404/410/302 matrix); Redis unavailable → 503 for a limited link, 302 for an unlimited one; counter seeding from `click_count` when the key is absent;
 - rule matching matrix: device × country × language × default, plus skipped-dimension cases and deterministic A/B (same input → same variant; distribution over 10 000 synthetic visitors within ±3 % of weights);
 - async dispatch on redirect with the in-memory transport; dispatch failure still returns 302;
-- click handler: row shape, `click_count` increment, idempotent redelivery, bot flag;
+- click handler: row shape, `click_count` increment, idempotent redelivery, bot flag; message for a deleted link is discarded without retry and without reaching `failed`;
 - analytics: every report against real PostgreSQL fixtures, gap filling, bots toggle, cache hit and invalidation on link update;
 - voters: owner vs stranger vs admin for every mutating operation; blocked user refused everywhere;
 - API keys: creation returns plaintext once, hashed lookup, expired/revoked → 401, per-key limit → 429; auth endpoints per-IP limit;
@@ -386,7 +386,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | # | Change id | Scope | Tier | Exit criterion |
 |---|---|---|---|---|
 | 6 | `add-routing-rules` | JSONB `rules` schema validation, `device-detector`, `CountryResolver` (GeoLite2 + header + test map), matching order, deterministic A/B, `resolved_by`/`variant` on clicks, hostile-input degradation | high | matrix test device × country × language × default; A/B determinism and distribution tests; malformed-UA test |
-| 7 | `add-async-click-logging` | `ClickRecorded` on the Redis transport, handler with hashing/detection/`click_count`, idempotency, retries and failed transport, Redis click counter for the limit, dispatch-failure tolerance | high | no SQL write on redirect (asserted); redelivery test; transport-down test still 302 |
+| 7 | `add-async-click-logging` | `ClickRecorded` on the Redis transport, handler with hashing/detection/`click_count`, idempotency, retries and failed transport, Redis click counter for the limit, dispatch-failure tolerance | high | no SQL write on redirect (asserted); redelivery test; transport-down test still 302; deleted-link message discarded; Redis-down → 503 only for limited links |
 
 ### Stage 3 — analytics, QR, API keys
 

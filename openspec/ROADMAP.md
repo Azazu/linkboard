@@ -32,7 +32,7 @@ minimum). Ids are stable between the specification and this file.
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
 | 6 | `add-routing-rules` | JSONB `rules` with schema validation; device/OS (`matomo/device-detector`), country (`CountryResolver`: GeoLite2 + header + test map), language matching in fixed order; deterministic A/B; `resolved_by`/`variant` on clicks; hostile-input degradation | high |
-| 7 | `add-async-click-logging` | Messenger `ClickRecorded` on the Redis transport, handler (visitor_hash, detection, is_bot, click_count), idempotency, retries + failure transport, Redis click counter for the limit, redirect never waits or fails on logging | high |
+| 7 | `add-async-click-logging` | Messenger `ClickRecorded` on the Redis transport, handler (visitor_hash, detection, is_bot, click_count), idempotency, retries + failure transport, Redis click counter as the limit authority (503 for limited links while Redis is down), discard of messages for deleted links, redirect never waits or fails on logging | high |
 
 ## Stage 3 — analytics, QR, API keys
 
