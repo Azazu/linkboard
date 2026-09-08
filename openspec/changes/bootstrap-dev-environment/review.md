@@ -11,3 +11,15 @@
 |---|----------|----------|---------|--------|
 | 1 | blocker | design.md: Decision 3 and Risks; tasks.md: 3.2, 4.1 | The planned host-permission override is not executable as documented: `UID` is Bash's readonly special variable, so `UID=$(id -u) GID=$(id -g) make init` emits `UID: readonly variable`. `.env.local` is deliberately not read by Compose, so it cannot provide the promised alternative either. Replace these inputs with non-reserved names such as `HOST_UID`/`HOST_GID` consistently in `.env`, Compose build args, the Dockerfile and docs, and add a verification using values other than 1000. | fixed |
 | 2 | major | proposal.md: Impact; design.md: Decision 4 and Risks; tasks.md: 1.1, 2.1 | The plan calls the extension-installer image “pinned” but does not name its tag or digest, while the new actionlint floor explicitly uses `rhysd/actionlint:latest`. These floating OCI inputs make both the image build and the CI-parser check non-reproducible; the stated reviewed-bump guarantee cannot be enforced. Declare immutable version tags or digests in the design/tasks and use those exact references in the runnable commands and Dockerfile. | fixed |
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-08
+**Reviewed-Commit:** 15ec00718453ed515bcc74727596b53cc42e7534
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — `HOST_UID`/`HOST_GID` replaces the Bash-reserved names, but task 2.3 is scheduled before task 3.1 adds those build args to Compose, so it is not feasible at its lifecycle point. Its required `touch var/.probe` also cannot run on the clean checkout, where `var/` does not exist and the artificial uid 1234 cannot own the host bind mount. Move the Compose wiring before this verification and make the non-1000 test self-contained (or verify the image uid without a bind-mounted workspace). |
+| 2 | confirmed — every newly introduced OCI input and the actionlint command now name exact tag-and-digest references, so planned builds and parser checks are reproducible. |
