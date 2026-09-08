@@ -35,3 +35,14 @@
 |---|------------|
 | 1 | confirmed — tasks 2.1 and 2.3 now build and run the image directly with `HOST_UID`/`HOST_GID` build arguments, so the non-1000 check is feasible before Compose wiring and does not depend on a host bind mount or pre-existing `var/`. |
 | 2 | confirmed — previously confirmed in Confirmation 1; unchanged by this diff. |
+
+## Round 2 · Gate 1
+**Reviewer:** codex
+**Date:** 2026-09-08
+**Reviewed-Commit:** bb4e446e780586d597300f34e963cdf3c2963398
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | blocker | design.md: Decision 9; tasks.md: 3a.1 | The planned guard only says that each target starts with `test -f composer.json || { ...; exit 0; }`. Make runs separate recipe lines in separate shells, so an `exit 0` in that guard returns only from its line and Make then executes the following `vendor/bin/php-cs-fixer`, PHPStan or PHPUnit line. The empty-app `make check` will still fail unless the guard and actual invocation are one shell conditional (or an equivalent Make-level conditional). Specify that mechanism and retain the no-composer success plus composer-present failing-input checks. |
