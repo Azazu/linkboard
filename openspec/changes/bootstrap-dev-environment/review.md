@@ -46,3 +46,14 @@
 | # | Severity | Location | Finding | Status |
 |---|----------|----------|---------|--------|
 | 1 | blocker | design.md: Decision 9; tasks.md: 3a.1 | The planned guard only says that each target starts with `test -f composer.json || { ...; exit 0; }`. Make runs separate recipe lines in separate shells, so an `exit 0` in that guard returns only from its line and Make then executes the following `vendor/bin/php-cs-fixer`, PHPStan or PHPUnit line. The empty-app `make check` will still fail unless the guard and actual invocation are one shell conditional (or an equivalent Make-level conditional). Specify that mechanism and retain the no-composer success plus composer-present failing-input checks. | fixed |
+
+## Confirmation 1 · Gate 1 · Round 2
+**Reviewer:** codex
+**Date:** 2026-09-08
+**Reviewed-Commit:** 435ce7fe3aca062f655aaffe048b641172209538
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — the plan now uses a Make-level `ifeq`/`ifdef` conditional that defines each target's complete recipe as either the SKIP echo or the real tool invocation. The no-composer and composer-present failing-input checks remain specified. |
