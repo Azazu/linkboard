@@ -9,6 +9,16 @@ PHPUNIT ?= vendor/bin/phpunit
 PHPSTAN ?= vendor/bin/phpstan
 CSFIX   ?= vendor/bin/php-cs-fixer
 
+# Until the Symfony application exists (roadmap change scaffold-symfony-app)
+# there is no composer.json and no vendor/: the check targets print SKIP
+# and succeed, mirroring the CI `detect` job. A Make-level conditional,
+# not a shell guard: recipe lines run in separate shells, so a guard
+# line could not stop the tool line that follows it.
+ifeq ($(wildcard composer.json),)
+APP_MISSING := 1
+endif
+SKIP_MSG = @echo "[SKIP] no composer.json — application not scaffolded yet"
+
 .DEFAULT_GOAL := help
 .PHONY: help init up down ps logs sh composer console migrate migration worker test stan cs cs-fix check
 
@@ -52,13 +62,25 @@ worker: ## Consume the async Messenger transport in the foreground
 	$(COMPOSE) exec php bin/console messenger:consume async -vv --time-limit=3600
 
 test: ## PHPUnit
+ifdef APP_MISSING
+	$(SKIP_MSG)
+else
 	$(EXEC) $(PHPUNIT)
+endif
 
 stan: ## Static analysis
+ifdef APP_MISSING
+	$(SKIP_MSG)
+else
 	$(EXEC) $(PHPSTAN) analyse --no-progress --memory-limit=1G
+endif
 
 cs: ## Code style check (no changes)
+ifdef APP_MISSING
+	$(SKIP_MSG)
+else
 	$(EXEC) $(CSFIX) fix --dry-run --diff
+endif
 
 cs-fix: ## Code style fix
 	$(EXEC) $(CSFIX) fix

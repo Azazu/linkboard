@@ -13,6 +13,7 @@ Authoritative live source: `make help`.
 | `make console ARGS='…'` | `bin/console` inside the container |
 | `make migrate` / `make migration` | apply migrations / generate a diff migration |
 | `make worker` | consume the async Messenger transport (foreground) |
+| `docker compose --profile worker up -d` | the same consumer as a background compose service (profile `worker`, not started by `make up`) |
 | `make test` / `make stan` / `make cs` / `make cs-fix` | PHPUnit / PHPStan / style check / style fix |
 | `make check` | style + static analysis + tests — the gate floor |
 

@@ -1,5 +1,10 @@
 # CI: strict OpenSpec validation, the workflow verifier's own suite,
 # and `make check` run natively (EXEC= bypasses docker compose).
+#
+# The php job runs only once composer.json exists. The probe lives in a
+# step of the `detect` job: the file-hashing expression function is not
+# available in a job-level `if`, and using it there made the whole
+# workflow unparseable (three red runs on main, 2026-09-08).
 name: ci
 
 on:
@@ -27,9 +32,25 @@ jobs:
       - name: Shell syntax
         run: for f in scripts/*.sh; do sh -n "$f"; done
 
-  php:
+  detect:
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('composer.json') != '' }}
+    outputs:
+      php: ${{ steps.probe.outputs.php }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe for composer.json
+        id: probe
+        run: |
+          if [ -f composer.json ]; then
+            echo "php=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "php=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  php:
+    needs: detect
+    if: needs.detect.outputs.php == 'true'
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
