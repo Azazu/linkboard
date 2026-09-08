@@ -16,6 +16,11 @@
 - [x] 3.2 Update `.env`: rename `SHORT_BASE_URL` → `APP_PUBLIC_URL`, add `HOST_UID=1000`, `HOST_GID=1000` with a comment on why not `UID`/`GID`. Verify: `rg -n 'SHORT_BASE_URL|\bUID=|\bGID=' --glob '!openspec/changes/**'` over the repository returns nothing.
 - [x] 3.3 Runtime check: `make up`, then `docker compose ps` shows postgres and redis `healthy`, php and nginx `running`; `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8082/` prints `404` (empty docroot); `docker compose exec redis redis-cli config get appendonly` prints `yes`; `docker compose down` afterwards. Record the outputs in the commit body.
 
+## 3a. Makefile guard (scope added after the first Gate 2 floor run)
+
+- [ ] 3a.1 Add the guard macro to `Makefile` and prepend it to `cs`, `stan`, `test`. Verify: without `composer.json`, `make check` exits 0 and prints `[SKIP] no composer.json — application not scaffolded yet` three times then `check: all green`; with a throwaway `composer.json` (`echo '{}' > composer.json`, removed afterwards) `make cs EXEC=` no longer prints SKIP and fails on the missing `vendor/bin/php-cs-fixer` — the failing input that shows the guard is inert once the application exists. Record both outputs in the commit body.
+- [ ] 3a.2 `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` reports `make check` OK. Verify: the FAIL line is gone from its output.
+
 ## 4. Documentation and plan
 
 - [x] 4.1 Update `docs/how-to/local-development.md` (worker profile command, AOF volume in Reset, "empty app returns 404 until change 2", `HOST_UID`/`HOST_GID` override note replacing the old UID/GID wording in Troubleshooting, CI-red-after-start note) and `docs/reference/commands.md` (worker profile). Verify: re-read both whole; every command in them was run in its exact form during tasks 2–3.
@@ -24,4 +29,4 @@
 ## 5. Wrap-up
 
 - [x] 5.1 Commit per block (`ci:` for task 1, `chore(docker):` for 2–3, `docs:` for 4) with the agent trailer, each body naming the verification outputs. Verify: `git log --oneline main..HEAD`.
-- [ ] 5.2 `openspec validate bootstrap-dev-environment --strict` passes; `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` passes (note: `make check` is not runnable before change 2 — record this in `handoff.md` for the Gate 2 reviewer); request Gate 2.
+- [ ] 5.2 `openspec validate bootstrap-dev-environment --strict` passes; `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` passes (with the guard of 3a, `make check` is green-with-SKIP; the handoff tells the Gate 2 reviewer so); request Gate 2.
