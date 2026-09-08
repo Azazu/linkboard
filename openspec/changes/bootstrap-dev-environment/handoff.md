@@ -1,7 +1,7 @@
 # Handoff — bootstrap-dev-environment
 
 **Updated:** 2026-09-08 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/bootstrap-dev-environment
 
 ## Done this session
@@ -13,10 +13,11 @@
 - Scope added with the user's decision: Makefile guard (proposal item 6, design decision 9, tasks 3a) — Gate 1 re-requested for the scope change; the guard is implemented only after it is approved.
 - Gate 1 Round 2: changes-requested (per-line shell guard would not stop later recipe lines). Fixed in design/tasks: Make-level `ifeq`/`ifdef` conditional so each recipe is either SKIP or the real tool. Confirmation requested.
 - Gate 1 Round 2 confirmed (c5a48c4). Guard implemented (e103cbd): `make check` is green-with-SKIP on the empty app, failing input recorded in the commit body. Gate 2 floor passes; Gate 2 requested.
+- Gate 2 Round 1 approved (6142986), no findings.
 - Task 1.3 accepted: CI run https://github.com/Azazu/linkboard/actions/runs/34252812345 on bb4e446 — workflow success, detect success, php skipped.
 
 ## Next step
-User runs Codex for Gate 2 (code diff `git diff main...change/bootstrap-dev-environment`), then `scripts/gate-run.sh bootstrap-dev-environment 2 record`. On approval: `/git:merge bootstrap-dev-environment`, then `/opsx:archive`. Note for the reviewer: `make check` passes via the Makefile SKIP guard — no PHP application exists yet (arrives with `scaffold-symfony-app`). Security-relevant surface: CI workflow (`.github/workflows/ci.yml`), Docker image and compose (`.docker/`, `docker-compose.yml`) — flagged per AGENTS.md.
+`/git:merge bootstrap-dev-environment` (user), then `/opsx:archive bootstrap-dev-environment`; after the merge the user pushes `main` and CI on `main` should turn green for the first time. Next change: `/workflow:start scaffold-symfony-app`.
 
 ## Blockers
 None.
