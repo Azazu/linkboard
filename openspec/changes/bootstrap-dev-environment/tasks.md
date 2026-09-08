@@ -2,7 +2,7 @@
 
 - [x] 1.1 Rewrite `.github/workflows/ci.yml`: add the `detect` job with a `probe` step writing `php=true|false` to `$GITHUB_OUTPUT`; give the `php` job `needs: detect` and `if: needs.detect.outputs.php == 'true'`; remove the job-level `hashFiles`. Verify: `rg -n hashFiles .github/` returns nothing and `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color` exits 0.
 - [x] 1.2 Demonstrated failing input for the retired check: run the same `actionlint` command against the previous workflow file from main (`git show main:.github/workflows/ci.yml > <scratchpad>/old-ci/.github/workflows/ci.yml`, `git init` in that directory because actionlint requires a repository root, then the same pinned actionlint command against it) and record the result in the commit body; if actionlint does not flag it, record that GitHub's parser is the only oracle and cite the three red runs on `main` (34235957169, 34238240202, 34243979355) as the failing input.
-- [ ] 1.3 Acceptance on GitHub (user pushes the branch): the run on `change/bootstrap-dev-environment` shows `workflow` green and `php` skipped; record the run URL in `handoff.md`.
+- [x] 1.3 Acceptance on GitHub (user pushes the branch): the run on `change/bootstrap-dev-environment` shows `workflow` green and `php` skipped; record the run URL in `handoff.md`.
 
 ## 2. php image and nginx
 
@@ -18,7 +18,7 @@
 
 ## 3a. Makefile guard (scope added after the first Gate 2 floor run)
 
-- [ ] 3a.1 Add the guard macro to `Makefile` and prepend it to `cs`, `stan`, `test`. Verify: without `composer.json`, `make check` exits 0 and prints `[SKIP] no composer.json — application not scaffolded yet` three times then `check: all green`; with a throwaway `composer.json` (`echo '{}' > composer.json`, removed afterwards) `make cs EXEC=` no longer prints SKIP and fails on the missing `vendor/bin/php-cs-fixer` — the failing input that shows the guard is inert once the application exists. Record both outputs in the commit body.
+- [ ] 3a.1 Add the Make-level conditional to `Makefile` (`ifeq ($(wildcard composer.json),)` → `APP_MISSING`; `ifdef APP_MISSING … else … endif` around the recipes of `cs`, `stan`, `test`, so each recipe is either the SKIP echo or the real tool line, never both). Verify: without `composer.json`, `make check` exits 0 and prints `[SKIP] no composer.json — application not scaffolded yet` three times then `check: all green`; with a throwaway `composer.json` (`echo '{}' > composer.json`, removed afterwards) `make cs EXEC=` no longer prints SKIP and fails on the missing `vendor/bin/php-cs-fixer` — the failing input that shows the guard is inert once the application exists. Record both outputs in the commit body.
 - [ ] 3a.2 `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` reports `make check` OK. Verify: the FAIL line is gone from its output.
 
 ## 4. Documentation and plan
