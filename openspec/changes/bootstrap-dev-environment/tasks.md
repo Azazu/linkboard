@@ -18,7 +18,7 @@
 
 ## 3a. Makefile guard (scope added after the first Gate 2 floor run)
 
-- [ ] 3a.1 Add the Make-level conditional to `Makefile` (`ifeq ($(wildcard composer.json),)` → `APP_MISSING`; `ifdef APP_MISSING … else … endif` around the recipes of `cs`, `stan`, `test`, so each recipe is either the SKIP echo or the real tool line, never both). Verify: without `composer.json`, `make check` exits 0 and prints `[SKIP] no composer.json — application not scaffolded yet` three times then `check: all green`; with a throwaway `composer.json` (`echo '{}' > composer.json`, removed afterwards) `make cs EXEC=` no longer prints SKIP and fails on the missing `vendor/bin/php-cs-fixer` — the failing input that shows the guard is inert once the application exists. Record both outputs in the commit body.
+- [x] 3a.1 Add the Make-level conditional to `Makefile` (`ifeq ($(wildcard composer.json),)` → `APP_MISSING`; `ifdef APP_MISSING … else … endif` around the recipes of `cs`, `stan`, `test`, so each recipe is either the SKIP echo or the real tool line, never both). Verify: without `composer.json`, `make check` exits 0 and prints `[SKIP] no composer.json — application not scaffolded yet` three times then `check: all green`; with a throwaway `composer.json` (`echo '{}' > composer.json`, removed afterwards) `make cs EXEC=` no longer prints SKIP and fails on the missing `vendor/bin/php-cs-fixer` — the failing input that shows the guard is inert once the application exists. Record both outputs in the commit body.
 - [ ] 3a.2 `scripts/pregate-verify.sh gate2 bootstrap-dev-environment` reports `make check` OK. Verify: the FAIL line is gone from its output.
 
 ## 4. Documentation and plan
