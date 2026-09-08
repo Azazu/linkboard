@@ -11,12 +11,6 @@ exit criterion. Each row is a summary; the change's `proposal.md`
 carries the full scope and the declared tier (the tier here is the
 minimum). Ids are stable between the specification and this file.
 
-## Stage 0 — specification
-
-| # | Change id | Scope (summary) | Tier |
-|---|---|---|---|
-| 0 | `write-requirements-spec` | Expand the brief into a full technical specification (roles, functional requirements, data model, API, non-functional requirements, stages); reconcile this roadmap against it | low |
-
 ## Stage 1 — skeleton, accounts, links, synchronous redirect
 
 | # | Change id | Scope (summary) | Tier |

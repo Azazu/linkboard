@@ -1,7 +1,7 @@
 # Handoff — write-requirements-spec
 
 **Updated:** 2026-09-08 · claude
-**State:** ready-to-merge
+**State:** merged
 **Branch:** change/write-requirements-spec
 
 ## Done this session
