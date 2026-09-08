@@ -23,3 +23,15 @@
 |---|------------|
 | 1 | changes-requested — `HOST_UID`/`HOST_GID` replaces the Bash-reserved names, but task 2.3 is scheduled before task 3.1 adds those build args to Compose, so it is not feasible at its lifecycle point. Its required `touch var/.probe` also cannot run on the clean checkout, where `var/` does not exist and the artificial uid 1234 cannot own the host bind mount. Move the Compose wiring before this verification and make the non-1000 test self-contained (or verify the image uid without a bind-mounted workspace). |
 | 2 | confirmed — every newly introduced OCI input and the actionlint command now name exact tag-and-digest references, so planned builds and parser checks are reproducible. |
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-08
+**Reviewed-Commit:** 6f69f0a4914cb30d46031e70ab9dbf4d44fb6676
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — tasks 2.1 and 2.3 now build and run the image directly with `HOST_UID`/`HOST_GID` build arguments, so the non-1000 check is feasible before Compose wiring and does not depend on a host bind mount or pre-existing `var/`. |
+| 2 | confirmed — previously confirmed in Confirmation 1; unchanged by this diff. |
