@@ -10,7 +10,7 @@
 - `AGENTS.md` layout and redirect rule synced (src/Web, templates, assets, tests/Web; "302 (never 301)").
 - `openspec/ROADMAP.md` reconciled with §7; `openspec/config.yaml` context updated.
 - User review of the specification: two findings fixed — click limit under Redis outage (FR-RED-3: 503 for limited links, counter is the authority, honest guarantee boundary) and delete-vs-queued-message race (FR-CLK-5/FR-LNK-10: discard without retry, required test).
-- Third user finding fixed: FR-RED-2/3 name the mechanism — one atomic Lua script (single EVALSHA) seeds, checks and increments the click counter, so the one-round-trip budget and concurrency safety coincide.
+- Third user finding fixed: FR-RED-2/3 name the mechanism — one atomic Lua script (single EVALSHA) seeds, checks and increments the click counter, so the one-round-trip budget and concurrency safety coincide. Fourth finding: plain EVAL every time (no EVALSHA/NOSCRIPT fallback), keeping the budget strict after Redis restarts.
 - Low tier: no Gate 2 required.
 
 ## Next step
