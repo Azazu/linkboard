@@ -7,13 +7,11 @@ every PHP command runs in the `php` container.
 ## First run
 
 ```bash
-make up                       # build the php image, start nginx, php, postgres, redis
+make init                     # build, up, composer install, migrate, create the test database
 ```
 
-`make init` (build, up, `composer install`, migrate) becomes the first-run
-command once the Symfony application exists (roadmap change
-`scaffold-symfony-app`); until then the docroot is empty and nginx
-answers 404 at http://localhost:8082 — that is the expected state.
+`make init` finishes with `make test-db`, so `make test` works right after
+the first run.
 
 The php image runs as `HOST_UID`/`HOST_GID` from `.env` (default 1000)
 so bind-mounted `var/` and `vendor/` stay owned by you. If your ids
@@ -29,8 +27,11 @@ HOST_UID=$(id -u) HOST_GID=$(id -g) make up
 8082/5434/6382 are taken or you need other values, put the overrides in
 `.env.local` (gitignored) — never edit secrets into `.env`.
 
-App: http://localhost:8082 · API docs: http://localhost:8082/api ·
-PostgreSQL: `127.0.0.1:5434` · Redis: `127.0.0.1:6382`.
+Health: http://localhost:8082/health (`?deep=1` also probes PostgreSQL and
+Redis) · API docs (Swagger UI): http://localhost:8082/api/docs · OpenAPI
+JSON: http://localhost:8082/api/docs.json · API base path:
+http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
+`127.0.0.1:6382`.
 
 ## Daily
 
@@ -40,9 +41,11 @@ PostgreSQL: `127.0.0.1:5434` · Redis: `127.0.0.1:6382`.
 | logs, status | `make logs`, `make ps` |
 | composer / console | `make composer ARGS='…'` / `make console ARGS='…'` |
 | migrations | `make migration` (generate, then read it) → `make migrate` |
+| test database | `make test-db` (create + migrate `<db>_test`; also run by `make init`) |
 | async worker (foreground) | `make worker` in a second terminal (clicks are logged asynchronously) |
-| async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile so `make up` does not start it before the application exists |
-| the gate floor | `make check` (php-cs-fixer + PHPStan + PHPUnit) |
+| async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile, so `make up` does not start it unless asked |
+| the gate floor | `make check` (php-cs-fixer + PHPStan level 8 + PHPUnit; suites `Unit`, `Integration`, `Api`) |
+| one suite | `docker compose exec php vendor/bin/phpunit --testsuite Unit` (also `Integration`, `Api`) |
 
 ## Reset (DESTRUCTIVE)
 
@@ -70,6 +73,10 @@ it yourself.
 - **CI is red right after `/workflow:start`** — `openspec validate --all
   --strict` fails for a change that has no artifacts yet; it turns green
   with `/opsx:propose`. Known limitation, not a defect of your change.
-- **`make check` differs from CI** — CI runs `make check EXEC=` natively
-  with PHP 8.4 and `MESSENGER_TRANSPORT_DSN=in-memory://`; make sure
-  `composer.json` pins the same platform.
+- **`make check` differs from CI** — CI runs `make test-db EXEC=` and
+  `make check EXEC=` natively with PHP 8.4; `composer.json` pins
+  `config.platform.php` to the same version as the image.
+- **Tests boot the `dev` kernel** — the php container carries `APP_ENV=dev`
+  in its real environment and `KernelTestCase` reads `$_ENV` first;
+  `phpunit.dist.xml` forces both `$_SERVER` and `$_ENV` to `test`. Keep
+  both lines if you edit it.
