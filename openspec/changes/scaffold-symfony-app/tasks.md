@@ -12,9 +12,9 @@
 
 ## 3. Persistence, messaging, logging
 
-- [ ] 3.1 `make composer ARGS='require symfony/orm-pack doctrine/doctrine-migrations-bundle symfony/uid'` (pins: ORM 3.7, DBAL 4.4, bundle 3.3, migrations-bundle 4.0); `doctrine.yaml` for PostgreSQL 16 (`server_version: '16'`, `uuid` mapping type default), `DATABASE_URL` from `.env`. Verify: `make console ARGS='doctrine:schema:validate --skip-sync'` reports mapping OK (no entities) and `make console ARGS='dbal:run-sql "SELECT 1"'` returns 1.
-- [ ] 3.2 `make composer ARGS='require symfony/messenger symfony/redis-messenger'`; `messenger.yaml` with `async` (Redis Streams) and `failed` (Doctrine) transports, `failure_transport: failed`, retry 3/1000 ms/×2; `.env.test`: `MESSENGER_TRANSPORT_DSN=in-memory://`. Verify: `make console ARGS='debug:messenger'` lists both transports; `make console ARGS='messenger:stats'` connects to Redis without error.
-- [ ] 3.3 `make composer ARGS='require symfony/monolog-bundle'`; `monolog.yaml`: `dev` → `var/log` + stderr, `prod` → JSON formatter to stderr, `test` → `var/log/test.log`. Verify: `make console ARGS='debug:config monolog --env=prod'` shows the JSON formatter handler.
+- [x] 3.1 `make composer ARGS='require symfony/orm-pack doctrine/doctrine-migrations-bundle symfony/uid'` (pins: ORM 3.7, DBAL 4.4, bundle 3.3, migrations-bundle 4.0); `doctrine.yaml` for PostgreSQL 16 (`server_version: '16'`, `uuid` mapping type default), `DATABASE_URL` from `.env`. Verify: `make console ARGS='doctrine:schema:validate --skip-sync'` reports mapping OK (no entities) and `make console ARGS='dbal:run-sql "SELECT 1"'` returns 1.
+- [x] 3.2 `make composer ARGS='require symfony/messenger symfony/redis-messenger'`; `messenger.yaml` with `async` (Redis Streams) and `failed` (Doctrine) transports, `failure_transport: failed`, retry 3/1000 ms/×2; `.env.test`: `MESSENGER_TRANSPORT_DSN=in-memory://`. Verify: `make console ARGS='debug:messenger'` lists both transports; `make console ARGS='messenger:stats'` connects to Redis without error.
+- [x] 3.3 `make composer ARGS='require symfony/monolog-bundle'`; `monolog.yaml`: `dev` → `var/log` + stderr, `prod` → JSON formatter to stderr, `test` → `var/log/test.log`. Verify: `make console ARGS='debug:config monolog --env=prod'` shows the JSON formatter handler.
 
 ## 4. API layer and health
 

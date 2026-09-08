@@ -1,0 +1,33 @@
+framework:
+    messenger:
+        # Messages that exhaust their retries land here for inspection:
+        # bin/console messenger:failed:show / messenger:failed:retry
+        failure_transport: failed
+
+        transports:
+            # Redis Streams (specification FR-CLK-1). One consumer group; each
+            # worker names itself by hostname so several can share the stream.
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: messages
+                    group: linkboard
+                    consumer: '%env(default:messenger_consumer_fallback:HOSTNAME)%'
+                retry_strategy:
+                    # FR-CLK-5: 3 attempts, 1 s, 2 s, 4 s
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 0
+            failed: 'doctrine://default?queue_name=failed'
+
+        routing:
+            # Nothing is routed yet; ClickRecorded arrives with the async click
+            # logging change and is routed here to `async`.
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                async: 'in-memory://'
+                failed: 'in-memory://'
