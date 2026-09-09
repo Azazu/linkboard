@@ -1,7 +1,7 @@
 # Handoff — add-users-and-security
 
 **Updated:** 2026-09-09 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/add-users-and-security
 
 ## Done this session
@@ -17,8 +17,10 @@
 
 - Branch run https://github.com/Azazu/linkboard/actions/runs/34328524137 on c1e4306: all jobs success. Gate 2 Confirmation 1 (b4517f5): #2 confirmed; #1, #3, #4 asked for completion — done: stale checker/design wording replaced (the checker does not run on session refresh; refreshUser does); the test env now uses the production-style always-on JSON audit stream (file instead of stderr) and the admin test asserts one record for block and one for unblock with action/actor/target and no email; an HTTP-level test reaches the unique-index race after validation (prePersist listener inserts the competitor) and asserts 422 with an email violation. make check: cs 0, stan 0, 70 tests / 385 assertions. Next: user pushes, green run on the head, `gate-run … 2 confirm 1` (second confirmation).
 
+- Branch run https://github.com/Azazu/linkboard/actions/runs/34329255776 on d8d6e15: all jobs success. Gate 2 Confirmation 2 (9f6d2e8): all four findings confirmed — Gate 2 passed.
+
 ## Next step
-`scripts/gate-run.sh add-users-and-security 2 full` (auto mode; executor runs it). On approval: `/git:merge add-users-and-security`, user pushes `main`, executor checks the `main` run, then `/opsx:archive` (syncs four delta specs incl. the MODIFIED health-check clause).
+`/git:merge add-users-and-security` (user). Then the user pushes `main`; the executor checks the `main` run (run list by SHA + jobs endpoint) before offering `/opsx:archive add-users-and-security` (syncs four delta specs incl. the MODIFIED health-check clause). Then `/workflow:start add-link-crud` (tier high).
 
 ## Blockers
 None.
