@@ -160,3 +160,25 @@
 - `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks, but its `make check` step failed because this sandbox cannot access `/var/run/docker.sock`. No host PHP executable is available. Executor-reported green checks and mutation results were read, not independently reproduced; this environment limitation is not attributed to a code regression.
 - Finding 2 has now failed two confirmations. Per AGENTS.md, stop the automatic confirmation loop and split/reduce the change or ask the user to arbitrate before proceeding.
 - Modified only `review.md`; ran no git write commands.
+
+
+## Confirmation 3 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** d68d62af98cae975056c25cf33deaaebfa72bea8
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — TargetUrlValidator skips only null; an empty string reaches TargetUrlPolicy and is rejected. PATCH presence handling remains intact. The HTTP regression asserts 422 on targetUrl and GETs the unchanged stored destination. Creation's default empty string remains rejected after removal of the redundant NotBlank constraint; POST tests cover missing and empty targets. |
+| 2 | changes-requested — The numeric, encoded and Unicode host examples, including mapped trailing dots, are now covered, but the effective-address guarantee still has an authority-parser bypass at src/Link/Validator/TargetUrlPolicy.php:55–89. The literal URL `http://127.0.0.1\@example.com/` (one backslash) is parsed by PHP with host example.com and user information containing the loopback address, so the policy accepts the hostname; a browser treats the backslash as a slash and contacts 127.0.0.1. Likewise `http://169.254.169.254\@example.com/` targets the metadata address without DNS. Mapping only PHP's extracted host cannot fix this disagreement. Reject backslashes before authority extraction or use a browser-compatible URL parser, add unit and POST/PATCH regressions (including unchanged storage after rejected PATCH), and reconcile the effective-address security guarantee. This is a remaining bypass of Round 1 finding 2's address policy and its changed security claim, not an unrelated minor finding. |
+| 3 | confirmed — Slug::PATTERN uses the absolute end anchor \z. POST regressions assert 422 on slug for abc plus newline, admin plus newline, and 32 valid characters plus newline. Related requirements, proposal and delta spec state whole-string matching. |
+
+### Validation
+- Reviewed only `def03664e7b9e36dc14187c9180aa35cf77c7a51..d68d62af98cae975056c25cf33deaaebfa72bea8` and collateral effects of Gate 2 Round 1 findings 1–3. Confirmed the requested branch and HEAD, initially clean working tree, and all source-round findings marked fixed.
+- Per the user's explicit request, performed this third confirmation after the previous stop notice; it does not waive unresolved findings.
+- Inspected changed validation paths, regression assertions, related artifact claims and executor mutation evidence. Reproduced the backslash examples' effective hosts and mapped-trailing-dot examples with local Node's WHATWG URL parser, without network requests. PHP authority extraction was verified against the [PHP 8.4 parser source](https://raw.githubusercontent.com/php/php-src/PHP-8.4/ext/standard/url.c): parse_host ends authority at slash/question-mark/hash, then takes the host after the last at-sign. Acceptance by the application follows from source inspection; no PHP/HTTP execution is claimed.
+- `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks. Its `make check` failed because the sandbox cannot access `/var/run/docker.sock`; no host PHP executable is available. Executor-reported green checks and mutation results were read, not independently reproduced. This environment limitation is not attributed to a code regression.
+- Finding 2 remains unresolved after the requested third confirmation. Stop further automatic confirmations and return to user arbitration or split/reduce the change, per AGENTS.md.
+- Modified only `review.md`; ran no git write commands.
