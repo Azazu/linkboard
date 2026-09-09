@@ -379,7 +379,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | 2 | `scaffold-symfony-app` | `symfony/skeleton` 8.1 on PHP 8.4, Doctrine + migrations, API Platform under `/api/v1` with docs, problem-details errors, `/health`, PHPUnit/PHPStan/CS-Fixer wired, bounded-context `src/` layout, `symfony/uid` | medium | `GET /health` and `/api/docs` work; `make check` green with a sample test per layer |
 | 3 | `add-users-and-security` | `users`, registration (web + API), form-login firewall for the web, JWT firewall for the API, `app:user:promote/demote`, blocking, role-based authorization boundaries (ownership voters arrive with their resources), auth rate limit | high | matrix test owner/stranger/admin/blocked; auth endpoints 429 after 10/min |
 | 4 | `add-link-crud` | `links` entity and migration, slug rules, URL policy, UTM, API Platform resource with voters, `shortUrl`, hard delete; routing `rules` column only — the API accepts rules from `add-routing-rules` | high | FR-LNK-1…11 tests green; every rejected URL class has a failing input |
-| 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table and a synchronous insert as the baseline, per-IP redirect limit | medium | redirect matrix test; click row written per redirect |
+| 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table and a synchronous insert as the baseline, per-IP redirect limit | high (raised from medium by the user) | redirect matrix test; click row written per redirect |
 
 ### Stage 2 — smart routing, async click logging
 

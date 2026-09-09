@@ -24,6 +24,18 @@ See `proposal.md` — Why. State: `links` exists with `click_count`, `max_clicks
 11. **Migration** — `make migration` after the entity mapping, then reviewed: table `clicks` per §3.4 (`id uuid PK`, `link_id uuid FK → links ON DELETE CASCADE`, `occurred_at timestamptz NOT NULL`, `country char(2)`, `device_type varchar(16)`, `os varchar(16)`, `browser varchar(32)`, `is_bot boolean NOT NULL DEFAULT false`, `referer_host varchar(255)`, `visitor_hash char(64) NOT NULL`, `variant varchar(16)`, `resolved_by varchar(8) NOT NULL`), index `(link_id, occurred_at DESC)`, partial index `(link_id, occurred_at) WHERE NOT is_bot`, `getDescription()`, reversible `down()`.
 12. **Configuration** — `.env`: `RATE_LIMIT_REDIRECT_PER_IP=60`, `VISITOR_HASH_SALT=localdev-only-salt-override-in-env-local` with a comment; `.env.test`: a fixed `VISITOR_HASH_SALT`; CI: the `.env` default suffices (tests assert stability and difference, not a specific digest). The production value is referenced by name only (AGENTS.md secrets rule).
 
+## Applicability (high tier)
+
+| Question | Applies? | Note |
+|---|---|---|
+| Crash before/after an external effect | yes | the only effect is the DB transaction (UPDATE + INSERT); a crash before commit leaves nothing, a crash after commit and before the response leaves one counted click without a delivered redirect (decision 5, bounded to one per crash); logging happens after the outcome is known |
+| Concurrent writers | yes | N concurrent redirects on one limited link: the conditional UPDATE takes the row lock, so exactly `max_clicks` requests get 1 affected row (decision 3); test 1.4(d) with separate connections; the PHP pre-check is never the authority |
+| Money rounding | n/a | |
+| Empty/zero/null inputs | yes | absent/oversized UA and Referer → truncated, never an error (decision 8); unparseable Referer → `referer_host` null; link without UTM → target unchanged; `max_clicks` null → unconditional increment; empty `Accept` → HTML |
+| Authorization boundary | yes | the endpoint is public by design: no token is read, no session started, no cookie set (decision 1, asserted); it exposes nothing beyond the 302/404/410 the link owner configured; the API keeps its own voters |
+| Deletion/expiry | yes | expired link → 410 at request time, never a job; deleting a link cascades to `clicks` (FK); a redirect racing a delete gets 404 (row gone) or a recorder failure → decision 5 |
+| Idempotency of retries | yes | a client retry is a new visit and a new click by definition; `HEAD` records nothing; the recorder's UPDATE + INSERT is one transaction so a failed attempt leaves no half-click (test 1.4(c)) |
+
 ## Risks / Trade-offs
 
 - [Hot links contend on the `links` row lock: 1 SELECT + 1 UPDATE + 1 INSERT per redirect] → accepted as the stage-1 baseline; row 7 removes the SQL write from the hot path and moves the limit to Redis; the how-to names the deviation from FR-RED-2 explicitly.

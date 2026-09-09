@@ -15,7 +15,7 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table written synchronously (baseline before async), per-IP redirect limit | medium |
+| 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table written synchronously (baseline before async), per-IP redirect limit | high (raised from medium by the user: anonymous hot path, concurrency, personal data) |
 
 ## Stage 2 — smart routing and async click logging
 

@@ -1,8 +1,8 @@
 # Proposal — add-redirect-with-sync-logging
 
-**Risk-Tier:** medium
+**Risk-Tier:** high
 
-Tier rationale: roadmap row 5 declares `medium` — an ordinary behavior change on a public surface: no authentication or authorization change, no money, no destructive migration (one new table), no new dependency. Parts the reviewer should still read as security-relevant: untrusted request data on the hot path (slug, `User-Agent`, `Referer`, client IP), composition of the `Location` header from a validated target plus owner-provided UTM values, hashing of the client IP, and the per-IP rate limit. The user may raise the tier (AGENTS.md).
+Tier rationale: raised from the roadmap's `medium` by the user (2026-09-09). Triggers: security-sensitive input handling on the only anonymous hot path (slug, `User-Agent`, `Referer`, client IP; composition of the `Location` header from a validated target plus owner-provided UTM values), concurrency (the click limit must hold exactly under concurrent redirects), personal data (hashing of the client IP, no raw IP or UA at rest), and the per-IP rate limit. Gate 1 + Gate 2, a demonstrated failing input for every new guard, a green branch run before Gate 2 (auto review mode).
 
 ## Why
 

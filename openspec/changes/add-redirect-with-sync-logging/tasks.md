@@ -1,3 +1,7 @@
+## 0. Gate 1 (high tier)
+
+- [ ] 0.1 `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passes; `scripts/gate-run.sh add-redirect-with-sync-logging 1 full`; findings fixed via `/workflow:fix-findings` and confirmed. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed`.
+
 ## 1. Click write model: entity, migration, recorder
 
 - [ ] 1.1 `src/Click/Entity/Click.php` (read-only mapping, every §3.4 column, index `(link_id, occurred_at DESC)`, partial index `WHERE NOT is_bot`, FK `ON DELETE CASCADE`), `src/Click/Visit.php` (readonly DTO: client IP, truncated UA, truncated Referer, occurredAt, isHead), `src/Click/RecordOutcome.php` (enum `allowed|exhausted`), `src/Click/ClickRecorderInterface.php`, `src/Click/Recorder/DbalClickRecorder.php` (one transaction: conditional `UPDATE links … WHERE click_count < max_clicks`, then `INSERT INTO clicks`), `src/Click/VisitorHasher.php` (`%env(VISITOR_HASH_SALT)%`), binding in `config/services.yaml`. Verify: `make console ARGS='doctrine:schema:validate --skip-sync'` reports the mapping OK; `make console ARGS='debug:container App\\Click\\ClickRecorderInterface'` resolves to the DBAL recorder.
