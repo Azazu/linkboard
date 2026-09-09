@@ -63,6 +63,23 @@ final class HealthTest extends WebTestCase
         }
     }
 
+    public function testAnAdminJwtDoesNotUnlockTheDeepProbeInProduction(): void
+    {
+        // Until the API-keys change authorizes the probe for an admin API key,
+        // prod refuses it for everyone — including an admin's JWT (spec
+        // health-check, MODIFIED by add-users-and-security).
+        (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
+        $_SERVER['APP_SECRET'] = $_ENV['APP_SECRET'] = 'test-only-secret-for-the-prod-kernel';
+        $_SERVER['JWT_PASSPHRASE'] = $_ENV['JWT_PASSPHRASE'] = 'test-only-passphrase';
+        $kernel = self::bootKernel(['environment' => 'prod', 'debug' => false]);
+
+        $request = Request::create('/health?deep=1', server: ['HTTP_AUTHORIZATION' => 'Bearer not-checked-here.admin.jwt']);
+        $response = $kernel->handle($request);
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->headers->get('Content-Type'));
+    }
+
     public function testHealthIsNotPartOfTheOpenApiDocument(): void
     {
         $client = self::createClient();
