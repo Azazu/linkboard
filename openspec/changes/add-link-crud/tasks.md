@@ -23,7 +23,7 @@
 ## 5. Wrap-up
 
 - [x] 5.1 `make check` green; commit per block (`feat(link):` 1.x, `feat(link):` 2.x, `feat(link):` 3.x, `test:`, `docs:`) with the agent trailer; commit bodies name every failing input demonstrated. Verify: `git log --oneline main..HEAD`.
-- [ ] 5.2 **Green Actions run on the exact branch head before Gate 2**: the user pushes the change branch; the executor polls the run list for the head SHA and then `/actions/runs/{run_id}/jobs` until `workflow`, `detect` and `php` are all `success`; URL and SHA recorded in `handoff.md`.
+- [x] 5.2 **Green Actions run on the exact branch head before Gate 2**: the user pushes the change branch; the executor polls the run list for the head SHA and then `/actions/runs/{run_id}/jobs` until `workflow`, `detect` and `php` are all `success`; URL and SHA recorded in `handoff.md`.
 - [ ] 5.3 `openspec validate add-link-crud --strict` and `scripts/pregate-verify.sh gate2 add-link-crud` pass; `scripts/gate-run.sh add-link-crud 2 full`. Verify: no FAIL line.
 
 ## Post-merge acceptance (not a Gate 2 task)
