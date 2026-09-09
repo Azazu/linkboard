@@ -18,13 +18,15 @@ framework:
                 adapter: cache.adapter.redis
                 provider: '%env(REDIS_URL)%'
     rate_limiter:
-        # FR-AUTH-4 / FR-KEY-4: sliding window per client IP on auth endpoints
+        # FR-AUTH-4 / FR-KEY-4: sliding window per client IP on auth endpoints.
+        # lock.factory (Redis, config/packages/lock.yaml): without it two
+        # concurrent requests can both pass at nine consumed tokens.
         auth_ip:
             policy: sliding_window
             limit: '%env(int:RATE_LIMIT_AUTH_PER_IP)%'
             interval: '1 minute'
             cache_pool: cache.rate_limiter
-            lock_factory: null
+            lock_factory: lock.factory
         # identical policy on the Redis pool in every environment; consumed by
         # tests only, to prove the storage auth_ip uses in dev/prod
         auth_ip_redis:
@@ -32,7 +34,7 @@ framework:
             limit: '%env(int:RATE_LIMIT_AUTH_PER_IP)%'
             interval: '1 minute'
             cache_pool: cache.rate_limiter
-            lock_factory: null
+            lock_factory: lock.factory
 
     # Note that the session will be started ONLY if you read or write from it.
     session: true

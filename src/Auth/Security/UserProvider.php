@@ -6,6 +6,7 @@ namespace App\Auth\Security;
 
 use App\Auth\Entity\User;
 use App\Auth\UserRepositoryInterface;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAccountStatusException;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -38,8 +39,18 @@ final readonly class UserProvider implements UserProviderInterface, PasswordUpgr
         }
 
         // Re-read on every request so blocking and role changes apply immediately.
-        return $this->users->findById($user->getId())
+        $fresh = $this->users->findById($user->getId())
             ?? throw new UserNotFoundException('Account no longer exists.');
+
+        // The session context listener refreshes users without running the
+        // user checker, so a block would not end an existing web session; the
+        // AccountStatusException from here reaches the firewall's exception
+        // listener, which drops the token and redirects to /login with the error.
+        if ($fresh->isBlocked()) {
+            throw new CustomUserMessageAccountStatusException(BlockedUserChecker::MESSAGE);
+        }
+
+        return $fresh;
     }
 
     public function supportsClass(string $class): bool

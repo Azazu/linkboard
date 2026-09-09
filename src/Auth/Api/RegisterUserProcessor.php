@@ -6,6 +6,7 @@ namespace App\Auth\Api;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use ApiPlatform\Validator\Exception\ValidationException;
 use App\Auth\Entity\User;
 use App\Auth\UserRepositoryInterface;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -13,7 +14,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactoryInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
-use Symfony\Component\Validator\Exception\ValidationFailedException;
 
 /**
  * @implements ProcessorInterface<RegistrationInput, UserOutput>
@@ -43,7 +43,9 @@ final readonly class RegisterUserProcessor implements ProcessorInterface
         } catch (UniqueConstraintViolationException) {
             // Lost the race against a concurrent registration: the index is the
             // authority, the answer is the same 422 the validator would have given.
-            throw new ValidationFailedException($data, new ConstraintViolationList([new ConstraintViolation('An account with this email already exists.', null, [], $data, 'email', $data->email)]));
+            // API Platform's exception, not Symfony's ValidationFailedException,
+            // which the error listener would render as a 500.
+            throw new ValidationException(new ConstraintViolationList([new ConstraintViolation('An account with this email already exists.', null, [], $data, 'email', $data->email)]));
         }
 
         return UserOutput::fromUser($user);

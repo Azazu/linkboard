@@ -13,6 +13,8 @@
 
 - Task 8.4: branch run https://github.com/Azazu/linkboard/actions/runs/34327044243 on head cdea818 — workflow, detect, php all success (run list by head SHA + jobs endpoint). Between cdea818 and the Gate 2 commit only tasks.md and handoff.md change (protocol files).
 
+- Gate 2 Round 1 (c665fff): changes-requested, 4 findings, all fixed: #1 blocked account ends an existing web session (refreshUser throws; BlockedSessionErrorSubscriber stores the error for /login; web test); #2 Redis lock on the limiters (symfony/lock, LOCK_DSN; 25-process concurrency test; without lock 17/25 accepted, with lock 10/25); #3 always-on audit stream handler in prod/dev (config test); #4 API Platform ValidationException on the flush race (processor test). make check: cs 0, stan 0, 69 tests / 369 assertions. Next: user pushes, green run on the head, then `gate-run … 2 confirm 1`.
+
 ## Next step
 `scripts/gate-run.sh add-users-and-security 2 full` (auto mode; executor runs it). On approval: `/git:merge add-users-and-security`, user pushes `main`, executor checks the `main` run, then `/opsx:archive` (syncs four delta specs incl. the MODIFIED health-check clause).
 

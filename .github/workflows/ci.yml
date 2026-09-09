@@ -81,6 +81,7 @@ jobs:
           # doctrine.yaml appends _test to the database name in the test env
           DATABASE_URL: postgresql://app:app@127.0.0.1:5432/app?serverVersion=16&charset=utf8
           REDIS_URL: redis://127.0.0.1:6379
+          LOCK_DSN: redis://127.0.0.1:6379
           MESSENGER_TRANSPORT_DSN: in-memory://
         run: |
           make jwt-keys EXEC=
