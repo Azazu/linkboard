@@ -29,7 +29,7 @@
 ## 5. Wrap-up
 
 - [x] 5.1 `make check` green (cs, stan level 8, all suites); commits per block (`feat(click):` 1.x, `feat(redirect):` 2.x, `test(redirect):` 3.x, `docs:` 4.x) with the agent trailer; every commit body of a guard names its demonstrated failing input. Verify: `git log --oneline main..HEAD`.
-- [x] 5.2 Green Actions run on the exact branch head before Gate 2: the user pushes `change/add-redirect-with-sync-logging`; the executor polls the run list for the head SHA and the jobs endpoint until `detect`, `workflow` and `php` are `success`; URL and SHA recorded in `handoff.md`.
+- [x] 5.2 Green Actions run on the exact branch head before Gate 2: the user pushes the branch change/add-redirect-with-sync-logging; the executor polls the run list for the head SHA and the jobs endpoint until `detect`, `workflow` and `php` are `success`; URL and SHA recorded in `handoff.md`.
 - [x] 5.3 `openspec validate add-redirect-with-sync-logging --strict` and `scripts/pregate-verify.sh gate2 add-redirect-with-sync-logging` pass; `scripts/gate-run.sh add-redirect-with-sync-logging 2 full`. Verify: no FAIL line.
 
 ## Post-merge acceptance (not a Gate 2 task)
