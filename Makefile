@@ -20,7 +20,7 @@ endif
 SKIP_MSG = @echo "[SKIP] no composer.json — application not scaffolded yet"
 
 .DEFAULT_GOAL := help
-.PHONY: help init up down ps logs sh composer console migrate migration test-db worker test stan cs cs-fix check
+.PHONY: help init up down ps logs sh composer console migrate migration test-db jwt-keys worker test stan cs cs-fix check
 
 help: ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -29,6 +29,7 @@ init: ## First run: build, up, composer install, migrate
 	$(COMPOSE) build
 	$(COMPOSE) up -d
 	$(EXEC) composer install
+	$(MAKE) jwt-keys
 	$(MAKE) migrate
 	$(MAKE) test-db
 
@@ -63,13 +64,18 @@ test-db: ## Create and migrate the test database (DATABASE_URL's database + _tes
 	$(EXEC) bin/console doctrine:database:create --if-not-exists --env=test
 	$(EXEC) bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration
 
+jwt-keys: ## Generate the dev and test JWT keypairs (config/jwt/<env>/, gitignored; skips existing)
+	$(EXEC) bin/console lexik:jwt:generate-keypair --skip-if-exists --env=dev
+	$(EXEC) bin/console lexik:jwt:generate-keypair --skip-if-exists --env=test
+
 worker: ## Consume the async Messenger transport in the foreground
 	$(COMPOSE) exec php bin/console messenger:consume async -vv --time-limit=3600
 
-test: ## PHPUnit
+test: ## PHPUnit (rebuilds the test container first: APP_DEBUG=0 in .env.test means config changes are not tracked)
 ifdef APP_MISSING
 	$(SKIP_MSG)
 else
+	$(EXEC) bin/console cache:clear --env=test --no-warmup
 	$(EXEC) $(PHPUNIT)
 endif
 

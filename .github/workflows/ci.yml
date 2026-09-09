@@ -83,5 +83,6 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6379
           MESSENGER_TRANSPORT_DSN: in-memory://
         run: |
+          make jwt-keys EXEC=
           make test-db EXEC=
           make check EXEC=

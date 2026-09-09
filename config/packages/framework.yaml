@@ -2,6 +2,39 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # Client IP for rate limits, geo and A/B hashing comes from here (FR-KEY-5):
+    # only headers from the listed proxies are trusted.
+    trusted_proxies: '%env(TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-port']
+
+    cache:
+        pools:
+            # storage of the request-path limiter (array in test, see below)
+            cache.rate_limiter:
+                adapter: cache.adapter.redis
+                provider: '%env(REDIS_URL)%'
+            # storage of the twin limiter that the integration test exercises
+            # against real Redis in every environment
+            cache.rate_limiter_redis:
+                adapter: cache.adapter.redis
+                provider: '%env(REDIS_URL)%'
+
+    rate_limiter:
+        # FR-AUTH-4 / FR-KEY-4: sliding window per client IP on auth endpoints
+        auth_ip:
+            policy: sliding_window
+            limit: '%env(int:RATE_LIMIT_AUTH_PER_IP)%'
+            interval: '1 minute'
+            cache_pool: cache.rate_limiter
+            lock_factory: null
+        # identical policy, Redis-only storage; consumed by tests only
+        auth_ip_redis:
+            policy: sliding_window
+            limit: '%env(int:RATE_LIMIT_AUTH_PER_IP)%'
+            interval: '1 minute'
+            cache_pool: cache.rate_limiter_redis
+            lock_factory: null
+
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
@@ -11,5 +44,10 @@ framework:
 when@test:
     framework:
         test: true
+        cache:
+            pools:
+                # deterministic per kernel boot: the 11th-request scenario is literal
+                cache.rate_limiter:
+                    adapter: cache.adapter.array
         session:
             storage_factory_id: session.storage.factory.mock_file
