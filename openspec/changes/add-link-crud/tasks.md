@@ -17,12 +17,12 @@
 
 ## 4. Docs and plan
 
-- [ ] 4.1 `docs/how-to/local-development.md`: create a link with curl, list, patch, delete; a "Security notes" paragraph on the URL policy and its residual risk (public hostname resolving privately; no resolution at validation; the server never fetches targets). Verify: re-read whole; every command run in its exact form.
-- [ ] 4.2 `openspec/ROADMAP.md` row 4 and `docs/explanation/requirements.md` §7 row 4: add "routing `rules` column only; API accepts rules from `add-routing-rules`". Verify: `rg -n 'rules column only' openspec/ROADMAP.md docs/explanation/requirements.md` shows both.
+- [x] 4.1 `docs/how-to/local-development.md`: create a link with curl, list, patch, delete; a "Security notes" paragraph on the URL policy and its residual risk (public hostname resolving privately; no resolution at validation; the server never fetches targets). Verify: re-read whole; every command run in its exact form.
+- [x] 4.2 `openspec/ROADMAP.md` row 4 and `docs/explanation/requirements.md` §7 row 4: add "routing `rules` column only; API accepts rules from `add-routing-rules`". Verify: `rg -n 'rules column only' openspec/ROADMAP.md docs/explanation/requirements.md` shows both.
 
 ## 5. Wrap-up
 
-- [ ] 5.1 `make check` green; commit per block (`feat(link):` 1.x, `feat(link):` 2.x, `feat(link):` 3.x, `test:`, `docs:`) with the agent trailer; commit bodies name every failing input demonstrated. Verify: `git log --oneline main..HEAD`.
+- [x] 5.1 `make check` green; commit per block (`feat(link):` 1.x, `feat(link):` 2.x, `feat(link):` 3.x, `test:`, `docs:`) with the agent trailer; commit bodies name every failing input demonstrated. Verify: `git log --oneline main..HEAD`.
 - [ ] 5.2 **Green Actions run on the exact branch head before Gate 2**: the user pushes the change branch; the executor polls the run list for the head SHA and then `/actions/runs/{run_id}/jobs` until `workflow`, `detect` and `php` are all `success`; URL and SHA recorded in `handoff.md`.
 - [ ] 5.3 `openspec validate add-link-crud --strict` and `scripts/pregate-verify.sh gate2 add-link-crud` pass; `scripts/gate-run.sh add-link-crud 2 full`. Verify: no FAIL line.
 

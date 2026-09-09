@@ -63,6 +63,31 @@ curl -s -X POST http://localhost:8082/api/v1/auth/token \
 curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/v1/me
 ```
 
+Create, list, change and delete links (the owner or an admin):
+
+```bash
+curl -s -X POST http://localhost:8082/api/v1/links -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"targetUrl":"https://example.com/landing","slug":"spring-sale","maxClicks":100}'
+curl -s -H "Authorization: Bearer $TOKEN" 'http://localhost:8082/api/v1/links?isActive=true'
+curl -s -X PATCH http://localhost:8082/api/v1/links/$ID -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/merge-patch+json' -d '{"isActive":false,"maxClicks":null}'
+curl -s -X DELETE http://localhost:8082/api/v1/links/$ID -H "Authorization: Bearer $TOKEN"
+```
+
+A PATCH changes only the fields present in the body; `expiresAt`,
+`maxClicks` and `utm` can be cleared with `null`, the slug never changes.
+Without `slug` a 7-character one is generated. In a shell, quote URLs with
+`[` `]` or pass `-g` to curl (`order[createdAt]=asc`).
+
+**Security notes on targets.** A target must be an absolute `http`/`https`
+URL to a public host: `localhost`, loopback, link-local and private
+addresses (v4 and v6, including IPv4-mapped v6) are rejected on write, so a
+short link cannot be pointed at the cloud metadata service or an internal
+host. Hostnames are deliberately not resolved at validation time: a public
+name that resolves to a private address is the documented residual risk,
+which is why the server itself never fetches a target — it only redirects.
+
 Auth endpoints (`/login`, `/register`, `/api/v1/auth/*`) accept 10 requests
 per minute per client IP (`RATE_LIMIT_AUTH_PER_IP` in `.env`); the counter
 lives in Redis. The client IP comes from the trusted-proxy configuration
