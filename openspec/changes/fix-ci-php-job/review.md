@@ -32,3 +32,14 @@
 | # | Resolution |
 |---|------------|
 | 1 | changes-requested — task 2.2 correctly requires a green run on the exact branch head before Gate 2, but its sole endpoint (`/actions/runs?branch=...`) exposes workflow-run status, not the individual `workflow`, `detect`, and `php` job conclusions it claims to check. Select the matching `head_sha` and query that run's `/actions/runs/{run_id}/jobs` endpoint (or use an equivalently exact GitHub CLI command), then require all three named jobs to be `completed` and `success`. This is the second failed confirmation of finding #1; per the review protocol, do not request a third confirmation without user arbitration. |
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** 8a677f7651208e0514a496d4bfbab6470a5fd7b3
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — task 2.2 now selects the workflow run by the exact `head_sha`, waits for completion, and queries that run's jobs endpoint to require `workflow`, `detect`, and `php` all to succeed before Gate 2. |
