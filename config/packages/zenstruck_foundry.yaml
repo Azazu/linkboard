@@ -13,4 +13,12 @@ when@dev: &dev
     #        autowire: true
     #        autoconfigure: true
 
-when@test: *dev
+when@test:
+    zenstruck_foundry:
+        persistence:
+            flush_once: true
+        orm:
+            reset:
+                # Rebuild the test schema from migrations, not from the mapping:
+                # the functional unique index on lower(email) exists only in a migration.
+                mode: migrate

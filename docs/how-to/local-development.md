@@ -10,8 +10,9 @@ every PHP command runs in the `php` container.
 make init                     # build, up, composer install, migrate, create the test database
 ```
 
-`make init` finishes with `make test-db`, so `make test` works right after
-the first run.
+`make init` also generates the dev and test JWT keypairs (`make jwt-keys`,
+`config/jwt/<env>/`, gitignored) and creates the test database
+(`make test-db`), so `make test` works right after the first run.
 
 The php image runs as `HOST_UID`/`HOST_GID` from `.env` (default 1000)
 so bind-mounted `var/` and `vendor/` stay owned by you. If your ids
@@ -42,10 +43,32 @@ http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
 | composer / console | `make composer ARGS='…'` / `make console ARGS='…'` |
 | migrations | `make migration` (generate, then read it) → `make migrate` |
 | test database | `make test-db` (create + migrate `<db>_test`; also run by `make init`) |
+| JWT keys | `make jwt-keys` (dev + test keypairs, skips existing; also run by `make init`) |
+| make an admin | `make console ARGS='app:user:promote you@example.com'` (`app:user:demote` reverts) — the only way roles change |
 | async worker (foreground) | `make worker` in a second terminal (clicks are logged asynchronously) |
 | async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile, so `make up` does not start it unless asked |
-| the gate floor | `make check` (php-cs-fixer + PHPStan level 8 + PHPUnit; suites `Unit`, `Integration`, `Api`) |
+| the gate floor | `make check` (php-cs-fixer + PHPStan level 8 + PHPUnit; suites `Unit`, `Integration`, `Api`, `Web`) |
 | one suite | `docker compose exec php vendor/bin/phpunit --testsuite Unit` (also `Integration`, `Api`) |
+
+## Accounts and the API
+
+Register at http://localhost:8082/register (or `POST /api/v1/auth/register`),
+then get a token and call the API:
+
+```bash
+curl -s -X POST http://localhost:8082/api/v1/auth/token \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"your-password-here"}'
+# → {"token":"…","expiresAt":"…"}  (valid for one hour, no refresh)
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/v1/me
+```
+
+Auth endpoints (`/login`, `/register`, `/api/v1/auth/*`) accept 10 requests
+per minute per client IP (`RATE_LIMIT_AUTH_PER_IP` in `.env`); the counter
+lives in Redis. The client IP comes from the trusted-proxy configuration
+(`TRUSTED_PROXIES`, default `127.0.0.1` = the nginx container): a forwarded
+header from any other peer is ignored, so do not widen it to a range you do
+not control.
 
 ## Reset (DESTRUCTIVE)
 
@@ -81,6 +104,9 @@ it yourself.
   (no `_test` suffix; it checks the configured dependency, like in prod),
   so that database must exist wherever the tests run. CI creates `app`
   as the service database and `make test-db` derives `app_test` from it.
+- **`make check` fails in the token tests with a key error** — the keypairs
+  are missing or were generated with another passphrase; run `make jwt-keys`
+  (delete `config/jwt/test/` first if the passphrase in `.env.test` changed).
 - **Tests boot the `dev` kernel** — the php container carries `APP_ENV=dev`
   in its real environment and `KernelTestCase` reads `$_ENV` first;
   `phpunit.dist.xml` forces both `$_SERVER` and `$_ENV` to `test`. Keep

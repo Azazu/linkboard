@@ -377,7 +377,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 |---|---|---|---|---|
 | 1 | `bootstrap-dev-environment` | Docker Compose (php-fpm, nginx, postgres, redis, worker service), php image and nginx config, Makefile targets of `AGENTS.md`, CI workflow parseable with the `php` job self-skipping while `composer.json` is absent | high (CI infrastructure trigger) | `make up` brings postgres and redis healthy and nginx/php running on a clean clone; CI `workflow` job green, `php` job skipped by `detect` |
 | 2 | `scaffold-symfony-app` | `symfony/skeleton` 8.1 on PHP 8.4, Doctrine + migrations, API Platform under `/api/v1` with docs, problem-details errors, `/health`, PHPUnit/PHPStan/CS-Fixer wired, bounded-context `src/` layout, `symfony/uid` | medium | `GET /health` and `/api/docs` work; `make check` green with a sample test per layer |
-| 3 | `add-users-and-security` | `users`, registration (web + API), form-login firewall for the web, JWT firewall for the API, `app:user:promote/demote`, blocking, voters skeleton, auth rate limit | high | matrix test owner/stranger/admin/blocked; auth endpoints 429 after 10/min |
+| 3 | `add-users-and-security` | `users`, registration (web + API), form-login firewall for the web, JWT firewall for the API, `app:user:promote/demote`, blocking, role-based authorization boundaries (ownership voters arrive with their resources), auth rate limit | high | matrix test owner/stranger/admin/blocked; auth endpoints 429 after 10/min |
 | 4 | `add-link-crud` | `links` entity and migration, slug rules, URL policy, UTM, API Platform resource with voters, `shortUrl`, hard delete | high | FR-LNK-1…11 tests green; every rejected URL class has a failing input |
 | 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table and a synchronous insert as the baseline, per-IP redirect limit | medium | redirect matrix test; click row written per redirect |
 
@@ -394,7 +394,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 |---|---|---|---|---|
 | 8 | `add-analytics-read-model` | query services and DTOs for the six reports, `EXPLAIN`-verified indexes, Redis tag cache with invalidation, admin global stats, `app:demo:seed` | medium | report tests against PostgreSQL; cache invalidation test |
 | 9 | `add-qr-codes` | `endroid/qr-code`, `GET /api/v1/links/{id}/qr` SVG/PNG | low | snapshot test of SVG; voter test |
-| 10 | `add-api-keys-and-rate-limiting` | `api_keys`, hashed lookup authenticator, per-key/per-user API limit, rate-limit headers, trusted-proxy tests | high | plaintext-once test; expired/revoked 401; 429 tests |
+| 10 | `add-api-keys-and-rate-limiting` | `api_keys`, hashed lookup authenticator, per-key/per-user API limit, rate-limit headers, trusted-proxy tests, prod deep health probe authorized by an admin API key | high | plaintext-once test; expired/revoked 401; 429 tests |
 
 ### Stage 4 — web UI, API polish, quality
 

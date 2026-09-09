@@ -9,6 +9,9 @@ parameters:
     paths:
         - src
         - tests
+    excludePaths:
+        # CLI fixtures spawned by tests; they use the test-only service container
+        - tests/Fixture/*
     tmpDir: var/phpstan
     treatPhpDocTypesAsCertain: false
     ignoreErrors:

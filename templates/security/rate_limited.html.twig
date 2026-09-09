@@ -1,0 +1,6 @@
+{% extends 'base.html.twig' %}
+{% block title %}Too many attempts — Linkboard{% endblock %}
+{% block body %}
+<h1>Too many attempts</h1>
+<p role="alert">Please wait {{ retry_after }} seconds before trying again.</p>
+{% endblock %}

@@ -30,6 +30,9 @@
         <testsuite name="Api">
             <directory>tests/Api</directory>
         </testsuite>
+        <testsuite name="Web">
+            <directory>tests/Web</directory>
+        </testsuite>
     </testsuites>
 
     <source ignoreSuppressionOfDeprecations="true"

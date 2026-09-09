@@ -2,6 +2,40 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # Client IP for rate limits, geo and A/B hashing comes from here (FR-KEY-5):
+    # only headers from the listed proxies are trusted.
+    trusted_proxies: '%env(TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-port']
+
+    cache:
+        pools:
+            # Redis-backed storage of the auth limiters (FR-KEY-4) in every environment.
+            # In test the request-path limiter auth_ip switches to an in-process
+            # storage (services.yaml, when@test) so its window is deterministic and
+            # not cleared by the per-request services reset; auth_ip_redis keeps
+            # this pool so the Redis path is exercised by an integration test.
+            cache.rate_limiter:
+                adapter: cache.adapter.redis
+                provider: '%env(REDIS_URL)%'
+    rate_limiter:
+        # FR-AUTH-4 / FR-KEY-4: sliding window per client IP on auth endpoints.
+        # lock.factory (Redis, config/packages/lock.yaml): without it two
+        # concurrent requests can both pass at nine consumed tokens.
+        auth_ip:
+            policy: sliding_window
+            limit: '%env(int:RATE_LIMIT_AUTH_PER_IP)%'
+            interval: '1 minute'
+            cache_pool: cache.rate_limiter
+            lock_factory: lock.factory
+        # identical policy on the Redis pool in every environment; consumed by
+        # tests only, to prove the storage auth_ip uses in dev/prod
+        auth_ip_redis:
+            policy: sliding_window
+            limit: '%env(int:RATE_LIMIT_AUTH_PER_IP)%'
+            interval: '1 minute'
+            cache_pool: cache.rate_limiter
+            lock_factory: lock.factory
+
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
@@ -11,5 +45,10 @@ framework:
 when@test:
     framework:
         test: true
+        rate_limiter:
+            auth_ip:
+                # in-process storage that survives the per-request services reset
+                # (an ArrayAdapter pool is cleared between requests by kernel.reset)
+                storage_service: app.rate_limiter.test_storage
         session:
             storage_factory_id: session.storage.factory.mock_file

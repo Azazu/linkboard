@@ -42,12 +42,13 @@ final class HealthTest extends WebTestCase
     public function testDeepProbeIsRefusedInProductionWithProblemDetails(): void
     {
         // The prod kernel has no test client (framework.test is off there), so
-        // the request goes through the kernel directly. It needs a non-empty
-        // secret; .env leaves APP_SECRET empty on purpose. The prod container is
-        // cached without resource tracking, so a stale var/cache/prod from an
-        // earlier configuration would test the wrong thing: start from scratch.
+        // the request goes through the kernel directly. Secrets come from the
+        // process environment (.env.test is already loaded); nothing is
+        // overridden here so later tests in the process are unaffected. The prod
+        // container is cached without resource tracking, so a stale
+        // var/cache/prod from an earlier configuration would test the wrong
+        // thing: start from scratch.
         (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
-        $_SERVER['APP_SECRET'] = $_ENV['APP_SECRET'] = 'test-only-secret-for-the-prod-kernel';
         $kernel = self::bootKernel(['environment' => 'prod', 'debug' => false]);
 
         $response = $kernel->handle(Request::create('/health?deep=1'));
@@ -61,6 +62,21 @@ final class HealthTest extends WebTestCase
         foreach (['type', 'title', 'detail'] as $member) {
             self::assertArrayHasKey($member, $problem);
         }
+    }
+
+    public function testAnAdminJwtDoesNotUnlockTheDeepProbeInProduction(): void
+    {
+        // Until the API-keys change authorizes the probe for an admin API key,
+        // prod refuses it for everyone — including an admin's JWT (spec
+        // health-check, MODIFIED by add-users-and-security).
+        (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
+        $kernel = self::bootKernel(['environment' => 'prod', 'debug' => false]);
+
+        $request = Request::create('/health?deep=1', server: ['HTTP_AUTHORIZATION' => 'Bearer not-checked-here.admin.jwt']);
+        $response = $kernel->handle($request);
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->headers->get('Content-Type'));
     }
 
     public function testHealthIsNotPartOfTheOpenApiDocument(): void

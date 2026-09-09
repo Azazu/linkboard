@@ -1,10 +1,17 @@
 monolog:
     channels: # To see all channels, run bin/console debug:autowiring logger
         - deprecation # Deprecations are logged in the dedicated "deprecation" channel when it exists
+        - audit # admin actions: action, actor_id, target_id — never emails (spec user-administration)
 
 when@dev:
     monolog:
         handlers:
+            # admin audit trail: written on success, not gated by fingers_crossed
+            audit:
+                type: stream
+                path: "%kernel.logs_dir%/audit.log"
+                level: info
+                channels: [audit]
             main:
                 type: stream
                 path: "%kernel.logs_dir%/%kernel.environment%.log"
@@ -18,6 +25,14 @@ when@dev:
 when@test:
     monolog:
         handlers:
+            # same wiring as prod (always-on info stream, JSON, only the audit
+            # channel) with a file instead of stderr so tests can read the records
+            audit:
+                type: stream
+                path: "%kernel.logs_dir%/audit.log"
+                level: info
+                channels: [audit]
+                formatter: monolog.formatter.json
             main:
                 type: fingers_crossed
                 action_level: error
@@ -32,12 +47,21 @@ when@test:
 when@prod:
     monolog:
         handlers:
+            # admin audit trail (spec user-administration): the main handler is
+            # fingers_crossed and only flushes on errors, so audit gets its own
+            # always-on JSON stream
+            audit:
+                type: stream
+                path: php://stderr
+                level: info
+                channels: [audit]
+                formatter: monolog.formatter.json
             main:
                 type: fingers_crossed
                 action_level: error
                 handler: nested
                 excluded_http_codes: [404, 405]
-                channels: ["!deprecation"]
+                channels: ["!deprecation", "!audit"]
                 buffer_size: 50 # How many messages should be saved? Prevent memory leaks
             nested:
                 type: stream

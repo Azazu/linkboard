@@ -1,0 +1,11 @@
+{% extends 'base.html.twig' %}
+{% block title %}Linkboard{% endblock %}
+{% block body %}
+<h1>Linkboard</h1>
+{% if app.user %}
+    <p>Signed in as {{ app.user.userIdentifier }}. The dashboard arrives with the web UI change.</p>
+    <form method="post" action="{{ path('app_logout') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}"><button type="submit">Log out</button></form>
+{% else %}
+    <p><a href="{{ path('app_login') }}">Log in</a> · <a href="{{ path('app_register') }}">Register</a> · <a href="/api/docs">API docs</a></p>
+{% endif %}
+{% endblock %}
