@@ -36,3 +36,23 @@
 - Confirmed branch `change/add-link-crud`, the requested HEAD and an initially clean working tree; all source-round findings were dispositioned as `fixed` before confirmation.
 - Checked related claims across repository artifacts and the installed API Platform request-context and Doctrine failed-commit mechanisms.
 - `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. This is an artifact confirmation; implementation tests are still planned.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** 68c26c9d1f58ffe3f2fdb4b3e1e800a297d00d68
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Design decision 6 preserves presence through decoded request-body key membership, independently of nullable DTO values. The installed API Platform controller supplies the request in processor context. The proposal, spec and tasks retain the per-field null contract and HTTP verification that omission preserves populated expiry/limit fields while explicit null clears only the limit. |
+| 2 | changes-requested — The persistence mechanism is now viable: decision 3 resets the failed EntityManager, builds a new Link, attaches the owner through getReference on the fresh manager, distinguishes custom-slug 422 from generated-slug retries, and bounds attempts at five. However, task 2.1 conflates two different verification cases: it describes the test "without the reset" as equivalent to "a competitor on all five candidates" and expects retry exhaustion. Without reset, Doctrine closes the manager after the first failed flush, so the next persist fails before five INSERT collisions can occur; an eventual 500 does not prove bounded exhaustion. Separate the successful-recovery test with reset enabled, the mutation check that removing reset breaks that success test, and an exhaustion test with reset enabled and all five candidates occupied, asserting five attempted collisions and the exhaustion error log. This completes the actual-collision and exhaustion verification requested in Round 1. |
+| 3 | changes-requested — The added spec scenario and task 3.3 now cover 403 rejection, 422 validation rejection and forced flush failure without a success audit record. After-flush ordering, ids and the crash limitation remain specified. The outstanding coverage from Confirmation 1 is still absent: design decision 8 and the audit requirement promise link.update and link.activate, but task 3.3 and the scenarios only verify successful deactivate/delete. Add successful update/reactivation verification with the required ids and explicit assertions excluding URL, email and slug from successful records. The existing scenario's absence-of-@/slug assertion does not exclude a target URL without either substring. |
+
+### Validation
+- Reviewed only `2389dc92035dc8640998b59485ba35d60e1b532e..68c26c9d1f58ffe3f2fdb4b3e1e800a297d00d68` and collateral effects of Round 1 findings 1–3; no unrelated findings introduced.
+- Confirmed branch `change/add-link-crud`, the requested HEAD and an initially clean working tree; all source-round findings were marked `fixed` before confirmation.
+- Checked related artifact claims, normative FR-LNK-2/FR-ADM-2, installed Doctrine rollback/reset behavior, API Platform request context and the existing admin audit pattern.
+- `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. Implementation tests remain planned; this is a Gate 1 artifact review.
+- Findings 2 and 3 have now failed two confirmations. Per AGENTS.md, stop the confirmation loop and split/reduce the change or ask the user to arbitrate before proceeding.
