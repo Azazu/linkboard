@@ -19,6 +19,7 @@
 
 - [x] 4.1 `docs/how-to/local-development.md`: create a link with curl, list, patch, delete; a "Security notes" paragraph on the URL policy and its residual risk (public hostname resolving privately; no resolution at validation; the server never fetches targets). Verify: re-read whole; every command run in its exact form.
 - [x] 4.2 `openspec/ROADMAP.md` row 4 and `docs/explanation/requirements.md` §7 row 4: add "routing `rules` column only; API accepts rules from `add-routing-rules`". Verify: `rg -n 'rules column only' openspec/ROADMAP.md docs/explanation/requirements.md` shows both.
+- [x] 4.3 Swagger UI sends the bearer token: `config/packages/api_platform.yaml` declares `swagger.http_auth.JWT` (bearer) so API Platform emits a global `security` requirement; `docs/how-to/local-development.md` gains the Authorize steps. Verify: `curl -s http://localhost:8082/api/docs.json` shows `"security":[{"JWT":[]}]`; a call from Swagger UI after Authorize carries the `Authorization` header.
 
 ## 5. Wrap-up
 

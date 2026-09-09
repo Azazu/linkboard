@@ -1,6 +1,6 @@
 # Handoff — add-link-crud
 
-**Updated:** 2026-09-09 · claude (session ended here; context reset by the user)
+**Updated:** 2026-09-09 · claude
 **State:** awaiting-gate-2
 **Branch:** change/add-link-crud
 
@@ -10,10 +10,12 @@
 
 - Implemented blocks 1–4 (1a75c0d entity/repository/migration, 821f026 slug rules + URL policy, f75151a API resource/voter/processors/audit, docs). make check: cs 0, stan 0, 159 tests / 1194 assertions. Deviations recorded: nullable fields emitted as null (`skip_null_values: false`); order tiebreaker follows the direction; the collision competitor is inserted on the same connection inside the flush (a side connection cannot see the per-test transaction's owner row).
 
-- Task 5.2: branch run https://github.com/Azazu/linkboard/actions/runs/34335286637 on head c4bedcb — detect, workflow, php all success (run list by SHA + jobs endpoint). Gate 2 NOT yet started: the user asked for a context reset first.
+- Task 5.2: branch run https://github.com/Azazu/linkboard/actions/runs/34335286637 on head c4bedcb — detect, workflow, php all success (run list by SHA + jobs endpoint).
+- Gate 2 attempt on 73b20f1: floor passed, Codex exited 1 on the workspace spend cap (resets 14:13); nothing written, fail-closed.
+- Task 4.3 (acd3a57): Swagger UI never attached the token (OpenAPI had the JWT scheme but no global `security` requirement) → `swagger.http_auth.JWT` in api_platform.yaml; how-to documents Authorize. make check green. The branch head moved past the green run → the user must push again and a new green run on acd3a57 must be recorded before Gate 2 is re-run.
 
 ## Next step
-Next session: `scripts/pregate-verify.sh gate2 add-link-crud` (expected to pass; floor incl. make check) then `scripts/gate-run.sh add-link-crud 2 full` (auto mode, Codex runs ~2–3 min). Only protocol files changed since the green run (tasks.md, handoff.md). On approval: `/git:merge add-link-crud`, user pushes main, check the main run, `/opsx:archive add-link-crud` (syncs spec `links`), update ~/Projects/pet/Linkboard_TZ_RU.md, then `/workflow:start add-redirect-with-sync-logging`. If Codex returns changes-requested: `/workflow:fix-findings`, re-push for a green run, `gate-run … 2 confirm 1`; stop and ask the user after two failed confirmations.
+User pushes `change/add-link-crud` (head acd3a57); executor verifies the run by SHA + jobs endpoint and records the URL here. Then `scripts/pregate-verify.sh gate2 add-link-crud` and `scripts/gate-run.sh add-link-crud 2 full` (auto mode; Codex spend cap resets 14:13). On approval: `/git:merge add-link-crud`, user pushes main, check the main run, `/opsx:archive add-link-crud` (syncs spec `links`), update ~/Projects/pet/Linkboard_TZ_RU.md, then `/workflow:start add-redirect-with-sync-logging`. If Codex returns changes-requested: `/workflow:fix-findings`, re-push for a green run, `gate-run … 2 confirm 1`; stop and ask the user after two failed confirmations.
 
 ## Blockers
 None.
