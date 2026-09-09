@@ -35,6 +35,7 @@ final class TargetUrlPolicyTest extends TestCase
         yield 'internationalised hostname (mapped to punycode)' => ['http://пример.рф/'];
         yield 'hostname with a compatibility character (Ⅻ → xii)' => ['http://Ⅻ.com/'];
         yield 'hostname with an underscore' => ['http://my_host.example.com/'];
+        yield 'hostname with an ideographic full stop as the trailing dot' => ['http://example.com。/'];
     }
 
     /** @return iterable<string, array{string}> */
@@ -84,6 +85,13 @@ final class TargetUrlPolicyTest extends TestCase
         yield 'fullwidth decimal metadata service' => ['http://２８５２０３９１６６/'];
         yield 'fullwidth localhost' => ['http://ｌｏｃａｌｈｏｓｔ/'];
         yield 'host the IDNA mapping rejects (zero-width joiner)' => ["http://a\u{200D}b.com/"];
+        // dots that UTS #46 maps to '.' only after our mapping step
+        yield 'loopback with an ideographic full stop' => ['http://127.0.0.1。/'];
+        yield 'metadata service decimal with a fullwidth full stop' => ['http://2852039166．/'];
+        yield 'loopback with a halfwidth ideographic full stop' => ['http://127.0.0.1｡/'];
+        yield 'localhost with an ideographic full stop' => ['http://localhost。/'];
+        yield 'empty label inside the host' => ['http://127.0..1/'];
+        yield 'two trailing dots' => ['http://127.0.0.1../'];
         yield 'host with a character outside LDH after mapping' => ['http://ex|ample.com/'];
         // numeric hosts a browser fails to parse at all
         yield 'five numeric labels' => ['http://1.2.3.4.5/'];

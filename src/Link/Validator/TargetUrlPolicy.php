@@ -18,7 +18,9 @@ namespace App\Link\Validator;
  * mapped the way browsers map it (UTS #46 domain-to-ASCII, non-transitional,
  * as `idn_to_ascii` implements it), so fullwidth digits (`１２７.０.０.１`),
  * `ｌｏｃａｌｈｏｓｔ` and other compatibility forms are judged on their ASCII
- * result; a host the mapping rejects is rejected. Percent-encoded hosts are
+ * result, and the trailing dot is removed only after that mapping (`。` and
+ * `．` map to `.`); a host the mapping rejects, or one with an empty label,
+ * is rejected. Percent-encoded hosts are
  * rejected: browsers decode them, parse_url does not, and an address must
  * never be judged on a spelling the client will not use. Names are NOT
  * resolved: a public hostname that resolves privately is the documented
@@ -67,9 +69,15 @@ final class TargetUrlPolicy
             return false !== $binary && !self::isBlockedAddress($binary);
         }
 
-        $host = self::toAscii(rtrim($rawHost, '.')); // a trailing dot names the same host
-        if (null === $host || 'localhost' === $host || str_ends_with($host, '.localhost')) {
-            return false;
+        // Map first, then drop the single trailing dot (a trailing dot names the
+        // same host): UTS #46 turns U+3002 / U+FF0E / U+FF61 into an ASCII dot,
+        // so the dot has to be handled on the mapped form, not before it.
+        $host = self::toAscii($rawHost);
+        if (null !== $host && str_ends_with($host, '.')) {
+            $host = substr($host, 0, -1);
+        }
+        if (null === $host || '' === $host || str_contains($host, '..') || 'localhost' === $host || str_ends_with($host, '.localhost')) {
+            return false; // unmappable, empty, or an empty label the numeric parser could not classify
         }
 
         $ipv4 = self::parseIpv4Host($host);

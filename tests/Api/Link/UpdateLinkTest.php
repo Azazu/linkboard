@@ -104,6 +104,8 @@ final class UpdateLinkTest extends LinkApiTestCase
         yield 'percent-encoded loopback' => ['http://%31%32%37.0.0.1/'];
         yield 'fullwidth loopback' => ['http://１２７.０.０.１/'];
         yield 'fullwidth decimal metadata service' => ['http://２８５２０３９１６６/'];
+        yield 'loopback with an ideographic full stop' => ['http://127.0.0.1。/'];
+        yield 'metadata service decimal with a fullwidth full stop' => ['http://2852039166．/'];
     }
 
     #[DataProvider('invalidTargets')]
