@@ -17,3 +17,22 @@
 - Confirmed the requested branch and HEAD; the working tree was clean before review.
 - `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation.
 - Reviewed proposal, design, delta spec, tasks and handoff against `AGENTS.md`, `openspec/config.yaml`, the normative requirements and relevant installed/source mechanisms. Risk tier high is appropriate.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** 529a897043499d0cd9214b3b6aa2eb4468727598
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Design decision 6 now uses decoded-body key membership to distinguish omission from explicit null; the installed API Platform controller supplies the request in processor context. The proposal, delta spec and tasks 3.1/3.3 agree on the per-field null contract and explicitly verify preservation of populated expiry/limit fields versus clearing only the limit over HTTP. |
+| 2 | changes-requested — Design decision 3 and tasks 2.1/3.1 avoid reuse of a closed EntityManager by abandoning retries after an actual INSERT collision, returning 500 on the first such collision. This does not satisfy the retry guarantee in `docs/explanation/requirements.md` FR-LNK-2 or the unchanged generated-slug requirement in `specs/links/spec.md:7`, and task 2.1 now tests that weakened behavior instead of collision recovery. For example, a competitor takes candidate 1 after the pre-check while candidate 2 is free: the proposed processor returns 500 without trying candidate 2. Specify a transaction/EntityManager-safe retry strategy and integration coverage for actual insert collision followed by success and bounded exhaustion, as requested in Round 1. Alternatively, obtain explicit acceptance of the reduced guarantee and reconcile the normative requirement and all affected artifacts; documenting the exception in the design alone does not resolve the finding. |
+| 3 | changes-requested — The audit mechanism, ids, data exclusions, after-flush ordering and crash limitation are now specified. However, task 3.3 only plans successful admin deactivate/delete and an owner's successful deactivation; neither it nor the added spec scenarios verifies that rejected requests and failed persistence emit no success audit record, which Round 1 explicitly required. Add verification for an authorization/validation rejection and a forced flush failure with no success record. Also cover the newly promised `link.update` and `link.activate` actions and explicitly assert the absence of URL/email/slug data in successful records, so each claimed audit outcome has verification coverage. |
+
+### Validation
+- Reviewed only `2389dc92035dc8640998b59485ba35d60e1b532e..529a897043499d0cd9214b3b6aa2eb4468727598` and collateral effects of Round 1 findings 1–3; no unrelated findings introduced.
+- Confirmed branch `change/add-link-crud`, the requested HEAD and an initially clean working tree; all source-round findings were dispositioned as `fixed` before confirmation.
+- Checked related claims across repository artifacts and the installed API Platform request-context and Doctrine failed-commit mechanisms.
+- `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. This is an artifact confirmation; implementation tests are still planned.
