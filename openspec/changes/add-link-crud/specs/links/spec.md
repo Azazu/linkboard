@@ -4,7 +4,7 @@ A link is the unit users own: a short slug that resolves to a target URL under r
 ## ADDED Requirements
 
 ### Requirement: Create a link with a generated or custom slug
-An authenticated user SHALL create a link from a required `targetUrl` and optional `slug`, `expiresAt`, `maxClicks` and `utm`. Without `slug` the system generates a 7-character slug from `[A-Za-z0-9]` using a cryptographically secure source, retrying on collision a bounded number of times and answering 500 (logged) if none is free. The response is 201 with `id`, `slug`, `shortUrl`, `targetUrl`, `utm`, `expiresAt`, `maxClicks`, `isActive: true`, `clickCount: 0`, `createdAt`, `updatedAt`.
+An authenticated user SHALL create a link from a required `targetUrl` and optional `slug`, `expiresAt`, `maxClicks` and `utm`. Without `slug` the system generates a 7-character slug from `[A-Za-z0-9]` using a cryptographically secure source; a collision with an existing slug at insert time is retried with a new candidate a bounded number of times (5), and the request answers 500 (logged) only when every candidate collided. The response is 201 with `id`, `slug`, `shortUrl`, `targetUrl`, `utm`, `expiresAt`, `maxClicks`, `isActive: true`, `clickCount: 0`, `createdAt`, `updatedAt`.
 
 #### Scenario: Generated slug
 - **WHEN** a user posts `{"targetUrl":"https://example.com/landing"}` to `/api/v1/links`
@@ -13,6 +13,10 @@ An authenticated user SHALL create a link from a required `targetUrl` and option
 #### Scenario: Custom slug
 - **WHEN** a user posts `{"targetUrl":"https://example.com","slug":"spring-sale_2026"}`
 - **THEN** the response status is 201 and `slug` is exactly `spring-sale_2026`
+
+#### Scenario: Generated slug collides at insert time
+- **WHEN** the first generated candidate is taken by a concurrent insert after the pre-check and before the write
+- **THEN** the request still answers 201 with the next free candidate; when five candidates in a row collide the response is 500 and an error is logged
 
 ### Requirement: Slug rules
 A custom slug MUST match `^[A-Za-z0-9_-]{3,32}$`, MUST NOT be in the reserved list (at least `api`, `admin`, `login`, `logout`, `register`, `dashboard`, `links`, `api-keys`, `health`, `docs`, `qr`, `assets`, `build`, `bundles`, `_profiler`, `_wdt`, `_error`), and MUST be unique case-sensitively: `abc` and `ABC` are different links. Violations are 422 with a `violations` entry for `slug`. The slug is immutable: an update that carries a slug different from the current one is rejected with 422.
@@ -117,3 +121,7 @@ When a user with `ROLE_ADMIN` who is not the owner updates, deactivates, reactiv
 #### Scenario: Owner is not audited
 - **WHEN** A deactivates their own link
 - **THEN** no audit record is written
+
+#### Scenario: Rejected or failed admin actions leave no record
+- **WHEN** a stranger's PATCH is refused with 403, an admin's PATCH is rejected with 422 (invalid `targetUrl`), and an admin's PATCH fails during persistence (the write is aborted)
+- **THEN** none of the three writes an audit record
