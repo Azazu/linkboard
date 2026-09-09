@@ -139,3 +139,24 @@
 - Inspected the changed validation paths, HTTP regression assertions and related artifact claims. Reproduced Unicode and ASCII effective-address normalization with the local Node WHATWG URL parser without network requests. PHP-side acceptance of the Unicode examples follows from source inspection; no HTTP reproduction is claimed.
 - `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks, but its `make check` step failed because the sandbox cannot access `/var/run/docker.sock`. No host PHP executable is available. Executor-reported green checks and mutation evidence in the handoff/commit were read, not independently reproduced; this environment limitation is not attributed to a code regression.
 - Modified only `review.md`; ran no git write commands.
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** db839ec7678234e37c26c8767d1e9cbc32d16eb1
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — TargetUrlValidator skips only null and sends the empty string through TargetUrlPolicy, which rejects it. Omitted PATCH fields retain their presence handling. UpdateLinkTest asserts 422 on targetUrl for an empty string and verifies the original destination with a subsequent GET. CreateLinkInput's default empty string remains rejected without the redundant NotBlank constraint; POST tests cover both empty and missing targets. |
+| 2 | changes-requested — Unicode digit normalization fixes the examples from Confirmation 1, but trailing Unicode dots still bypass the effective-address policy. At src/Link/Validator/TargetUrlPolicy.php:70, rtrim removes ASCII dots BEFORE toAscii. UTS #46 maps a final U+3002/U+FF0E/U+FF61 to an ASCII dot, leaving an empty last label; parseIpv4Host then returns null and isAllowed accepts the host without any range check. For example, http://127.0.0.1。/ and http://2852039166．/ map without IDNA errors to 127.0.0.1. and 2852039166., while the browser targets 127.0.0.1 and 169.254.169.254. The same ordering misses the localhost check for localhost。 . Handle the terminal dot after domain-to-ASCII normalization, before localhost and numeric classification (or reject these representations). Add unit and POST/PATCH rejection regressions for mapped trailing dots, including unchanged storage after rejected PATCH, and keep the security claims consistent. This is the unresolved Round 1 address-policy bypass, not an unrelated finding. |
+| 3 | confirmed — Slug::PATTERN uses the absolute end anchor \z. HTTP regression cases require 422 on slug for abc plus newline, admin plus newline, and 32 valid characters plus newline. The requirement, proposal and delta spec retain whole-string matching, preventing the reserved-word and storage-length bypasses. |
+
+### Validation
+- Reviewed only `def03664e7b9e36dc14187c9180aa35cf77c7a51..db839ec7678234e37c26c8767d1e9cbc32d16eb1` and collateral effects of Gate 2 Round 1 findings 1–3; no unrelated findings introduced.
+- Confirmed branch `change/add-link-crud`, the requested HEAD and an initially clean working tree. Every source-round finding was marked fixed; there were no blockers or open rows.
+- Inspected the validation paths, HTTP regression assertions, related artifact claims and executor mutation evidence. Reproduced the trailing-dot domain-to-ASCII results using local ICU 77 through uidna_nameToASCII_UTF8 with non-transitional, CheckBidi and CheckJoiners options: all cited mappings returned zero errors. Independently reproduced the effective IP hosts with Node's WHATWG URL parser, without network requests. PHP-side acceptance follows from source inspection; no HTTP reproduction is claimed.
+- `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks, but its `make check` step failed because this sandbox cannot access `/var/run/docker.sock`. No host PHP executable is available. Executor-reported green checks and mutation results were read, not independently reproduced; this environment limitation is not attributed to a code regression.
+- Finding 2 has now failed two confirmations. Per AGENTS.md, stop the automatic confirmation loop and split/reduce the change or ask the user to arbitrate before proceeding.
+- Modified only `review.md`; ran no git write commands.
