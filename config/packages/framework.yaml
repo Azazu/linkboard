@@ -35,6 +35,14 @@ framework:
             interval: '1 minute'
             cache_pool: cache.rate_limiter
             lock_factory: lock.factory
+        # FR-RED-6: redirects per client IP; fail-open when Redis is down
+        # (App\Redirect\RedirectRateLimit) — the only Redis use on the hot path
+        redirect_ip:
+            policy: sliding_window
+            limit: '%env(int:RATE_LIMIT_REDIRECT_PER_IP)%'
+            interval: '1 minute'
+            cache_pool: cache.rate_limiter
+            lock_factory: lock.factory
 
     # Note that the session will be started ONLY if you read or write from it.
     session: true
@@ -49,6 +57,8 @@ when@test:
             auth_ip:
                 # in-process storage that survives the per-request services reset
                 # (an ArrayAdapter pool is cleared between requests by kernel.reset)
+                storage_service: app.rate_limiter.test_storage
+            redirect_ip:
                 storage_service: app.rate_limiter.test_storage
         session:
             storage_factory_id: session.storage.factory.mock_file

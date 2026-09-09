@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Security;
 
+use App\Shared\Api\ProblemDetails;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationFailureEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTExpiredEvent;
@@ -13,7 +14,6 @@ use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTNotFoundEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Events;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Security\Core\Exception\AccountStatusException;
 
 /**
@@ -57,12 +57,12 @@ final readonly class JwtProblemDetailsSubscriber implements EventSubscriberInter
     {
         $exception = $event->getException();
         if ($exception instanceof AccountStatusException) {
-            $event->setResponse(self::problem(403, 'Forbidden', BlockedUserChecker::MESSAGE));
+            $event->setResponse(ProblemDetails::response(403, 'Forbidden', BlockedUserChecker::MESSAGE));
 
             return;
         }
         // Never say whether the email exists (spec authentication, "Invalid credentials").
-        $event->setResponse(self::problem(401, 'Unauthorized', 'Invalid credentials.'));
+        $event->setResponse(ProblemDetails::response(401, 'Unauthorized', 'Invalid credentials.'));
     }
 
     public function onTokenProblem(JWTFailureEventInterface $event): void
@@ -72,7 +72,7 @@ final readonly class JwtProblemDetailsSubscriber implements EventSubscriberInter
         $exception = $event->getException();
         for ($e = $exception; null !== $e; $e = $e->getPrevious()) {
             if ($e instanceof AccountStatusException) {
-                $event->setResponse(self::problem(403, 'Forbidden', BlockedUserChecker::MESSAGE));
+                $event->setResponse(ProblemDetails::response(403, 'Forbidden', BlockedUserChecker::MESSAGE));
 
                 return;
             }
@@ -84,20 +84,6 @@ final readonly class JwtProblemDetailsSubscriber implements EventSubscriberInter
             $event instanceof JWTInvalidEvent => 'Invalid token.',
             default => 'Authentication failed.',
         };
-        $event->setResponse(self::problem(401, 'Unauthorized', $detail));
-    }
-
-    public static function problem(int $status, string $title, string $detail): JsonResponse
-    {
-        $response = new JsonResponse([
-            'type' => '/errors/'.$status,
-            'title' => $title,
-            'status' => $status,
-            'detail' => $detail,
-        ], $status);
-        $response->headers->set('Content-Type', 'application/problem+json');
-        $response->headers->set('Cache-Control', 'no-store');
-
-        return $response;
+        $event->setResponse(ProblemDetails::response(401, 'Unauthorized', $detail));
     }
 }
