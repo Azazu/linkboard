@@ -64,6 +64,11 @@ final class CreateLinkTest extends LinkApiTestCase
         yield 'past expiry' => [['targetUrl' => 'https://e.com', 'expiresAt' => '2020-01-01T00:00:00Z'], ['expiresAt']];
         yield 'zero limit' => [['targetUrl' => 'https://e.com', 'maxClicks' => 0], ['maxClicks']];
         yield 'empty target' => [['targetUrl' => ''], ['targetUrl']];
+        yield 'missing target' => [[], ['targetUrl']];
+        // `$` would match before a trailing newline; the anchor must be absolute
+        yield 'slug with a trailing newline' => [['targetUrl' => 'https://e.com', 'slug' => "abc\n"], ['slug']];
+        yield 'reserved slug with a trailing newline' => [['targetUrl' => 'https://e.com', 'slug' => "admin\n"], ['slug']];
+        yield 'maximum-length slug with a trailing newline' => [['targetUrl' => 'https://e.com', 'slug' => str_repeat('a', 32)."\n"], ['slug']];
     }
 
     /**
@@ -85,7 +90,7 @@ final class CreateLinkTest extends LinkApiTestCase
     /** @return iterable<string, array{string}> */
     public static function rejectedTargets(): iterable
     {
-        foreach (['market://details?id=x', 'ftp://example.com/f', 'javascript:alert(1)', 'http://localhost/', 'http://127.0.0.1/', 'http://[::1]/', 'http://10.0.0.5/', 'http://172.16.9.1/', 'http://192.168.1.1/', 'http://169.254.169.254/latest/meta-data', 'http://[fe80::1]/', 'http://[fd00::1]/', 'not a url', 'https://example.com/'.str_repeat('a', 2049 - \strlen('https://example.com/'))] as $url) {
+        foreach (['market://details?id=x', 'ftp://example.com/f', 'javascript:alert(1)', 'http://localhost/', 'http://127.0.0.1/', 'http://[::1]/', 'http://10.0.0.5/', 'http://172.16.9.1/', 'http://192.168.1.1/', 'http://169.254.169.254/latest/meta-data', 'http://[fe80::1]/', 'http://[fd00::1]/', 'not a url', 'https://example.com/'.str_repeat('a', 2049 - \strlen('https://example.com/')), 'http://127.1/', 'http://2130706433/', 'http://0x7f000001/', 'http://0177.0.0.1/', 'http://2852039166/', 'http://%31%32%37.0.0.1/', 'http://127.0.0.1./'] as $url) {
             yield $url => [$url];
         }
     }

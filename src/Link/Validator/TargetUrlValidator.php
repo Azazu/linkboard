@@ -15,8 +15,8 @@ final class TargetUrlValidator extends ConstraintValidator
         if (!$constraint instanceof TargetUrl) {
             throw new UnexpectedTypeException($constraint, TargetUrl::class);
         }
-        if (null === $value || '' === $value) {
-            return; // NotBlank reports emptiness
+        if (null === $value) {
+            return; // absence is the caller's contract (optional on PATCH); '' is judged by the policy
         }
         if (!\is_string($value)) {
             throw new UnexpectedTypeException($value, 'string');

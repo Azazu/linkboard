@@ -19,7 +19,7 @@ An authenticated user SHALL create a link from a required `targetUrl` and option
 - **THEN** the request still answers 201 with the next free candidate; when five candidates in a row collide the response is 500 and an error is logged
 
 ### Requirement: Slug rules
-A custom slug MUST match `^[A-Za-z0-9_-]{3,32}$`, MUST NOT be in the reserved list (at least `api`, `admin`, `login`, `logout`, `register`, `dashboard`, `links`, `api-keys`, `health`, `docs`, `qr`, `assets`, `build`, `bundles`, `_profiler`, `_wdt`, `_error`), and MUST be unique case-sensitively: `abc` and `ABC` are different links. Violations are 422 with a `violations` entry for `slug`. The slug is immutable: an update that carries a slug different from the current one is rejected with 422.
+A custom slug MUST match `^[A-Za-z0-9_-]{3,32}$` as the entire string (a trailing newline is not part of a match), MUST NOT be in the reserved list (at least `api`, `admin`, `login`, `logout`, `register`, `dashboard`, `links`, `api-keys`, `health`, `docs`, `qr`, `assets`, `build`, `bundles`, `_profiler`, `_wdt`, `_error`), and MUST be unique case-sensitively: `abc` and `ABC` are different links. Violations are 422 with a `violations` entry for `slug`. The slug is immutable: an update that carries a slug different from the current one is rejected with 422.
 
 #### Scenario: Reserved word
 - **WHEN** a user posts a link with `slug` `admin`
@@ -38,7 +38,7 @@ A custom slug MUST match `^[A-Za-z0-9_-]{3,32}$`, MUST NOT be in the reserved li
 - **THEN** the response status is 422 with a violation on `slug` and the stored slug is unchanged
 
 ### Requirement: Target URL policy
-`targetUrl` MUST be an absolute URL of at most 2048 characters with scheme `http` or `https` and a host. The host MUST NOT be `localhost` or a literal IP in the loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`) or private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) ranges. No name resolution is performed at validation time. Violations are 422 with a violation on `targetUrl`.
+`targetUrl` MUST be an absolute URL of at most 2048 characters with scheme `http` or `https` and a host. The host MUST NOT be `localhost` or a literal IP in the loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`) or private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) ranges. A literal IP MUST be recognised in every form the WHATWG URL host parser accepts (shorthand `127.1`, decimal `2130706433`, hexadecimal `0x7f000001`, octal `0177.0.0.1`, trailing dot) and judged by the resulting address; a host that ends in a number but is not a valid IPv4, and any percent-encoded host, MUST be rejected. An empty string is not a URL and MUST be rejected wherever `targetUrl` is present. No name resolution is performed at validation time. Violations are 422 with a violation on `targetUrl`.
 
 #### Scenario: Accepted store links
 - **WHEN** a user posts `https://apps.apple.com/app/id123` or `https://play.google.com/store/apps/details?id=com.example`

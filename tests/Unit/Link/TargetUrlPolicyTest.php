@@ -26,6 +26,12 @@ final class TargetUrlPolicyTest extends TestCase
         yield 'public ipv6 literal' => ['http://[2001:db8::1]/'];
         yield 'uppercase scheme' => ['HTTPS://Example.COM/'];
         yield 'exactly 2048 characters' => ['https://example.com/'.str_repeat('a', 2048 - \strlen('https://example.com/'))];
+        yield 'hostname with a trailing dot' => ['http://example.com./'];
+        yield 'punycode hostname' => ['http://xn--e1afmkfd.xn--p1ai/'];
+        yield 'numeric first label is still a hostname' => ['http://1.example.com/'];
+        yield 'public address as a decimal integer' => ['http://1572395042/'];
+        yield 'public address in hex' => ['http://0x5db8d822/'];
+        yield 'public address with a trailing dot' => ['http://93.184.216.34./'];
     }
 
     /** @return iterable<string, array{string}> */
@@ -56,6 +62,24 @@ final class TargetUrlPolicyTest extends TestCase
         yield 'ipv4-mapped ipv6 private' => ['http://[::ffff:10.0.0.1]/'];
         yield 'this network' => ['http://0.0.0.0/'];
         yield 'whitespace inside' => ['https://exa mple.com/'];
+        yield 'empty string' => [''];
+        // alternative IPv4 spellings a browser resolves to a blocked address (WHATWG host parser)
+        yield 'loopback shorthand 127.1' => ['http://127.1/'];
+        yield 'loopback as a decimal integer' => ['http://2130706433/'];
+        yield 'loopback in hex' => ['http://0x7f000001/'];
+        yield 'loopback in hex, uppercase' => ['http://0X7F000001/'];
+        yield 'loopback in octal' => ['http://0177.0.0.1/'];
+        yield 'loopback with a trailing dot' => ['http://127.0.0.1./'];
+        yield 'metadata service as a decimal integer' => ['http://2852039166/'];
+        yield 'private 10/8 shorthand' => ['http://10.1/'];
+        yield 'single number in 0/8' => ['http://1/'];
+        yield 'percent-encoded loopback' => ['http://%31%32%37.0.0.1/'];
+        // numeric hosts a browser fails to parse at all
+        yield 'five numeric labels' => ['http://1.2.3.4.5/'];
+        yield 'number above 255' => ['http://256.1.1.1/'];
+        yield 'last number too large for the remaining bytes' => ['http://1.2.70000/'];
+        yield 'leading zero without octal digits' => ['http://08.0.0.1/'];
+        yield 'bare 0x' => ['http://0x/'];
         yield '2049 characters' => ['https://example.com/'.str_repeat('a', 2049 - \strlen('https://example.com/'))];
     }
 

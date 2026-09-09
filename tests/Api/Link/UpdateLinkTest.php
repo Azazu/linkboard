@@ -8,6 +8,7 @@ use App\Link\LinkRepositoryInterface;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -91,14 +92,27 @@ final class UpdateLinkTest extends LinkApiTestCase
         self::assertSame('keep-me', self::getContainer()->get(LinkRepositoryInterface::class)->findById(Uuid::fromString((string) $link->getId()))?->getSlug());
     }
 
-    public function testInvalidTargetLeavesTheLinkUnchanged(): void
+    /** @return iterable<string, array{string}> */
+    public static function invalidTargets(): iterable
+    {
+        yield 'empty string (present, not omitted)' => [''];
+        yield 'private address' => ['http://10.0.0.1/'];
+        yield 'loopback shorthand' => ['http://127.1/'];
+        yield 'loopback as a decimal integer' => ['http://2130706433/'];
+        yield 'loopback in hex' => ['http://0x7f000001/'];
+        yield 'metadata service as a decimal integer' => ['http://2852039166/'];
+        yield 'percent-encoded loopback' => ['http://%31%32%37.0.0.1/'];
+    }
+
+    #[DataProvider('invalidTargets')]
+    public function testInvalidTargetLeavesTheLinkUnchanged(string $target): void
     {
         $client = self::createClient();
         $owner = UserFactory::createOne(['email' => 'a@example.com']);
         $link = LinkFactory::createOne(['owner' => $owner, 'targetUrl' => 'https://example.com/original']);
         $token = $this->token($client, 'a@example.com');
 
-        $this->api($client, $token, 'PATCH', '/api/v1/links/'.$link->getId(), ['targetUrl' => 'http://10.0.0.1/']);
+        $this->api($client, $token, 'PATCH', '/api/v1/links/'.$link->getId(), ['targetUrl' => $target]);
 
         self::assertSame(['targetUrl'], $this->violationPaths($client));
         $this->api($client, $token, 'GET', '/api/v1/links/'.$link->getId());

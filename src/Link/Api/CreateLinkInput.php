@@ -10,7 +10,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final class CreateLinkInput
 {
-    #[Assert\NotBlank]
     #[Assert\Length(max: 2048)]
     #[TargetUrl]
     public string $targetUrl = '';
