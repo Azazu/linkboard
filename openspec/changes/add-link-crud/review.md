@@ -98,3 +98,24 @@
 - Checked related artifact claims, normative FR-LNK-2/FR-ADM-2, installed Doctrine failed-commit and Symfony lazy-manager reset behavior, API Platform request context and the existing admin audit implementation.
 - `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. This confirms the Gate 1 artifacts; implementation tests remain planned.
 - Modified only `review.md`; ran no git write commands.
+
+
+## Round 1 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** def03664e7b9e36dc14187c9180aa35cf77c7a51
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | major | `src/Link/Api/UpdateLinkInput.php:17`; `src/Link/Validator/TargetUrlValidator.php:20`; `src/Link/Api/UpdateLinkProcessor.php:60` | PATCH `{"targetUrl":""}` passes validation and replaces a valid destination with an empty string: the DTO has only a maximum length constraint, TargetUrlValidator deliberately skips empty strings assuming NotBlank will reject them, and the processor rejects only null. Unlike creation, PATCH has no NotBlank guard. This violates the absolute-URL requirement and the promise that updates apply creation's validation. Reject a present empty target while preserving omitted-field behavior; add an HTTP regression asserting 422 on targetUrl and that the stored destination remains unchanged. | open |
+| 2 | major | `src/Link/Validator/TargetUrlPolicy.php:49` | Treating every host that inet_pton cannot parse as an allowed hostname bypasses the private/loopback/link-local policy without DNS. For example, `http://127.1/`, `http://2130706433/` and `http://0x7f000001/` are accepted by this branch but browser URL parsing targets 127.0.0.1; `http://2852039166/` targets 169.254.169.254. Percent-encoded host digits provide another form (`http://%31%32%37.0.0.1/`). These are numeric/encoded address representations, outside the documented unresolved-DNS exception. Canonicalize or reject ambiguous/encoded IP representations before the hostname fallback, apply the existing range policy to the effective address, and add unit plus POST/PATCH HTTP regressions for these inputs. Reconcile the security-note guarantee with the resulting implementation. | open |
+| 3 | major | `src/Link/Validator/Slug.php:15` | The PCRE `$` anchor matches before a final newline, so the pattern accepts `"abc\n"` and `"admin\n"`. The latter also misses the exact reserved-word check; the original string is persisted and directly concatenated into shortUrl. This stores a slug outside the promised alphabet and produces a URL whose newline may be removed by a browser, targeting a different slug or the reserved route. With 32 valid characters followed by a newline it also passes the validator but exceeds VARCHAR(32), producing a storage error instead of 422. Use an absolute end-of-string anchor (or the equivalent PCRE option) and add HTTP rejection tests for a trailing newline, including a reserved word and the length boundary. | open |
+
+### Validation
+- Confirmed branch `change/add-link-crud`, HEAD `def03664e7b9e36dc14187c9180aa35cf77c7a51`, and an initially clean working tree. Reviewed `git diff main...change/add-link-crud`, the change artifacts, `openspec/config.yaml`, normative link requirements, implementation and tests. The declared high risk tier is appropriate; Gate 1's latest record is confirmed.
+- Checked ownership enforcement, collection scoping, PATCH presence handling, admin audit ordering/data shape, migration constraints, and generated-slug collision recovery against the installed Symfony/Doctrine mechanisms and the tests.
+- Reproduced the slug pattern accepting trailing newlines with the local PCRE2 library. Confirmed the alternative-IP examples' effective hosts with Node's WHATWG URL parser, without network requests. Finding 1 follows directly from the installed Length validator, the custom validator's empty-value return, and the processor/entity write path. These are focused parser/source checks, not completed HTTP reproductions.
+- `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks, but failed its `make check` step because this sandbox cannot access `/var/run/docker.sock`. No host PHP is installed. Consequently PHP lint/static analysis/PHPUnit and HTTP regressions could not be independently executed in this review; the executor's earlier green results in the handoff/commit history were read, not reproduced. The environment failure is not attributed to a code regression.
+- Modified only `review.md`; ran no git write commands.
