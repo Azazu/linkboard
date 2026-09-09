@@ -43,3 +43,25 @@
 - Reviewed only the diff from `6e59b75bb617ada03da5ec51b92935f2a93b041f` to the Reviewed-Commit and collateral context needed for the six source findings; all six source statuses were `fixed`.
 - Verified the requested branch and HEAD and an initially clean working tree. Inspected the existing firewall configuration and installed rate-limiter factory and consumption path.
 - `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passed, including strict OpenSpec validation, with zero warnings. This is a Gate 1 artifact confirmation, not implementation validation.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** cd112a8364ba05866e50f9aa249bcc23517d0879
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 6 preserves unrelated raw query components and replaces all occurrences of the intended percent-decoded UTM keys. The spec and task 2.1 cover repeated, dotted, bracketed and encoded components and require a regression against the old map-based algorithm. |
+| 2 | confirmed — The proposal, decision 1 and task 2.3 explicitly narrow the API firewall boundary. The spec and task 3.1 verify public access to an api-prefixed slug with absent and invalid credentials while retaining authentication on the actual API route. |
+| 3 | confirmed — Decision 9 and task 3.3(c1–c3) retain creation-failure coverage and now explicitly require successful creation of a real SlidingWindowLimiter followed by failing lock acquisition or storage access during consumption. Each case asserts 302 and a warning naming the failure class without the IP. The planned mutation moving only consume() outside the catch must fail the lock/storage cases while leaving the creation case green, closing Confirmation 1's coverage gap. The fail-open policy and Redis dependency boundary remain explicit in the proposal and normative spec. |
+| 4 | confirmed — Decision 7 and the header-bounds requirement validate the extracted host against length, UTF-8 and control-character constraints, converting invalid input to null. Tasks 2.1 and 3.2 require boundary tests and hostile-header requests that persist a click and return 302 for both limited and unlimited links. |
+| 5 | confirmed — The normative contracts explicitly distinguish normal recording, unlimited write-failure redirects, HEAD's independence from recording, and the commit-to-response crash window. Tasks 1.4, 2.1 and 3.3 cover transaction atomicity, HEAD bypass and the write-failure outcomes. |
+| 6 | confirmed — Decision 13 and the store-failure requirement bound write-failure outcomes to successful link resolution and separately specify lookup failure as 503 with Retry-After. Tasks 2.1 and 3.3 require independent lookup-failure tests; the artifacts disclaim availability during a total database outage. |
+
+### Validation
+
+- Reviewed the diff from `6e59b75bb617ada03da5ec51b92935f2a93b041f` to the Reviewed-Commit and collateral context reachable from the six named findings. All source finding statuses were `fixed`; no unrelated findings were introduced.
+- Verified the requested branch and HEAD and an initially clean working tree. Checked the installed rate-limiter factory interface, consumption path and lock acquisition path against the revised failure-test plan.
+- `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passed, including strict OpenSpec validation, with zero warnings. This confirms Gate 1 artifacts; implementation and the planned failing-input demonstrations remain subject to Gate 2.
