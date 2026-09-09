@@ -63,6 +63,11 @@ curl -s -X POST http://localhost:8082/api/v1/auth/token \
 curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/v1/me
 ```
 
+In Swagger UI the same flow is `POST /api/v1/auth/token` → copy `token` →
+**Authorize** (paste the bare token; the UI adds `Bearer`). The request
+preview under each operation shows the `Authorization` header when it is
+attached.
+
 Create, list, change and delete links (the owner or an admin):
 
 ```bash
