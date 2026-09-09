@@ -12,6 +12,7 @@ See `proposal.md` — Why. CI is the only place where the application database a
 ## Decisions
 
 1. **Rename the service database, not the probe.** Alternatives: (a) make the probe append `_test` in the test environment — hides the fact that the probe checks the configured database and would diverge from prod behavior; (b) point CI `DATABASE_URL` at `app_test` and skip `make test-db` — then Doctrine's suffix would look for `app_test_test`. Creating `app` as the service database and letting `make test-db` derive `app_test` keeps CI identical in shape to the local stack.
+3. **Reproduce the real CI path, not a paraphrase.** The php container gets `make`; the reproduction runs `make test-db EXEC=` then `make check EXEC=` with `APP_ENV=test`, `DATABASE_URL=postgresql://app:app@ci-pg:5432/app?...`, `REDIS_URL`, `MESSENGER_TRANSPORT_DSN=in-memory://` — the same variables the workflow sets — against a throwaway `postgres:16-alpine` on the compose network. Failing input: `POSTGRES_DB=app_test` (make exits 2 with the two health tests failing); passing: `POSTGRES_DB=app`.
 2. **Bump action majors to v7 by tag**, not SHA: the repository has no SHA-pinning policy yet; introducing one for two actions would be inconsistent. Recorded as a possible later decision.
 
 ## Applicability (high tier)
@@ -21,7 +22,7 @@ See `proposal.md` — Why. CI is the only place where the application database a
 | Crash before/after an external effect | n/a | CI steps only |
 | Concurrent writers | n/a | |
 | Money rounding | n/a | |
-| Empty/zero/null inputs | yes | database `app` absent → the exact failure being fixed; the local reproduction (throwaway postgres with `POSTGRES_DB=app_test`) is the failing input, the same reproduction with `POSTGRES_DB=app` is the passing one |
+| Empty/zero/null inputs | yes | database `app` absent → the exact failure being fixed; the `make check EXEC=` reproduction (decision 3) with `POSTGRES_DB=app_test` is the failing input, the same run with `POSTGRES_DB=app` is the passing one |
 | Authorization boundary | yes | workflow `permissions: contents: read` unchanged; no secrets touched |
 | Deletion/expiry | n/a | |
 | Idempotency of retries | yes | `doctrine:database:create --if-not-exists` and CI re-runs are idempotent |

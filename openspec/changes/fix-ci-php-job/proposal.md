@@ -12,7 +12,8 @@ The first run of the CI `php` job on `main` (run 34317318434 after the `scaffold
 
 1. `.github/workflows/ci.yml`, `php` job service `postgres`: `POSTGRES_DB: app` (was `app_test`) and the health check `pg_isready -U app -d app`. `make test-db EXEC=` then creates `app_test` next to it, mirroring the local setup (`linkboard` + `linkboard_test`).
 2. `.github/workflows/ci.yml`: `actions/checkout@v7` (three places) and `actions/setup-node@v7` — current majors (v7.0.1 / v7.0.0 on 2026-09-09), Node 24 runtime, warnings gone. `shivammathur/setup-php@v2` stays (no warning, v2 is the maintained line).
-3. `docs/how-to/local-development.md`, troubleshooting: one sentence that the probe uses the un-suffixed `DATABASE_URL` database, so it must exist wherever the tests run.
+3. `.docker/php/Dockerfile`: add `make` to the image (`apk add --no-cache make`), so the exact CI command path — `make test-db EXEC=` followed by `make check EXEC=` with CI-shaped environment variables — can be executed inside the php container against a throwaway CI-shaped PostgreSQL. Without it the reproduction would have to paraphrase the Makefile.
+4. `docs/how-to/local-development.md`, troubleshooting: one sentence that the probe uses the un-suffixed `DATABASE_URL` database, so it must exist wherever the tests run.
 
 ## Capabilities
 
@@ -34,5 +35,6 @@ None.
 ## Impact
 
 - `.github/workflows/ci.yml` (service env, health check, two action majors).
+- `.docker/php/Dockerfile` (`make` package; image rebuild).
 - `docs/how-to/local-development.md` (one troubleshooting bullet).
 - No dependency, code or schema change.
