@@ -7,7 +7,7 @@ doubt it wins over default agent behavior. Process record:
 
 Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 8, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
 
-**Review mode:** manual
+**Review mode:** auto
 
 ## Agent Roles
 
