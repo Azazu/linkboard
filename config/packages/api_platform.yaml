@@ -35,6 +35,15 @@ api_platform:
     handle_symfony_errors: true
 
     enable_swagger_ui: true
+    # Declares the bearer scheme to API Platform itself so every operation
+    # carries a `security` requirement; Swagger UI attaches the token from
+    # "Authorize" only to operations that declare one. The name matches the
+    # scheme LexikJWTAuthenticationBundle registers, so the two merge.
+    swagger:
+        http_auth:
+            JWT:
+                scheme: bearer
+                bearerFormat: JWT
     enable_re_doc: false
     enable_scalar: false
     enable_docs: true
