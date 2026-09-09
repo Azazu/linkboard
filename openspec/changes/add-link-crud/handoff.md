@@ -1,7 +1,7 @@
 # Handoff — add-link-crud
 
 **Updated:** 2026-09-09 · claude
-**State:** blocked
+**State:** awaiting-gate-2
 **Branch:** change/add-link-crud
 
 ## Done this session
@@ -11,11 +11,12 @@
 - Implemented blocks 1–4 (1a75c0d entity/repository/migration, 821f026 slug rules + URL policy, f75151a API resource/voter/processors/audit, docs). make check: cs 0, stan 0, 159 tests / 1194 assertions. Deviations recorded: nullable fields emitted as null (`skip_null_values: false`); order tiebreaker follows the direction; the collision competitor is inserted on the same connection inside the flush (a side connection cannot see the per-test transaction's owner row).
 
 - Task 5.2: branch run https://github.com/Azazu/linkboard/actions/runs/34335286637 on head c4bedcb — detect, workflow, php all success (run list by SHA + jobs endpoint).
-- Gate 2 attempt on 73b20f1: floor passed, Codex exited 1 on the workspace spend cap (resets 14:13); nothing written, fail-closed.
+- Gate 2 attempt on 73b20f1: floor passed, Codex exited 1 on the workspace spend cap; nothing written, fail-closed. Retried later the same day at the user's request: worked.
 - Task 4.3 (acd3a57): Swagger UI never attached the token (OpenAPI had the JWT scheme but no global `security` requirement) → `swagger.http_auth.JWT` in api_platform.yaml; how-to documents Authorize. make check green. Branch run https://github.com/Azazu/linkboard/actions/runs/34337613127 on head 8d38817 — detect, workflow, php all success.
+- Gate 2 Round 1 (def0366, recorded f64663f): changes-requested, 3 majors, all fixed in 5a010be — (1) PATCH `{"targetUrl":""}` now 422 (validator judges '' itself); (2) alternative IPv4 spellings (`127.1`, decimal, hex, octal, trailing dot) parsed per the WHATWG host parser and range-checked, percent-encoded hosts rejected; (3) slug pattern anchored with `\z`. Each guard has a demonstrated failing input (commit body). Spec/design/proposal/requirements/how-to reconciled. make check: 198 tests / 1330 assertions. **Security-sensitive:** input validation of untrusted URLs and slugs — needs a named developer's review.
 
 ## Next step
-Once the reviewer is available again: `scripts/pregate-verify.sh gate2 add-link-crud` then `scripts/gate-run.sh add-link-crud 2 full` (auto mode). Only protocol files change between the green run on 8d38817 and the reviewed head, so no new push is needed unless code changes. On approval: `/git:merge add-link-crud`, user pushes main, check the main run, `/opsx:archive add-link-crud` (syncs spec `links`), update ~/Projects/pet/Linkboard_TZ_RU.md, then `/workflow:start add-redirect-with-sync-logging`. On approval: `/git:merge add-link-crud`, user pushes main, check the main run, `/opsx:archive add-link-crud` (syncs spec `links`), update ~/Projects/pet/Linkboard_TZ_RU.md, then `/workflow:start add-redirect-with-sync-logging`. If Codex returns changes-requested: `/workflow:fix-findings`, re-push for a green run, `gate-run … 2 confirm 1`; stop and ask the user after two failed confirmations.
+The user pushes `change/add-link-crud` (code changed since the last green run); executor verifies the run on the new head by SHA + jobs endpoint and records the URL here. Then `scripts/gate-run.sh add-link-crud 2 confirm 1` (auto mode). On confirmed: `/git:merge add-link-crud`, user pushes main, check the main run, `/opsx:archive add-link-crud` (syncs spec `links`), update ~/Projects/pet/Linkboard_TZ_RU.md, then `/workflow:start add-redirect-with-sync-logging`. After two failed confirmations on the same finding: stop and ask the user.
 
 ## Blockers
-Codex workspace spend cap is exhausted until the end of September 2026 (gate-run exited 1: "You hit your spend cap set by the owner of your workspace"); the user is deciding whether to raise the cap or switch accounts. Gate 2 cannot run until then; nothing else is pending on the branch.
+None (the Codex spend cap that blocked the first attempt turned out not to apply).
