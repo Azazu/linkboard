@@ -15,7 +15,6 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 4 | `add-link-crud` | `links` entity (slug rules, target URL policy, expires_at, max_clicks, is_active, UTM), API Platform resource with owner voters, `shortUrl`, hard delete; routing `rules` column only — the API accepts rules from `add-routing-rules` | high |
 | 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table written synchronously (baseline before async), per-IP redirect limit | medium |
 
 ## Stage 2 — smart routing and async click logging

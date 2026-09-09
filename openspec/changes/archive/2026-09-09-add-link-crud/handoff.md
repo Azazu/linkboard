@@ -1,7 +1,7 @@
 # Handoff — add-link-crud
 
 **Updated:** 2026-09-09 · claude
-**State:** ready-to-merge
+**State:** merged
 **Branch:** change/add-link-crud
 
 ## Done this session
