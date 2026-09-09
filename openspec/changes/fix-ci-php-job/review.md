@@ -43,3 +43,14 @@
 | # | Resolution |
 |---|------------|
 | 1 | confirmed — task 2.2 now selects the workflow run by the exact `head_sha`, waits for completion, and queries that run's jobs endpoint to require `workflow`, `detect`, and `php` all to succeed before Gate 2. |
+
+## Round 1 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** 08163eb0f1d9188e091d0ce56e233de4911a3d37
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | blocker | openspec/changes/fix-ci-php-job/handoff.md: Task 2.2 evidence; tasks.md: 2.2–2.3 | The recorded green Actions run `34319257555` is valid for `workflow`, `detect`, and `php`, but GitHub binds it to `head_sha` `5a218d8e4b820406d6b9b28bbf678d5d1da9dc63`, not the Gate 2 commit `08163eb0f1d9188e091d0ce56e233de4911a3d37`. Moreover, `design.md` changed between those commits, contrary to task 2.3's own statement that only `handoff.md` and `tasks.md` may differ after the green run. The code/workflow diff is unchanged, but that does not satisfy this change's explicit exact-head CI guarantee. Push commit `08163eb` (or its unchanged-code successor), obtain and record a green run whose `head_sha` matches the commit submitted for Gate 2, and request confirmation; make no further workflow or application changes afterward. |
