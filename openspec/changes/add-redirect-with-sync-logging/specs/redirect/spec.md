@@ -10,13 +10,17 @@ Public resolution of a short link: the one anonymous, hot-path endpoint of the s
 - **WHEN** an anonymous client requests `GET /promo-1` and `promo-1` is an active, unexpired link without a click limit
 - **THEN** the response status is 302 and the response carries no `Set-Cookie` header
 
+#### Scenario: A slug that begins with "api" is still public
+- **WHEN** an anonymous client requests `GET /api-promo` for an active link, once without credentials and once with `Authorization: Bearer not-a-token`
+- **THEN** both responses are 302; `GET /api/v1/me` with the same invalid bearer stays 401
+
 #### Scenario: Slugs are case-sensitive
 - **WHEN** only the link `Promo` exists and a client requests `GET /promo`
 - **THEN** the response status is 404
 
 #### Scenario: HEAD mirrors GET without recording
-- **WHEN** a client sends `HEAD /promo-1` for an active link
-- **THEN** the status and headers equal those of `GET /promo-1`, the body is empty, and no click is recorded
+- **WHEN** a client sends `HEAD /promo-1` for an active link while the click store is healthy
+- **THEN** the status and headers equal those of `GET /promo-1`, the body is empty, and no click is recorded (HEAD answers from the link state alone and never touches the click store, so it is unaffected by click-store failures — see "Failures of the stores")
 
 ### Requirement: Response matrix
 The endpoint SHALL answer 404 when no link has the slug or the link is inactive; 410 Gone when the link's `expiresAt` is in the past or its recorded clicks have reached `maxClicks`; otherwise 302 Found with `Location` set to the destination. 301 MUST never be used. Inactivity is checked before expiry and limit, so an inactive expired link is 404.
@@ -42,11 +46,15 @@ The endpoint SHALL answer 404 when no link has the slug or the link is inactive;
 - **THEN** the response status is 302 and `Location` is the link's destination
 
 ### Requirement: Destination with UTM appended
-The `Location` of a 302 SHALL be the link's `targetUrl` with the link's UTM keys added to the query string. Existing query parameters of the target MUST be preserved, a UTM key already present on the target MUST be overwritten by the link's value, the fragment MUST be kept, and values MUST be percent-encoded. A link without UTM redirects to its `targetUrl` unchanged.
+The `Location` of a 302 SHALL be the link's `targetUrl` with the link's UTM keys added to the query string. The query is processed as a sequence of `key=value` pairs, never as a decoded map: every pair whose percent-decoded key is one of the link's UTM keys is removed (all occurrences), every other pair is kept byte for byte and in order (repeated keys, dotted keys, bracket notation and encoded values included), then the link's UTM pairs are appended in a fixed order with percent-encoded values. The fragment MUST be kept. A link without UTM redirects to its `targetUrl` unchanged.
 
 #### Scenario: UTM added to a target with a query and a fragment
 - **WHEN** a link targets `https://example.com/p?a=1&utm_source=old#top` and carries UTM `{"utm_source":"newsletter","utm_campaign":"spring sale"}`
 - **THEN** `Location` is `https://example.com/p?a=1&utm_source=newsletter&utm_campaign=spring%20sale#top`
+
+#### Scenario: Unrelated query components survive untouched
+- **WHEN** a link targets `https://example.com/p?tag=a&tag=b&a.b=1&x%5By%5D=2&utm%5Fsource=old&utm_source=old2` and carries UTM `{"utm_source":"news"}`
+- **THEN** `Location` is `https://example.com/p?tag=a&tag=b&a.b=1&x%5By%5D=2&utm_source=news` (both spellings of the old key removed, everything else verbatim)
 
 #### Scenario: No UTM
 - **WHEN** a link targets `https://example.com/p?a=1` and has no UTM
@@ -75,7 +83,7 @@ Concurrent requests to a link with `maxClicks` SHALL never redirect more times t
 - **THEN** exactly 3 responses are 302, 7 are 410, and the link's `clickCount` is 3
 
 ### Requirement: Per-IP rate limit
-Redirects SHALL be limited per client IP with a sliding window, default 60 requests per minute, configurable by `RATE_LIMIT_REDIRECT_PER_IP`. Over the limit the endpoint SHALL answer 429 with a `Retry-After` header (HTML page or problem details by `Accept`) without touching the link. The client IP MUST be the one derived through the trusted-proxy configuration: a forwarded header from an untrusted peer does not create a separate bucket.
+Redirects SHALL be limited per client IP with a sliding window, default 60 requests per minute, configurable by `RATE_LIMIT_REDIRECT_PER_IP`. Over the limit the endpoint SHALL answer 429 with a `Retry-After` header (HTML page or problem details by `Accept`) without touching the link. The client IP MUST be the one derived through the trusted-proxy configuration: a forwarded header from an untrusted peer does not create a separate bucket. The limit holds only while its store is reachable: when the limiter's storage or lock fails, the request MUST proceed as if allowed (fail-open) and the failure MUST be logged at `warning` without the client IP; redirect availability never depends on the limiter's store.
 
 #### Scenario: Flood from one address
 - **WHEN** one client IP sends 61 redirect requests within a minute
@@ -85,13 +93,21 @@ Redirects SHALL be limited per client IP with a sliding window, default 60 reque
 - **WHEN** an untrusted peer sends requests with different `X-Forwarded-For` values
 - **THEN** they are counted against the peer's own IP, not against the forwarded values
 
-### Requirement: Recording failure never fails an unlimited redirect
-When the click cannot be recorded, a link without `maxClicks` SHALL still answer 302 and the failure SHALL be logged at `error` without personal data; a link with `maxClicks` SHALL answer 503 with `Retry-After: 5` (its limit cannot be guaranteed) and log at `warning`.
+#### Scenario: Limiter store unavailable
+- **WHEN** the limiter's storage or lock fails and a client requests an active link
+- **THEN** the response is the normal matrix answer (302 here) and a `warning` log record names the failure class but no client IP
 
-#### Scenario: Recording fails for an unlimited link
-- **WHEN** the click store is unavailable and a client requests an active link without `maxClicks`
-- **THEN** the response is 302 to the destination and an `error` log record names the link id and the failure class, but no IP or user agent
+### Requirement: Failures of the stores
+Link lookup and click recording are two steps with two failure policies. If the link cannot be looked up (the link store is unreachable or errors), the endpoint SHALL answer 503 with `Retry-After: 5` for every slug and log at `error`; nothing can be resolved without the link. If the link was resolved and only the click write fails, a link without `maxClicks` SHALL still answer 302 and the failure SHALL be logged at `error` without personal data — this is the one case in which a GET 302 leaves no click record; a link with `maxClicks` SHALL answer 503 with `Retry-After: 5` (its limit cannot be guaranteed) and log at `warning`. `HEAD` never records and is unaffected by click-write failures. A crash between the click's commit and the delivery of the response may leave one recorded click without a delivered redirect; this is bounded to one click per crash and is not prevented.
 
-#### Scenario: Recording fails for a limited link
-- **WHEN** the click store is unavailable and a client requests an active link with `maxClicks` 10 and 0 clicks
+#### Scenario: Link lookup fails
+- **WHEN** the link store errors while looking up `promo-1`
+- **THEN** the response is 503 with `Retry-After: 5` and an `error` log record names the failure class
+
+#### Scenario: Click write fails for an unlimited link
+- **WHEN** the link was resolved, the click write fails, and the link has no `maxClicks`
+- **THEN** the response is 302 to the destination, no click record exists for it, and an `error` log record names the link id and the failure class but no IP or user agent
+
+#### Scenario: Click write fails for a limited link
+- **WHEN** the link was resolved, the click write fails, and the link has `maxClicks` 10 with 0 clicks
 - **THEN** the response is 503 with `Retry-After: 5`
