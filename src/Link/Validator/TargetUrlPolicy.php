@@ -14,9 +14,13 @@ namespace App\Link\Validator;
  * dotted quads: the WHATWG URL host parser treats a host whose last label is
  * a number as IPv4 (`127.1`, `2130706433`, `0x7f000001`, `0177.0.0.1`,
  * trailing dot), so those are canonicalised before the range check and
- * rejected outright when they are not a valid IPv4. Percent-encoded hosts
- * are rejected: browsers decode them, parse_url does not, and an address
- * must never be judged on a spelling the client will not use. Names are NOT
+ * rejected outright when they are not a valid IPv4. Before that the host is
+ * mapped the way browsers map it (UTS #46 domain-to-ASCII, non-transitional,
+ * as `idn_to_ascii` implements it), so fullwidth digits (`１２７.０.０.１`),
+ * `ｌｏｃａｌｈｏｓｔ` and other compatibility forms are judged on their ASCII
+ * result; a host the mapping rejects is rejected. Percent-encoded hosts are
+ * rejected: browsers decode them, parse_url does not, and an address must
+ * never be judged on a spelling the client will not use. Names are NOT
  * resolved: a public hostname that resolves privately is the documented
  * residual risk (the server never fetches targets).
  */
@@ -63,8 +67,8 @@ final class TargetUrlPolicy
             return false !== $binary && !self::isBlockedAddress($binary);
         }
 
-        $host = strtolower(rtrim($rawHost, '.')); // a trailing dot names the same host
-        if ('' === $host || 'localhost' === $host || str_ends_with($host, '.localhost')) {
+        $host = self::toAscii(rtrim($rawHost, '.')); // a trailing dot names the same host
+        if (null === $host || 'localhost' === $host || str_ends_with($host, '.localhost')) {
             return false;
         }
 
@@ -74,6 +78,27 @@ final class TargetUrlPolicy
         }
 
         return false !== $ipv4 && !self::isBlockedAddress(pack('N', $ipv4));
+    }
+
+    /**
+     * Browser-compatible domain-to-ASCII (UTS #46, non-transitional, CheckBidi
+     * and CheckJoiners on, as the WHATWG URL host parser specifies). The result
+     * is lowercase ASCII; anything the mapping rejects, or that is left with a
+     * character outside letters, digits, `.`, `-` and `_`, is not a host we
+     * can judge and is rejected (null).
+     */
+    private static function toAscii(string $host): ?string
+    {
+        if ('' === $host) {
+            return null;
+        }
+        $info = [];
+        $ascii = idn_to_ascii($host, \IDNA_NONTRANSITIONAL_TO_ASCII | \IDNA_CHECK_BIDI | \IDNA_CHECK_CONTEXTJ, \INTL_IDNA_VARIANT_UTS46, $info);
+        if (false === $ascii || 0 !== ($info['errors'] ?? 0) || 1 !== preg_match('/^[a-z0-9._-]+\z/', $ascii)) {
+            return null;
+        }
+
+        return $ascii;
     }
 
     private static function isBlockedAddress(string $binary): bool

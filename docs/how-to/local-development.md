@@ -89,10 +89,12 @@ Without `slug` a 7-character one is generated. In a shell, quote URLs with
 URL to a public host: `localhost`, loopback, link-local and private
 addresses (v4 and v6, including IPv4-mapped v6) are rejected on write, so a
 short link cannot be pointed at the cloud metadata service or an internal
-host. Literal addresses are recognised in every spelling a browser accepts
+host. The host is first mapped to ASCII the way browsers do it (UTS #46, so
+fullwidth `１２７.０.０.１` becomes `127.0.0.1` and `пример.рф` its punycode),
+literal addresses are recognised in every spelling a browser accepts
 (`127.1`, `2130706433`, `0x7f000001`, `0177.0.0.1`, trailing dot), and
-percent-encoded hosts are rejected, so the check applies to the address the
-visitor's browser will actually contact. Hostnames are deliberately not
+percent-encoded or unmappable hosts are rejected, so the check applies to
+the address the visitor's browser will actually contact. Hostnames are deliberately not
 resolved at validation time: a public name that resolves to a private
 address is the documented residual risk, which is why the server itself
 never fetches a target — it only redirects.
