@@ -19,8 +19,9 @@ Everything after this change is owned by somebody: links belong to users, analyt
 7. **Console commands** `app:user:promote <email>` / `app:user:demote <email>` — the only way to change roles.
 8. **Auth rate limit**: 10 requests per minute per client IP on `/login`, `/register`, `/api/v1/auth/*` (sliding window, Symfony RateLimiter on the Redis cache pool, `RATE_LIMIT_AUTH_PER_IP` env), 429 with `Retry-After` — problem details under `/api`, HTML elsewhere. Client IP from the trusted-proxy mechanism (`TRUSTED_PROXIES`).
 9. **Minimal Twig pages** for `/login` and `/register` (unstyled, functional) so the web firewall is exercisable and tested; the real UI is `add-web-ui`.
-10. **Keys and secrets wiring**: `JWT_PASSPHRASE` and key paths per environment (`.env.dev`/`.env.test` carry dev/test-only values as Symfony ships for `APP_SECRET`; prod from the real environment); `make jwt-keys` (`lexik:jwt:generate-keypair --skip-if-exists`) called by `make init` and by CI before `make check`; `config/jwt/` gitignored.
-11. **Docs**: how-to (first run generates keys; how to promote an admin; how to get a token with curl), `AGENTS.md` layout unchanged (`src/Auth/` already listed).
+10. **Keys and secrets wiring, isolated per environment**: key files live at `config/jwt/%kernel.environment%/{private,public}.pem` (gitignored), so dev and test never share an encrypted key; `JWT_PASSPHRASE` comes from `.env.dev` and `.env.test` (dev/test-only values, committed the way Symfony commits `APP_SECRET` in `.env.dev`) and from the real environment in prod. `make jwt-keys` runs `lexik:jwt:generate-keypair --skip-if-exists` twice, `--env=dev` and `--env=test`; `make init` calls it; CI runs `make jwt-keys EXEC=` (test env only matters there) before `make test-db EXEC=`. `lexik:jwt:check-config --env=dev` and `--env=test` are the verification that each environment can load its own key with its own passphrase.
+11. **Deep health probe in prod — deferred explicitly.** The health specification tied the production 404 to "until an authorization boundary exists". This change introduces that boundary but keeps the deep probe unconditionally refused in `prod`: the authorized path will be an **admin API key** in `add-api-keys-and-rate-limiting` (monitoring systems hold keys, not sessions or JWTs). The health requirement is amended accordingly (delta spec `health-check`, MODIFIED), the roadmap row 10 gains the item.
+12. **Docs**: how-to (first run generates keys; how to promote an admin; how to get a token with curl), `AGENTS.md` layout unchanged (`src/Auth/` already listed).
 
 Deviation from the roadmap wording "voters skeleton": ownership voters (`LinkVoter`, `ApiKeyVoter`) need a resource to vote on and arrive with those resources; this change enforces authorization boundaries by role (`ROLE_USER` / `ROLE_ADMIN`) through `access_control` and `#[IsGranted]`. Recorded in the roadmap row.
 
@@ -35,6 +36,7 @@ Deviation from the roadmap wording "voters skeleton": ownership voters (`LinkVot
 ### Modified Capabilities
 
 - `api-error-format`: the "Validation errors carry violations" requirement (422 shape) that was deferred to the first validated input is added now.
+- `health-check`: the production deep-probe clause is rewritten — 404 stays unconditional in `prod` until `add-api-keys-and-rate-limiting` authorizes it by an admin API key (sessions/JWTs never do).
 
 ## Non-goals
 
