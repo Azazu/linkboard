@@ -1,14 +1,15 @@
 # Handoff — add-link-crud
 
 **Updated:** 2026-09-09 · claude
-**State:** proposing
+**State:** awaiting-gate-1
 **Branch:** change/add-link-crud
 
 ## Done this session
 - Change started: branch and scaffold created (after the `add-users-and-security` archive; `main` run 34330518338 green).
+- Proposal (tier high), delta spec `links` (8 requirements, 15 scenarios), design (11 decisions, applicability table), tasks (5 blocks). Gate 1 running in auto mode.
 
 ## Next step
-`/opsx:propose add-link-crud` — `links` entity and migration, slug generation and custom aliases with the reserved list, target URL policy (http/https only, no loopback/link-local/private hosts), UTM, `expires_at`/`max_clicks`, `is_active`, API Platform resource with owner voters (`LinkVoter`), `shortUrl`, hard delete with cascade; specification §2.2 FR-LNK-1…11, §3.3, §4, D6, D8, D9. Tier high (URL validation = open-redirect/SSRF class, deletion, voters): Gate 1 before implementation, green branch run before Gate 2 (auto review mode).
+Gate 1 verdict (`scripts/gate-run.sh add-link-crud 1 full`, auto). On approval: `/opsx:apply add-link-crud` (block 1 first). Security-relevant surface: target URL validation (open-redirect/SSRF class), ownership voter, hard delete.
 
 ## Blockers
 None.

@@ -1,0 +1,31 @@
+## 1. Entity, repository, migration
+
+- [ ] 1.1 `src/Link/Entity/Link.php`, `src/Link/LinkRepositoryInterface.php`, `src/Link/Repository/DoctrineLinkRepository.php`, `src/Link/LinkListQuery.php` (filters/order value object), binding in `config/services.yaml`. Verify: `make console ARGS='doctrine:schema:validate --skip-sync'` mapping OK; `make stan` clean.
+- [ ] 1.2 `make migration` → review; add the `"C"` collation on `slug`, the `CHECK (max_clicks > 0)` constraint, the `(owner_id, created_at DESC)` index and a description; `make migrate`; `make test-db`. Verify: `doctrine:migrations:migrate prev` then `migrate` both succeed; `dbal:run-sql` shows the unique index, the check constraint and `ON DELETE CASCADE` on the FK; `doctrine:migrations:diff` reports no changes.
+- [ ] 1.3 `tests/Integration/Link/DoctrineLinkRepositoryTest.php`: `abc` and `ABC` both insert (case-sensitive); exact duplicate raises `UniqueConstraintViolationException` (failing input); `max_clicks = 0` insert raises a check-constraint violation (failing input); page/filter/order queries. `tests/Factory/LinkFactory.php`. Verify: `make test` green.
+
+## 2. Slug rules and URL policy
+
+- [ ] 2.1 `src/Link/ReservedSlugs.php`, `src/Link/SlugGenerator.php`, `src/Link/Validator/Slug.php` + validator (regex, reserved, exists). Unit tests: generator shape (7 chars base62, secure source) and retry behavior with a stubbed repository (5 collisions → exception); reserved list contains every top-level route of the router (`RouterInterface`) — an integration test that fails when a route is added without a reserved word (failing input demonstrated by asserting against a fake extra route in the test). Verify: `make test` green.
+- [ ] 2.2 `src/Link/Validator/TargetUrl.php` + validator with the explicit prefix table. `tests/Unit/Link/TargetUrlValidatorTest.php`: data provider with every rejected class from the spec (schemes `market://`, `ftp://`, `javascript:`, `localhost`, `127.0.0.1`, `[::1]`, `10.x`, `172.16.x`, `192.168.x`, `169.254.169.254`, `[fe80::1]`, `[fd00::1]`, `not a url`, 2049 chars) and accepted forms (store URLs, `http://example.com`, IPv6 public literal `[2001:db8::1]`, port and query). Verify: `make test` green; each rejected class is one failing input.
+
+## 3. API resource
+
+- [ ] 3.1 `src/Link/Api/LinkResource.php` (DTO + `#[ApiResource]` operations per design decision 6), `CreateLinkInput`, `UpdateLinkInput`, `CreateLinkProcessor` (generated/custom slug, retry, unique-index race → 422), `UpdateLinkProcessor` (merge-patch semantics, slug immutability → 422), `DeleteLinkProcessor`, `LinkItemProvider` (404 on unknown/non-UUID), `OwnLinksProvider` and `AllLinksProvider` (filters, order, pagination envelope, 400 on bad filter values), `shortUrl` from `APP_PUBLIC_URL` (`%env(APP_PUBLIC_URL)%` parameter). Verify with curl against the dev stack (record in the commit body): generated slug 201; custom 201; reserved 422; duplicate 422; `http://10.0.0.5/` 422; PATCH slug 422; PATCH isActive false 200; list with `isActive=false&slug=…`; `order[createdAt]=asc`; DELETE 204 then GET 404 then reuse slug 201.
+- [ ] 3.2 `src/Link/Security/LinkVoter.php`. Verify: `make console ARGS='debug:container App\\Link\\Security\\LinkVoter'` shows the `security.voter` tag; curl matrix owner 200 / stranger 403 / admin 200 / anonymous 401 on GET, PATCH, DELETE.
+- [ ] 3.3 `tests/Api/Link/CreateLinkTest.php` (generated, custom, reserved, too short/long/bad chars, case-sensitive uniqueness, every URL-policy rejection over HTTP, accepted store URLs, UTM valid/invalid, past expiry, zero limit, shape of the 201 body incl. `shortUrl` and `clickCount` 0), `UpdateLinkTest.php` (fields, null clears, isActive, invalid target unchanged, slug immutability), `ListLinksTest.php` (own-only, filters, order, envelope, page size cap 100, bad filter 400), `DeleteLinkTest.php` (204, 404 after, slug reuse), `LinkAccessTest.php` (owner/stranger/admin/anonymous matrix on GET/PATCH/DELETE; admin listing with `ownerId`; user on `/admin/links` 403). Verify: `make test` green; every scenario of spec `links` maps to a test (table in the commit body).
+
+## 4. Docs and plan
+
+- [ ] 4.1 `docs/how-to/local-development.md`: create a link with curl, list, patch, delete; a "Security notes" paragraph on the URL policy and its residual risk (public hostname resolving privately; no resolution at validation; the server never fetches targets). Verify: re-read whole; every command run in its exact form.
+- [ ] 4.2 `openspec/ROADMAP.md` row 4 and `docs/explanation/requirements.md` §7 row 4: add "routing `rules` column only; API accepts rules from `add-routing-rules`". Verify: `rg -n 'rules column only' openspec/ROADMAP.md docs/explanation/requirements.md` shows both.
+
+## 5. Wrap-up
+
+- [ ] 5.1 `make check` green; commit per block (`feat(link):` 1.x, `feat(link):` 2.x, `feat(link):` 3.x, `test:`, `docs:`) with the agent trailer; commit bodies name every failing input demonstrated. Verify: `git log --oneline main..HEAD`.
+- [ ] 5.2 **Green Actions run on the exact branch head before Gate 2**: the user pushes the change branch; the executor polls the run list for the head SHA and then `/actions/runs/{run_id}/jobs` until `workflow`, `detect` and `php` are all `success`; URL and SHA recorded in `handoff.md`.
+- [ ] 5.3 `openspec validate add-link-crud --strict` and `scripts/pregate-verify.sh gate2 add-link-crud` pass; `scripts/gate-run.sh add-link-crud 2 full`. Verify: no FAIL line.
+
+## Post-merge acceptance (not a Gate 2 task)
+
+- After the user pushes `main`, the executor checks the `main` run (run list by SHA + jobs endpoint) and reports it before offering the archive.
