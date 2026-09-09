@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+{% block title %}Log in — Linkboard{% endblock %}
+{% block body %}
+<h1>Log in</h1>
+{% if error %}
+    <p role="alert" class="error">{{ error.messageKey == 'blocked' ? 'This account is blocked.' : 'Invalid credentials.' }}</p>
+{% endif %}
+<form method="post" action="{{ path('app_login') }}">
+    <label>Email <input type="email" name="email" value="{{ last_email }}" required autofocus></label>
+    <label>Password <input type="password" name="password" required></label>
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+    <button type="submit">Log in</button>
+</form>
+<p><a href="{{ path('app_register') }}">Create an account</a></p>
+{% endblock %}

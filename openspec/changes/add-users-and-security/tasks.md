@@ -18,9 +18,9 @@
 
 ## 4. Firewalls, JWT, blocking
 
-- [ ] 4.1 `security.yaml` (design decision 4), `lexik_jwt_authentication.yaml` (`token_ttl: 3600`, key paths, passphrase env), `JwtProblemDetailsSubscriber` (success → add `expiresAt`; failure/invalid/expired/not-found → 401 problem details; `AccountStatusException` → 403 `detail: blocked`), `BlockedUserChecker`, `GET /api/v1/me` (`Me` resource with a state provider). Verify: `curl -s -X POST http://127.0.0.1:8082/api/v1/auth/token -H 'Content-Type: application/json' -d '{"email":"ann@example.com","password":"correct-horse-battery"}'` → `{"token":…,"expiresAt":…}`; `GET /api/v1/me` with the bearer → 200; without → 401 problem+json.
-- [ ] 4.2 `tests/Api/Auth/TokenTest.php`: issue + `/me`; wrong password 401; missing token 401; malformed token 401; expired token 401 (token minted with `exp` in the past through the JWT manager / encoder with a past timestamp). Failing input for blocking: `tests/Api/Auth/BlockedUserTest.php` — valid JWT, then block via repository, replay → 403 `blocked`. Verify: `make test` green.
-- [ ] 4.3 Public/protected surface test `tests/Api/Auth/AccessControlTest.php`: `/api/docs.json`, `/api/v1`, `/health` public; `/api/v1/me` 401 anonymous. Verify: `make test` green.
+- [x] 4.1 `security.yaml` (design decision 4), `lexik_jwt_authentication.yaml` (`token_ttl: 3600`, key paths, passphrase env), `JwtProblemDetailsSubscriber` (success → add `expiresAt`; failure/invalid/expired/not-found → 401 problem details; `AccountStatusException` → 403 `detail: blocked`), `BlockedUserChecker`, `GET /api/v1/me` (`Me` resource with a state provider). Verify: `curl -s -X POST http://127.0.0.1:8082/api/v1/auth/token -H 'Content-Type: application/json' -d '{"email":"ann@example.com","password":"correct-horse-battery"}'` → `{"token":…,"expiresAt":…}`; `GET /api/v1/me` with the bearer → 200; without → 401 problem+json.
+- [x] 4.2 `tests/Api/Auth/TokenTest.php`: issue + `/me`; wrong password 401; missing token 401; malformed token 401; expired token 401 (token minted with `exp` in the past through the JWT manager / encoder with a past timestamp). Failing input for blocking: `tests/Api/Auth/BlockedUserTest.php` — valid JWT, then block via repository, replay → 403 `blocked`. Verify: `make test` green.
+- [x] 4.3 Public/protected surface test `tests/Api/Auth/AccessControlTest.php`: `/api/docs.json`, `/api/v1`, `/health` public; `/api/v1/me` 401 anonymous. Verify: `make test` green.
 
 ## 5. Admin operations
 
@@ -34,8 +34,8 @@
 
 ## 7. Web pages
 
-- [ ] 7.1 `src/Web/Security/LoginController`, `RegistrationController` + `RegistrationFormType`, `templates/security/login.html.twig`, `register.html.twig`, a placeholder `/` page for the post-login target. Verify: `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8082/login` → 200; `/register` → 200.
-- [ ] 7.2 `tests/Web/Security/LoginTest.php`, `RegistrationTest.php`: register → 302 to `/login`; login OK → 302; wrong password → error message without email disclosure; missing CSRF → failure; blocked user → "blocked" message. Verify: `make test` green (suite `Web` added to `phpunit.dist.xml`).
+- [x] 7.1 `src/Web/Security/LoginController`, `RegistrationController` + `RegistrationFormType`, `templates/security/login.html.twig`, `register.html.twig`, a placeholder `/` page for the post-login target. Verify: `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8082/login` → 200; `/register` → 200.
+- [x] 7.2 `tests/Web/Security/LoginTest.php`, `RegistrationTest.php`: register → 302 to `/login`; login OK → 302; wrong password → error message without email disclosure; missing CSRF → failure; blocked user → "blocked" message. Verify: `make test` green (suite `Web` added to `phpunit.dist.xml`).
 
 ## 8. Docs, plan, wrap-up
 
