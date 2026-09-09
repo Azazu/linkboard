@@ -1,7 +1,7 @@
 # Handoff — add-link-crud
 
 **Updated:** 2026-09-09 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/add-link-crud
 
 ## Done this session
@@ -17,9 +17,10 @@
 - Gate 2 Confirmation 1 (d324e4f, recorded 977a510): #1 and #3 confirmed; #2 changes-requested — fullwidth digit spellings mapped by browsers (UTS #46) bypassed the numeric parser. Fixed: hosts run through `idn_to_ascii` (UTS #46, non-transitional) before every check; unmappable hosts rejected. Failing input demonstrated (commit body). make check: 213 tests / 1374 assertions. This will be the second confirmation on finding #2 — if it fails again, stop and ask the user (protocol). Branch run https://github.com/Azazu/linkboard/actions/runs/34346434761 on head 1b721b7 — detect, workflow, php all success.
 - Gate 2 Confirmation 2 (db839ec, recorded fbf185c): #1, #3 confirmed; #2 changes-requested — `。`/`．` map to `.` after our trailing-dot strip, leaving an empty last label. Two failed confirmations on #2 → stopped per protocol; the user chose option 1 (fix and a third confirmation). Fixed: map first, strip the trailing dot from the mapped form, reject empty labels; regressions unit/POST/PATCH; failing input demonstrated (commit body). make check: 224 tests / 1409 assertions. Branch run https://github.com/Azazu/linkboard/actions/runs/34347056917 on head 25cd549 — detect, workflow, php all success.
 - Gate 2 Confirmation 3 (d68d62a, recorded c8e3ac3): #1, #3 confirmed; #2 changes-requested — `http://127.0.0.1\@example.com/`: parse_url host example.com, browser host 127.0.0.1. Stopped per protocol; the user chose to fix and run a fourth confirmation. Fixed at the character level: backslash / C0 / space / DEL anywhere → rejected before parsing; userinfo → rejected (spec narrowed accordingly). Regressions unit/POST/PATCH; failing input demonstrated (commit body). make check: 240 tests / 1461 assertions. Branch run https://github.com/Azazu/linkboard/actions/runs/34347768566 on head c48493a — detect, workflow, php all success.
+- Gate 2 Confirmation 4 (4be5204, recorded f9ea48b): all three findings confirmed. Gate 2 passed; only review.md/handoff.md changed since the green run.
 
 ## Next step
-`scripts/gate-run.sh add-link-crud 2 confirm 1` (auto mode; fourth confirmation of round 1, chosen by the user). On confirmed: `/git:merge add-link-crud`, user pushes main, check the main run, `/opsx:archive add-link-crud` (syncs spec `links`), update ~/Projects/pet/Linkboard_TZ_RU.md, then `/workflow:start add-redirect-with-sync-logging`. After two failed confirmations on the same finding: stop and ask the user.
+`/git:merge add-link-crud` (user's command). Then the user pushes main; check the main run via API; `/opsx:archive add-link-crud` (syncs spec `links`); update ~/Projects/pet/Linkboard_TZ_RU.md; `/workflow:start add-redirect-with-sync-logging` (roadmap row 5, medium).
 
 ## Blockers
 None (the Codex spend cap that blocked the first attempt turned out not to apply).
