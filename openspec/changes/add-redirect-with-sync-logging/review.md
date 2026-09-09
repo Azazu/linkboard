@@ -21,3 +21,25 @@
 - Confirmed the current branch is `change/add-redirect-with-sync-logging` and HEAD is the reviewed commit above; the working tree was clean before this record.
 - Read the proposal, design, tasks, delta specs, handoff, roadmap, OpenSpec configuration, applicable requirements, and the existing routing/security, URL-validation and limiter implementation context.
 - `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passed, including strict OpenSpec validation, with zero warnings. These mechanical checks do not resolve the design findings above.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** f207eb17fd24ee9e6b01aef3801937d7f6657cc7
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 6 now preserves unrelated raw query pairs and removes every occurrence of the intended percent-decoded UTM keys. The redirect spec and task 2.1 cover repeated, dotted, bracketed and encoded components, including a regression that fails with the old map-based algorithm. |
+| 2 | confirmed — Decision 1, proposal impact and task 2.3 explicitly narrow the API firewall to `^/api(/\|$)`. The public-slug scenario and task 3.1 cover `api-promo` with absent and invalid credentials and retain a 401 assertion for the actual API route. |
+| 3 | changes-requested — The fail-open policy, Redis dependency boundary and safe warning log are now specified, but decision 9 and task 3.3(c) only plan a throwing factory. That does not exercise successful creation followed by a failure during `consume()`, where the installed `SlidingWindowLimiter` acquires its lock and reads/writes storage. A catch surrounding only `create()` would pass the planned failure test while leaving the original outage path unprotected. Add explicit verification tasks using successful creation with failing lock acquisition and failing storage during consumption; assert the normal redirect response and a warning without the IP, and demonstrate failure when consumption is outside the catch. Retain the creation-failure case. This is the outstanding failing-dependency coverage requested by finding 3. |
+| 4 | confirmed — Decision 7 and the header-bounds requirement constrain the extracted host to 255 bytes, valid UTF-8 and no controls, with invalid input becoming null. Tasks 2.1 and 3.2 cover column boundaries and hostile hosts with a persisted click and 302 for both limited and unlimited links. |
+| 5 | confirmed — The normative specs now state the unlimited write-failure exception, HEAD's independence from click writes and the commit-to-response crash window. Task 2.1 verifies that HEAD never invokes the recorder; tasks 1.4 and 3.3 cover atomic recording and the explicit write-failure outcomes. The healthy-store HEAD scenario bounds the normal GET/HEAD comparison. |
+| 6 | confirmed — Decision 13 and the store-failure requirement distinguish lookup failure (503 before resolution) from write failure after successful resolution (302/503). Tasks 2.1 and 3.3 separately cover a throwing repository, and the artifacts explicitly disclaim availability during a total database outage. |
+
+### Validation
+
+- Reviewed only the diff from `6e59b75bb617ada03da5ec51b92935f2a93b041f` to the Reviewed-Commit and collateral context needed for the six source findings; all six source statuses were `fixed`.
+- Verified the requested branch and HEAD and an initially clean working tree. Inspected the existing firewall configuration and installed rate-limiter factory and consumption path.
+- `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passed, including strict OpenSpec validation, with zero warnings. This is a Gate 1 artifact confirmation, not implementation validation.
