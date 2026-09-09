@@ -31,3 +31,11 @@ services:
 
     # Domain repositories are interfaces; the Doctrine implementation is the binding.
     App\Auth\UserRepositoryInterface: '@App\Auth\Repository\DoctrineUserRepository'
+
+when@test:
+    services:
+        # Rate-limiter storage for the test environment: lives for the process,
+        # is not tagged kernel.reset, so a test that sends 11 requests through
+        # one kernel (disableReboot) sees one window. Not registered elsewhere.
+        app.rate_limiter.test_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
