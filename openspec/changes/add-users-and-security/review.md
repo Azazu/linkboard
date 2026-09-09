@@ -59,3 +59,20 @@ Reviewed the branch diff against `main`, change artifacts, tests, and the instal
 
 ### Verification
 Reviewed only `380cb567d2873b9e6e49bbdddd1c2ca24df5c1fc..c1e430686bdb4c089941a312fff7a07178734098` and collateral source, configuration, specifications, tests and installed framework code reachable from findings 1–4. Repository searches checked the affected claims. Branch and HEAD match the requested target; the worktree was initially clean and `git diff --check` for the requested range passed. Runtime verification was unavailable: `make ps` failed because Docker socket access was denied, and `command -v php` found no host PHP. No unrelated findings were introduced; only this review file was modified and no git write commands were run.
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** d8d6e151c29103aedc26f3ae8c033bb7cafd2fe3
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — `UserProvider::refreshUser()` rejects blocked accounts; the exception subscriber preserves the blocked login message, including wrapped exceptions. The web regression logs in before blocking and reuses the session to verify the redirect, message and loss of authenticated access. The checker comment and design decision 6 now correctly distinguish authentication checks from provider-enforced session refresh. |
+| 2 | confirmed — both limiters use the Redis-backed `lock.factory`, protecting the installed sliding-window implementation's fetch/update/save sequence. The 25-process Redis regression requires exactly 10 acceptances; the executor records 17 acceptances without the lock and 10 with it. The previously confirmed fix remains intact. |
+| 3 | confirmed — production has a dedicated always-on info-level JSON audit stream, excluded from the fingers-crossed main handler. The test environment now uses the same audit handler type, level, channel and formatter with a readable file destination. The API regression performs successful block and unblock and asserts exactly one INFO record each with action, actor and target, without an intervening error; the configuration test separately verifies the production destination and wiring. |
+| 4 | confirmed — the flush-conflict branch throws API Platform's validation exception. The new HTTP regression inserts a competing row through a prePersist listener after uniqueness validation, reaches the real unique-index conflict, and asserts HTTP 422, problem+json and an email violation through the API error path. |
+
+### Verification
+Reviewed only `380cb567d2873b9e6e49bbdddd1c2ca24df5c1fc..d8d6e151c29103aedc26f3ae8c033bb7cafd2fe3` and collateral effects reachable from findings 1–4, including related claims, tests and installed framework implementations. Branch and HEAD match the requested target; the worktree was initially clean and the requested range passed `git diff --check`. Runtime tests could not be independently rerun: `make ps` was denied access to the Docker socket and no host PHP executable was found. The recorded green checks and concurrency measurements are executor evidence, not independent executions. Only `review.md` was modified; no git write commands were run and no unrelated findings were introduced.
