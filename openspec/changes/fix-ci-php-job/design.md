@@ -29,7 +29,7 @@ See `proposal.md` — Why. CI is the only place where the application database a
 
 ## Risks / Trade-offs
 
-- [GitHub's runner is the only place the workflow file and the actions are exercised] → the local reproduction covers the database logic; a green run on the exact branch head is mandatory before Gate 2 (task 2.2), and the `main` run is checked before the archive (task 2.4). This is the standing rule from here on: no merge is offered while the head's run is red or unverified.
+- [GitHub's runner is the only place the workflow file and the actions are exercised] → the local reproduction covers the database logic; a green run on the exact branch head is mandatory before Gate 2 (task 2.2), and the `main` run is checked before the archive (post-merge acceptance 2.4 in tasks.md; not a checkbox because it cannot happen before Gate 2). This is the standing rule from here on: no merge is offered while the head's run is red or unverified.
 - [v7 of the actions changes defaults] → checkout v7 / setup-node v7 keep the inputs this workflow uses (`node-version`); verified against their release notes titles only — the run itself is the check.
 
 ## Migration Plan
