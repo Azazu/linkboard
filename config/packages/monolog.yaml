@@ -25,10 +25,14 @@ when@dev:
 when@test:
     monolog:
         handlers:
-            # in-memory handler so tests can assert audit records
+            # same wiring as prod (always-on info stream, JSON, only the audit
+            # channel) with a file instead of stderr so tests can read the records
             audit:
-                type: test
+                type: stream
+                path: "%kernel.logs_dir%/audit.log"
+                level: info
                 channels: [audit]
+                formatter: monolog.formatter.json
             main:
                 type: fingers_crossed
                 action_level: error

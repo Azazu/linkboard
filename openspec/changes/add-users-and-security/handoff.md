@@ -15,6 +15,8 @@
 
 - Gate 2 Round 1 (c665fff): changes-requested, 4 findings, all fixed: #1 blocked account ends an existing web session (refreshUser throws; BlockedSessionErrorSubscriber stores the error for /login; web test); #2 Redis lock on the limiters (symfony/lock, LOCK_DSN; 25-process concurrency test; without lock 17/25 accepted, with lock 10/25); #3 always-on audit stream handler in prod/dev (config test); #4 API Platform ValidationException on the flush race (processor test). make check: cs 0, stan 0, 69 tests / 369 assertions. Next: user pushes, green run on the head, then `gate-run … 2 confirm 1`.
 
+- Branch run https://github.com/Azazu/linkboard/actions/runs/34328524137 on c1e4306: all jobs success. Gate 2 Confirmation 1 (b4517f5): #2 confirmed; #1, #3, #4 asked for completion — done: stale checker/design wording replaced (the checker does not run on session refresh; refreshUser does); the test env now uses the production-style always-on JSON audit stream (file instead of stderr) and the admin test asserts one record for block and one for unblock with action/actor/target and no email; an HTTP-level test reaches the unique-index race after validation (prePersist listener inserts the competitor) and asserts 422 with an email violation. make check: cs 0, stan 0, 70 tests / 385 assertions. Next: user pushes, green run on the head, `gate-run … 2 confirm 1` (second confirmation).
+
 ## Next step
 `scripts/gate-run.sh add-users-and-security 2 full` (auto mode; executor runs it). On approval: `/git:merge add-users-and-security`, user pushes `main`, executor checks the `main` run, then `/opsx:archive` (syncs four delta specs incl. the MODIFIED health-check clause).
 

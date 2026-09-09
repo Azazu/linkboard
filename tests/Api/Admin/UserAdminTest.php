@@ -6,11 +6,10 @@ namespace App\Tests\Api\Admin;
 
 use App\Auth\Entity\User;
 use App\Tests\Factory\UserFactory;
-use Monolog\Handler\TestHandler;
-use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
 
@@ -115,30 +114,35 @@ final class UserAdminTest extends WebTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
-    public function testBlockWritesOneAuditRecordWithoutEmails(): void
+    public function testBlockAndUnblockEachWriteOneAuditRecordThroughTheStreamHandler(): void
     {
+        // The test env uses the production wiring (always-on info stream, JSON,
+        // audit channel only) with a file instead of stderr.
         $client = self::createClient();
+        $log = self::getContainer()->getParameter('kernel.logs_dir').'/audit.log';
+        \assert(\is_string($log));
+        (new Filesystem())->dumpFile($log, '');
         $admin = UserFactory::new()->admin()->create(['email' => 'admin@example.com']);
         $user = UserFactory::createOne(['email' => 'ann@example.com']);
 
         $this->request($client, 'admin@example.com', 'POST', '/api/v1/admin/users/'.$user->getId().'/block');
         self::assertResponseStatusCodeSame(200);
+        $this->request($client, 'admin@example.com', 'POST', '/api/v1/admin/users/'.$user->getId().'/unblock');
+        self::assertResponseStatusCodeSame(200);
 
-        // the audit channel's test handler (config/packages/monolog.yaml, when@test)
-        $logger = self::getContainer()->get('monolog.logger.audit');
-        self::assertInstanceOf(Logger::class, $logger);
-        $handlers = array_values(array_filter($logger->getHandlers(), static fn ($h): bool => $h instanceof TestHandler));
-        self::assertCount(1, $handlers);
-        $handler = $handlers[0];
-        self::assertInstanceOf(TestHandler::class, $handler);
-        $records = array_values(array_filter($handler->getRecords(), static fn ($r): bool => 'user.block' === $r->message));
-        self::assertCount(1, $records);
-        $record = $records[0];
-        self::assertSame('info', strtolower($record->level->getName()));
-        self::assertSame('user.block', $record->context['action']);
-        self::assertSame((string) $admin->getId(), $record->context['actor_id']);
-        self::assertSame((string) $user->getId(), $record->context['target_id']);
-        self::assertStringNotContainsString('@', $record->message.json_encode($record->context, \JSON_THROW_ON_ERROR));
+        $lines = array_values(array_filter(explode("\n", file_get_contents($log) ?: '')));
+        self::assertCount(2, $lines, 'exactly one record per action');
+        foreach ([['user.block', $lines[0]], ['user.unblock', $lines[1]]] as [$action, $line]) {
+            $record = json_decode($line, true, 512, \JSON_THROW_ON_ERROR);
+            self::assertIsArray($record);
+            self::assertSame('audit', $record['channel']);
+            self::assertSame('INFO', $record['level_name']);
+            self::assertSame($action, $record['message']);
+            self::assertSame($action, $record['context']['action']);
+            self::assertSame((string) $admin->getId(), $record['context']['actor_id']);
+            self::assertSame((string) $user->getId(), $record['context']['target_id']);
+            self::assertStringNotContainsString('@', $line);
+        }
     }
 
     private function token(KernelBrowser $client, string $email): string

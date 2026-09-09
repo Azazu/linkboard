@@ -11,9 +11,11 @@ use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 /**
- * Runs on every authentication — a JWT on the api firewall, the session
- * refresh on the web firewall — so a block takes effect on the next request
- * (specification FR-AUTH-6). The API turns this exception into a 403 problem
+ * Runs on every *authentication*: a bearer JWT on the api firewall and the
+ * form login on the web firewall (specification FR-AUTH-6). It does NOT run
+ * when an existing web session is refreshed — Symfony's ContextListener
+ * bypasses user checkers — so UserProvider::refreshUser() enforces the same
+ * policy for live sessions. The API turns this exception into a 403 problem
  * with detail "blocked" (JwtProblemDetailsSubscriber).
  */
 final class BlockedUserChecker implements UserCheckerInterface
