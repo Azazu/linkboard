@@ -22,7 +22,9 @@ namespace App\Link\Validator;
  * `．` map to `.`); a host the mapping rejects, or one with an empty label,
  * is rejected. Percent-encoded hosts are
  * rejected: browsers decode them, parse_url does not, and an address must
- * never be judged on a spelling the client will not use. Names are NOT
+ * never be judged on a spelling the client will not use. For the same reason
+ * a URL containing a backslash or a control character is rejected before
+ * parsing, and userinfo (`user@host`) is not accepted at all. Names are NOT
  * resolved: a public hostname that resolves privately is the documented
  * residual risk (the server never fetches targets).
  */
@@ -49,11 +51,24 @@ final class TargetUrlPolicy
 
     public static function isAllowed(string $url): bool
     {
-        if (\strlen($url) > TargetUrl::MAX_LENGTH || preg_match('/[\s]/', $url)) {
+        if (\strlen($url) > TargetUrl::MAX_LENGTH) {
+            return false;
+        }
+        // Characters on which parse_url and the WHATWG URL parser disagree are
+        // rejected before any parsing: a backslash (browsers read it as `/`, so
+        // `http://127.0.0.1\@example.com/` reaches 127.0.0.1 while PHP sees host
+        // example.com), and every C0 control, space and DEL (browsers strip tab
+        // and newline and percent-encode the rest).
+        if (1 === preg_match('/[\x00-\x20\x7f\\\\]/', $url)) {
             return false;
         }
         $parts = parse_url($url);
         if (false === $parts || !isset($parts['scheme'], $parts['host']) || '' === $parts['host']) {
+            return false;
+        }
+        // No userinfo: a target needs no credentials, and `user@host` is the
+        // shape every "two hosts in one authority" trick relies on.
+        if (isset($parts['user']) || isset($parts['pass'])) {
             return false;
         }
         if (!\in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {

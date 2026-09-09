@@ -92,6 +92,17 @@ final class TargetUrlPolicyTest extends TestCase
         yield 'localhost with an ideographic full stop' => ['http://localhost。/'];
         yield 'empty label inside the host' => ['http://127.0..1/'];
         yield 'two trailing dots' => ['http://127.0.0.1../'];
+        // authority read differently by parse_url and by browsers
+        yield 'backslash before @ hides loopback in userinfo' => ['http://127.0.0.1\\@example.com/'];
+        yield 'backslash before @ hides the metadata service in userinfo' => ['http://169.254.169.254\\@example.com/'];
+        yield 'backslash in the path' => ['https://example.com\\path'];
+        yield 'userinfo with a public host' => ['http://user:secret@example.com/'];
+        yield 'userinfo without a password' => ['http://user@example.com/'];
+        yield 'userinfo hiding a blocked host' => ['http://example.com@127.0.0.1/'];
+        yield 'tab inside' => ["http://127.0.0.1\t@example.com/"];
+        yield 'newline inside' => ["https://example.com/\n"];
+        yield 'NUL inside' => ["https://example.com/\0"];
+        yield 'DEL inside' => ["https://example.com/\x7f"];
         yield 'host with a character outside LDH after mapping' => ['http://ex|ample.com/'];
         // numeric hosts a browser fails to parse at all
         yield 'five numeric labels' => ['http://1.2.3.4.5/'];

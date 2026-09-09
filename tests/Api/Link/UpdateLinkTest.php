@@ -106,6 +106,9 @@ final class UpdateLinkTest extends LinkApiTestCase
         yield 'fullwidth decimal metadata service' => ['http://２８５２０３９１６６/'];
         yield 'loopback with an ideographic full stop' => ['http://127.0.0.1。/'];
         yield 'metadata service decimal with a fullwidth full stop' => ['http://2852039166．/'];
+        yield 'backslash before @ hides loopback in userinfo' => ['http://127.0.0.1\\@example.com/'];
+        yield 'backslash before @ hides the metadata service in userinfo' => ['http://169.254.169.254\\@example.com/'];
+        yield 'userinfo' => ['http://user:secret@example.com/'];
     }
 
     #[DataProvider('invalidTargets')]

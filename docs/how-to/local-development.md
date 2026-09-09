@@ -93,8 +93,10 @@ host. The host is first mapped to ASCII the way browsers do it (UTS #46, so
 fullwidth `１２７.０.０.１` becomes `127.0.0.1`, `。` becomes `.`, and `пример.рф` its punycode),
 literal addresses are recognised in every spelling a browser accepts
 (`127.1`, `2130706433`, `0x7f000001`, `0177.0.0.1`, trailing dot), and
-percent-encoded or unmappable hosts are rejected, so the check applies to
-the address the visitor's browser will actually contact. Hostnames are deliberately not
+percent-encoded or unmappable hosts, userinfo (`user@host`) and any
+backslash or control character are rejected, so the check applies to the
+address the visitor's browser will actually contact rather than to a
+spelling PHP and the browser read differently. Hostnames are deliberately not
 resolved at validation time: a public name that resolves to a private
 address is the documented residual risk, which is why the server itself
 never fetches a target — it only redirects.
