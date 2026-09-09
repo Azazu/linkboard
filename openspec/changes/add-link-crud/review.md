@@ -119,3 +119,23 @@
 - Reproduced the slug pattern accepting trailing newlines with the local PCRE2 library. Confirmed the alternative-IP examples' effective hosts with Node's WHATWG URL parser, without network requests. Finding 1 follows directly from the installed Length validator, the custom validator's empty-value return, and the processor/entity write path. These are focused parser/source checks, not completed HTTP reproductions.
 - `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks, but failed its `make check` step because this sandbox cannot access `/var/run/docker.sock`. No host PHP is installed. Consequently PHP lint/static analysis/PHPUnit and HTTP regressions could not be independently executed in this review; the executor's earlier green results in the handoff/commit history were read, not reproduced. The environment failure is not attributed to a code regression.
 - Modified only `review.md`; ran no git write commands.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** d324e4f8ddb75b8a92fac6f324552b8a55f48f60
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — TargetUrlValidator now skips only null and passes the empty string to TargetUrlPolicy, which rejects it for missing scheme/host. Omitted PATCH fields retain their nullable/presence behavior. UpdateLinkTest adds the empty-string HTTP case, asserts 422 on targetUrl and GETs the unchanged destination. Removing CreateLinkInput's redundant NotBlank retains empty/missing-target rejection through its default empty string and the shared validator; POST regressions cover both. |
+| 2 | changes-requested — The listed ASCII numeric spellings and percent-encoded hosts are now handled, with unit and POST/PATCH regressions, but the same effective-address bypass remains through Unicode host normalization. For example, `http://１２７.０.０.１/` and `http://２８５２０３９１６６/` normalize in Node's WHATWG URL parser to 127.0.0.1 and 169.254.169.254 respectively, without DNS. TargetUrlPolicy.php:66–73 performs only lowercase/trailing-ASCII-dot handling before parseIpv4Host; its ASCII-only last-label pattern at lines 105–106 returns null for these hosts, allowing them as hostnames. Thus the new security-note guarantee that every browser-accepted spelling is checked is still false. Normalize the host using browser-compatible domain-to-ASCII processing before localhost/numeric classification, or reject non-ASCII hosts before the hostname fallback; retain safe ASCII/punycode hostname behavior. Add unit and POST/PATCH regressions for these normalized literal addresses, including unchanged storage after rejected PATCH, and reconcile the affected security claims. This is the unresolved parser/address-policy finding, not an unrelated finding. |
+| 3 | confirmed — Slug::PATTERN now uses the absolute end anchor `\z`, so a final newline cannot pass the alphabet/length check or reach the reserved-word/database path. CreateLinkTest adds HTTP 422 cases for abc plus newline, admin plus newline, and 32 valid characters plus newline. The related requirement, proposal and delta spec clarify whole-string matching. |
+
+### Validation
+- Reviewed only `def03664e7b9e36dc14187c9180aa35cf77c7a51..d324e4f8ddb75b8a92fac6f324552b8a55f48f60` and collateral effects of Gate 2 Round 1 findings 1–3; no unrelated findings introduced.
+- Confirmed branch `change/add-link-crud`, the requested HEAD and an initially clean working tree; all three source-round major findings were marked fixed, with no blockers or open rows.
+- Inspected the changed validation paths, HTTP regression assertions and related artifact claims. Reproduced Unicode and ASCII effective-address normalization with the local Node WHATWG URL parser without network requests. PHP-side acceptance of the Unicode examples follows from source inspection; no HTTP reproduction is claimed.
+- `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks, but its `make check` step failed because the sandbox cannot access `/var/run/docker.sock`. No host PHP executable is available. Executor-reported green checks and mutation evidence in the handoff/commit were read, not independently reproduced; this environment limitation is not attributed to a code regression.
+- Modified only `review.md`; ran no git write commands.
