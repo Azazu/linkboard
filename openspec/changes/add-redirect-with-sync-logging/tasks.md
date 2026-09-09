@@ -23,12 +23,12 @@
 
 ## 4. Docs
 
-- [ ] 4.1 `docs/how-to/local-development.md`: a "Redirect" section (curl -I of a short link, the 404/410/302 matrix in two lines, `RATE_LIMIT_REDIRECT_PER_IP`, `VISITOR_HASH_SALT` — set in `.env.local`, rotation note, never committed), and a one-paragraph baseline note: clicks are written synchronously on the hot path until `add-async-click-logging`, contrary to FR-RED-2, on purpose. Verify: re-read whole after the last edit; every documented command run in its exact form against the dev stack.
-- [ ] 4.2 Re-read `openspec/ROADMAP.md` row 5 and `docs/explanation/requirements.md` §7 row 5 against the delivered scope; edit only if a scope claim changed. Verify: `rg -n 'add-redirect-with-sync-logging' openspec/ROADMAP.md docs/explanation/requirements.md` shows the rows and they match.
+- [x] 4.1 `docs/how-to/local-development.md` (also the two stale "asynchronous" claims in Daily and Troubleshooting corrected): a "Redirect" section (curl -I of a short link, the 404/410/302 matrix in two lines, `RATE_LIMIT_REDIRECT_PER_IP`, `VISITOR_HASH_SALT` — set in `.env.local`, rotation note, never committed), and a one-paragraph baseline note: clicks are written synchronously on the hot path until `add-async-click-logging`, contrary to FR-RED-2, on purpose. Verify: re-read whole after the last edit; every documented command run in its exact form against the dev stack.
+- [x] 4.2 Re-read `openspec/ROADMAP.md` row 5 and `docs/explanation/requirements.md` §7 row 5 against the delivered scope; edit only if a scope claim changed. Verify: `rg -n 'add-redirect-with-sync-logging' openspec/ROADMAP.md docs/explanation/requirements.md` shows the rows and they match.
 
 ## 5. Wrap-up
 
-- [ ] 5.1 `make check` green (cs, stan level 8, all suites); commits per block (`feat(click):` 1.x, `feat(redirect):` 2.x, `test(redirect):` 3.x, `docs:` 4.x) with the agent trailer; every commit body of a guard names its demonstrated failing input. Verify: `git log --oneline main..HEAD`.
+- [x] 5.1 `make check` green (cs, stan level 8, all suites); commits per block (`feat(click):` 1.x, `feat(redirect):` 2.x, `test(redirect):` 3.x, `docs:` 4.x) with the agent trailer; every commit body of a guard names its demonstrated failing input. Verify: `git log --oneline main..HEAD`.
 - [ ] 5.2 Green Actions run on the exact branch head before Gate 2: the user pushes `change/add-redirect-with-sync-logging`; the executor polls the run list for the head SHA and the jobs endpoint until `detect`, `workflow` and `php` are `success`; URL and SHA recorded in `handoff.md`.
 - [ ] 5.3 `openspec validate add-redirect-with-sync-logging --strict` and `scripts/pregate-verify.sh gate2 add-redirect-with-sync-logging` pass; `scripts/gate-run.sh add-redirect-with-sync-logging 2 full`. Verify: no FAIL line.
 

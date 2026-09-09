@@ -45,7 +45,7 @@ http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
 | test database | `make test-db` (create + migrate `<db>_test`; also run by `make init`) |
 | JWT keys | `make jwt-keys` (dev + test keypairs, skips existing; also run by `make init`) |
 | make an admin | `make console ARGS='app:user:promote you@example.com'` (`app:user:demote` reverts) — the only way roles change |
-| async worker (foreground) | `make worker` in a second terminal (clicks are logged asynchronously) |
+| async worker (foreground) | `make worker` in a second terminal — needed from `add-async-click-logging` on; until then clicks are written synchronously (see Redirect) |
 | async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile, so `make up` does not start it unless asked |
 | the gate floor | `make check` (php-cs-fixer + PHPStan level 8 + PHPUnit; suites `Unit`, `Integration`, `Api`, `Web`) |
 | one suite | `docker compose exec php vendor/bin/phpunit --testsuite Unit` (also `Integration`, `Api`) |
@@ -108,6 +108,48 @@ lives in Redis. The client IP comes from the trusted-proxy configuration
 header from any other peer is ignored, so do not widen it to a range you do
 not control.
 
+## Redirect
+
+The short link itself is `GET /{slug}` — public, no session, no cookie:
+
+```bash
+curl -sI http://localhost:8082/spring-sale
+# HTTP/1.1 302 Found · Location: <target with the link's UTM appended>
+# Cache-Control: no-store · Referrer-Policy: no-referrer-when-downgrade
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8082/nothing-here   # 404
+curl -s -H 'Accept: application/json' http://localhost:8082/nothing-here        # problem details
+```
+
+Unknown or inactive slug → 404; expired or click limit reached → 410 Gone;
+otherwise 302 (never 301). Bodies are small HTML pages, or RFC 9457 problem
+details for `Accept: application/json`. `HEAD` answers like `GET` but records
+nothing. The click limit is exact under concurrency: check and increment are
+one SQL statement, so a link with `maxClicks` 3 answers 302 exactly three times.
+
+Every `GET` 302 writes one row into `clicks` and increments the link's
+`clickCount` in the same transaction. The row stores a salted hash of the
+visitor (`visitor_hash`) and the referer host — never the IP or the user
+agent. The salt is `VISITOR_HASH_SALT`: the value in `.env` is a
+local-development default; set the real one in `.env.local` (gitignored) or
+the deployment's environment, never in the repository. Rotating it breaks
+unique-visitor continuity: visitors before and after the rotation count as
+different people.
+
+Redirects are rate limited per client IP, `RATE_LIMIT_REDIRECT_PER_IP`
+(default 60 per minute, sliding window, counter in Redis with the shared
+lock); over the limit → 429 with `Retry-After`. This limiter is the only Redis
+use on the redirect path and it fails **open**: while Redis is down redirects
+are served unlimited and each request logs a warning.
+
+**Baseline note (stage 1).** Until `add-async-click-logging` (roadmap row 7)
+the click is written synchronously inside the redirect request — one SELECT,
+one UPDATE and one INSERT — which deliberately contradicts FR-RED-2 ("no SQL
+write on the hot path") for now. The failure contract is already the final
+one: if the click cannot be written, a link without `maxClicks` still
+redirects and logs an error; a link with `maxClicks` answers 503 with
+`Retry-After: 5` because its limit cannot be guaranteed; if the link itself
+cannot be looked up, every slug answers 503.
+
 ## Reset (DESTRUCTIVE)
 
 `docker compose down --volumes` deletes both named volumes: `pg_data`
@@ -125,9 +167,10 @@ it yourself.
 - **Compose does not see my `.env.local`** — Docker Compose reads only
   `.env`; for compose-level overrides (ports, project name) use
   `docker compose --env-file .env.local` or export them in the shell.
-- **Redirects work but analytics stay empty** — no worker is consuming
-  the `async` transport; run `make worker`, or check
-  `make console ARGS='messenger:stats'`.
+- **Redirects work but analytics stay empty** — from `add-async-click-logging`
+  on: no worker is consuming the `async` transport; run `make worker`, or
+  check `make console ARGS='messenger:stats'`. Before that change clicks land
+  in `clicks` synchronously and no worker is involved.
 - **Permission denied on `var/`** — the php image must run as your ids;
   rebuild with `HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose build php`
   (see `.docker/php/Dockerfile`).
