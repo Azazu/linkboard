@@ -182,3 +182,23 @@
 - `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks. Its `make check` failed because the sandbox cannot access `/var/run/docker.sock`; no host PHP executable is available. Executor-reported green checks and mutation results were read, not independently reproduced. This environment limitation is not attributed to a code regression.
 - Finding 2 remains unresolved after the requested third confirmation. Stop further automatic confirmations and return to user arbitration or split/reduce the change, per AGENTS.md.
 - Modified only `review.md`; ran no git write commands.
+
+## Confirmation 4 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** 4be52045f6f008f5cc48b1a821bfb899d12632d9
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — TargetUrlValidator skips only null; a present empty string reaches TargetUrlPolicy and is rejected for lacking a scheme/host. PATCH presence handling is preserved. UpdateLinkTest asserts 422 on targetUrl and verifies the unchanged destination with a subsequent GET. Creation's default empty string remains invalid after removal of the redundant NotBlank constraint; POST regressions cover missing and empty targets. |
+| 2 | confirmed — Backslashes, C0 controls, space and DEL are rejected before parse_url, and userinfo is rejected after parsing, closing the authority disagreement from Confirmation 3. Percent-encoded hosts are rejected; other non-bracketed hosts undergo UTS #46 mapping before removal of the single trailing dot and localhost/numeric classification. The numeric parser handles shorthand, decimal, hex and octal IPv4 forms and applies the existing range checks to the resulting address; bracketed IPv6 retains its range and mapped-IPv4 checks. Unit and POST/PATCH regressions cover the original numeric/encoded examples, Unicode addresses, mapped trailing dots and backslash authority examples; rejected PATCH cases verify unchanged storage. Accepted-host unit cases retain public addresses, ASCII/punycode and internationalized hostnames. The requirement, proposal, design, delta spec and security note describe the resulting restrictions and unresolved-DNS limitation consistently. No remaining bypass of the named finding was identified in the reviewed scope. |
+| 3 | confirmed — Slug::PATTERN uses the absolute end anchor \z. POST regressions assert 422 on slug for abc plus newline, admin plus newline, and 32 valid characters plus newline. Related requirements, proposal and delta spec specify whole-string matching, closing both the reserved-word and storage-length paths. |
+
+### Validation
+- Reviewed only `def03664e7b9e36dc14187c9180aa35cf77c7a51..4be52045f6f008f5cc48b1a821bfb899d12632d9` and collateral effects of Gate 2 Round 1 findings 1–3; no unrelated findings introduced. Confirmed the requested branch and HEAD, an initially clean working tree, and every source-round finding marked fixed.
+- Per the user's explicit request, performed this fourth confirmation after the prior stop notice.
+- Inspected the changed validation paths, POST/PATCH assertions and their shared 422 assertion helper, related artifact claims, existing ext-intl requirement, and executor mutation evidence in the fix commits. Independently reproduced the cited effective-address examples with local Node's WHATWG URL parser without network requests. Application rejection is established by source inspection here; no PHP or HTTP execution is claimed.
+- `scripts/pregate-verify.sh gate2 add-link-crud` passed whitespace, strict OpenSpec validation, task/path and Markdown-link checks. Its `make check` failed because the sandbox cannot access `/var/run/docker.sock`; no host PHP executable is available. Executor-reported green checks (240 tests / 1461 assertions) and mutation results were read, not independently reproduced. This environment limitation is not attributed to a code regression, and this confirmation does not waive the green-check requirement.
+- Modified only `review.md`; ran no git write commands.
