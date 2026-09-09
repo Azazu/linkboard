@@ -77,3 +77,24 @@
 - Checked related artifact claims, normative FR-LNK-2/FR-ADM-2, installed Doctrine rollback and Symfony manager-reset mechanisms, API Platform request context and the existing admin audit implementation.
 - `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. This is a Gate 1 artifact review; implementation tests remain planned.
 - Findings 2 and 3 remain unresolved after the requested third confirmation. Stop further automatic confirmations and return to user arbitration or split/reduce the change, per AGENTS.md.
+
+## Confirmation 4 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** a437dfdbc7b8d0d8f5214fad9f0e0f2ade2254e5
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 6 uses decoded request-body key membership to preserve field presence independently of nullable DTO values. The proposal, spec and tasks 3.1/3.3 agree on the per-field null contract and HTTP verification that omission preserves populated expiry/limit fields while explicit null clears only the limit; null targetUrl/isActive is rejected. The installed API Platform controller supplies the request in processor context. |
+| 2 | confirmed — Decision 3 and task 3.1 specify resetManager after a generated-slug INSERT collision, a new Link and owner attachment through getReference on the recovered manager, bounded attempts and separate custom-slug 422 behavior. Task 2.1 now verifies actual collision recovery through candidate 2 being persisted with the correct owner, an open manager and a managed owner, without requiring different lazy-service object identity. Removing reset must break that success test. A separate test occupies all five candidates and verifies exhaustion with 500 and an error log naming five attempts. This resolves the recovery and exhaustion verification gaps without weakening FR-LNK-2. |
+| 3 | confirmed — Decision 8, the audit requirement and task 3.3 cover successful update, deactivate, activate and delete with actor/target/owner ids, including one-record precedence for combined updates. Task 3.3 now explicitly asserts the exact safe context keys and scalar values for every successful record and excludes slug, old/new target URLs and email from the entire JSON line. The spec scenarios reflect these exclusions. Verification also covers owner actions, 403/422 rejection and forced flush failure without a success record; after-flush ordering and the crash limitation remain explicit. |
+
+### Validation
+- Reviewed only `2389dc92035dc8640998b59485ba35d60e1b532e..a437dfdbc7b8d0d8f5214fad9f0e0f2ade2254e5` and collateral effects of Round 1 findings 1–3; no unrelated findings introduced.
+- Confirmed branch `change/add-link-crud`, the requested HEAD and an initially clean working tree; all source-round findings were marked `fixed`.
+- Per the user's explicit request, performed this fourth confirmation after the prior stop notice.
+- Checked related artifact claims, normative FR-LNK-2/FR-ADM-2, installed Doctrine failed-commit and Symfony lazy-manager reset behavior, API Platform request context and the existing admin audit implementation.
+- `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. This confirms the Gate 1 artifacts; implementation tests remain planned.
+- Modified only `review.md`; ran no git write commands.
