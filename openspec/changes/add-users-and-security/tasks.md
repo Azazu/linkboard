@@ -13,8 +13,8 @@
 
 ## 3. Registration and the 422 shape
 
-- [ ] 3.1 `RegistrationInput` DTO with constraints (`Email`, `Length(min 12)`, `UniqueEmail` custom constraint + validator over the repository), `Registration` API resource `POST /api/v1/auth/register` with `RegisterUserProcessor`, `UserOutput`. Verify: `curl -s -i -X POST http://127.0.0.1:8082/api/v1/auth/register -H 'Content-Type: application/json' -d '{"email":"ann@example.com","password":"correct-horse-battery"}'` → 201 with id/email/createdAt; the same again → 422 with a `violations` entry for `email`.
-- [ ] 3.2 `tests/Api/Auth/RegistrationTest.php`: 201 shape and no password material; duplicate differing by case → 422; 11-char password → 422 (no account created); `{"email":"not-an-email","password":"short"}` → 422 with `violations` for `email` and `password` (spec `api-error-format`). Verify: `make test` green.
+- [x] 3.1 `RegistrationInput` DTO with constraints (`Email`, `Length(min 12)`, `UniqueEmail` custom constraint + validator over the repository), `Registration` API resource `POST /api/v1/auth/register` with `RegisterUserProcessor`, `UserOutput`. Verify: `curl -s -i -X POST http://127.0.0.1:8082/api/v1/auth/register -H 'Content-Type: application/json' -d '{"email":"ann@example.com","password":"correct-horse-battery"}'` → 201 with id/email/createdAt; the same again → 422 with a `violations` entry for `email`.
+- [x] 3.2 `tests/Api/Auth/RegistrationTest.php`: 201 shape and no password material; duplicate differing by case → 422; 11-char password → 422 (no account created); `{"email":"not-an-email","password":"short"}` → 422 with `violations` for `email` and `password` (spec `api-error-format`). Verify: `make test` green.
 
 ## 4. Firewalls, JWT, blocking
 
