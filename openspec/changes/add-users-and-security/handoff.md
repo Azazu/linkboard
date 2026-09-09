@@ -1,7 +1,7 @@
 # Handoff — add-users-and-security
 
 **Updated:** 2026-09-09 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/add-users-and-security
 
 ## Done this session
@@ -11,8 +11,10 @@
 
 - Implemented blocks 1–8 (commits 7f90734 … see git log): users + migration, registration (API + web), JWT with problem details, /me, blocking, admin list/block/unblock with audit, auth rate limit on Redis, bare web pages, docs. make check: cs 0, stan 0, 65 tests / 323 assertions. Deviations recorded in proposal/design: symfony/expression-language added; email in html5 mode (no egulias dependency); test limiter on an in-process storage instead of an array pool (kernel.reset clears pools between requests); JSON pagination envelope normalizer added (plain json has none in API Platform).
 
+- Task 8.4: branch run https://github.com/Azazu/linkboard/actions/runs/34327044243 on head cdea818 — workflow, detect, php all success (run list by head SHA + jobs endpoint). Between cdea818 and the Gate 2 commit only tasks.md and handoff.md change (protocol files).
+
 ## Next step
-Task 8.4: the user pushes `change/add-users-and-security`; the executor polls the run list for the head SHA and `/actions/runs/{id}/jobs` until workflow, detect and php are all success, records the URL here, then task 8.5 (pregate gate2, `scripts/gate-run.sh add-users-and-security 2 full`).
+`scripts/gate-run.sh add-users-and-security 2 full` (auto mode; executor runs it). On approval: `/git:merge add-users-and-security`, user pushes `main`, executor checks the `main` run, then `/opsx:archive` (syncs four delta specs incl. the MODIFIED health-check clause).
 
 ## Blockers
 None.
