@@ -56,3 +56,24 @@
 - Checked related artifact claims, normative FR-LNK-2/FR-ADM-2, installed Doctrine rollback/reset behavior, API Platform request context and the existing admin audit pattern.
 - `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. Implementation tests remain planned; this is a Gate 1 artifact review.
 - Findings 2 and 3 have now failed two confirmations. Per AGENTS.md, stop the confirmation loop and split/reduce the change or ask the user to arbitrate before proceeding.
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** 75f27c081177bb9611d871df042babd041326d12
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 6 uses decoded request-body key membership independently of nullable DTO values. The proposal, spec and tasks agree on omission versus explicit null, including HTTP verification on populated expiry/limit fields and rejection of null targetUrl/isActive. The installed API Platform controller supplies the request in processor context. |
+| 2 | changes-requested — Task 2.1 now separates actual INSERT collision recovery, five-candidate exhaustion with an error log, and custom-slug 422; decision 3 retains resetManager and owner reattachment through getReference. However, the recovery test newly requires ManagerRegistry::getManager() to be a new instance. The installed DoctrineBundle declares the EntityManager service lazy (vendor/doctrine/doctrine-bundle/config/orm.php), and Symfony's ManagerRegistry::resetService resets that lazy object in place through resetLazyObject or ReflectionClass::resetAsLazyGhost/resetAsLazyProxy (vendor/symfony/doctrine-bridge/ManagerRegistry.php). Object identity can therefore remain unchanged after correct recovery, making the required assertion fail for a valid implementation. Replace the identity assertion with recovery evidence: the registry manager is open and successfully persists candidate 2 with the owner attached to its current UnitOfWork; retain the separate exhaustion test. Removing reset must break the successful-recovery test. |
+| 3 | changes-requested — The new scenario and task 3.3 cover successful link.update/link.activate and the one-record-per-request precedence rule, alongside deactivate/delete and rejection/flush-failure paths. The outstanding data-exclusion verification remains missing: task 3.3 asserts actions and ids but never excludes URL/email/slug, and the deactivate/delete scenario still checks only absence of @ and the slug. A record leaking https://example.org/moved would satisfy those assertions. Add explicit assertions across successful audit records that the message and context contain no target URL, email or slug (or assert an exact safe message/context shape). The design's exclusion promise alone does not verify the Round 1 requirement. |
+
+### Validation
+- Reviewed only `2389dc92035dc8640998b59485ba35d60e1b532e..75f27c081177bb9611d871df042babd041326d12` and collateral effects of Round 1 findings 1–3; no unrelated findings introduced.
+- Confirmed branch `change/add-link-crud`, the requested HEAD and an initially clean working tree; every source-round finding was marked `fixed`.
+- Per the user's explicit request, performed this third confirmation after the earlier stop notice; this does not waive unresolved findings.
+- Checked related artifact claims, normative FR-LNK-2/FR-ADM-2, installed Doctrine rollback and Symfony manager-reset mechanisms, API Platform request context and the existing admin audit implementation.
+- `scripts/pregate-verify.sh gate1 add-link-crud` passed, including strict OpenSpec validation. This is a Gate 1 artifact review; implementation tests remain planned.
+- Findings 2 and 3 remain unresolved after the requested third confirmation. Stop further automatic confirmations and return to user arbitration or split/reduce the change, per AGENTS.md.
