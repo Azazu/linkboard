@@ -76,6 +76,11 @@ it yourself.
 - **`make check` differs from CI** — CI runs `make test-db EXEC=` and
   `make check EXEC=` natively with PHP 8.4; `composer.json` pins
   `config.platform.php` to the same version as the image.
+- **Health tests fail with `database: fail` while everything else works** —
+  the deep probe connects to the database named in `DATABASE_URL` as is
+  (no `_test` suffix; it checks the configured dependency, like in prod),
+  so that database must exist wherever the tests run. CI creates `app`
+  as the service database and `make test-db` derives `app_test` from it.
 - **Tests boot the `dev` kernel** — the php container carries `APP_ENV=dev`
   in its real environment and `KernelTestCase` reads `$_ENV` first;
   `phpunit.dist.xml` forces both `$_SERVER` and `$_ENV` to `test`. Keep
