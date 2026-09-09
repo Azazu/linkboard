@@ -19,8 +19,8 @@ jobs:
   workflow:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Install OpenSpec CLI (pinned)
@@ -37,7 +37,7 @@ jobs:
     outputs:
       php: ${{ steps.probe.outputs.php }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Probe for composer.json
         id: probe
         run: |
@@ -55,18 +55,20 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: app_test
+          # The application database; make test-db derives the _test database
+          # from it (doctrine.yaml dbname_suffix), exactly like locally.
+          POSTGRES_DB: app
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U app -d app_test"
+          --health-cmd "pg_isready -U app -d app"
           --health-interval 5s --health-timeout 3s --health-retries 20
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"

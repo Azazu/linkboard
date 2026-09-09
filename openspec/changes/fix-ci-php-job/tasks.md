@@ -1,0 +1,16 @@
+## 1. Fix
+
+- [x] 1.1 `.github/workflows/ci.yml`: `POSTGRES_DB: app`, health check `-d app`, `actions/checkout@v7` ×3, `actions/setup-node@v7`. Verify: pinned actionlint (`rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667`) exits 0; `rg -n 'app_test|@v4' .github/` returns nothing.
+- [x] 1.2 `.docker/php/Dockerfile`: `apk add --no-cache make` (alongside git/unzip/postgresql16-client); `docker compose build php`; verify `docker compose run --rm --no-deps php make --version` prints GNU Make.
+- [x] 1.2a Real CI path, failing input: start `docker run -d --rm --name ci-pg --network linkboard_default -e POSTGRES_DB=app_test -e POSTGRES_USER=app -e POSTGRES_PASSWORD=app postgres:16-alpine`, wait for `pg_isready`, then `docker compose exec -T -e APP_ENV=test -e DATABASE_URL='postgresql://app:app@ci-pg:5432/app?serverVersion=16&charset=utf8' -e REDIS_URL=redis://redis:6379 -e MESSENGER_TRANSPORT_DSN=in-memory:// php sh -c 'make test-db EXEC= && make check EXEC='` → exit 2, the two health tests fail (`database` reported `fail`). Stop `ci-pg`. Record the tail in the commit body.
+- [x] 1.2b Real CI path, passing input: same as 1.2a with `-e POSTGRES_DB=app` → `make test-db EXEC=` creates `app_test`, `make check EXEC=` exits 0 with cs 0 / stan 0 / 21 tests. Stop `ci-pg`. Record the tail in the commit body.
+- [x] 1.3 `docs/how-to/local-development.md`: troubleshooting bullet on the probe using the un-suffixed database. Verify: re-read the file whole.
+
+## 2. Wrap-up
+
+- [x] 2.1 Commit (`ci:` for 1.1–1.2b, `docs:` for 1.3) with the agent trailer; `openspec validate fix-ci-php-job --strict`. Verify: `git log --oneline main..HEAD`.
+- [x] 2.2 **Green Actions run on the exact branch head before Gate 2** (the only real test of the workflow file and the v7 actions): the user pushes the change branch; the executor polls `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/fix-ci-php-job` (run list: picks the run whose `head_sha` equals `git rev-parse HEAD`, waits for `status: completed`) and then `https://api.github.com/repos/Azazu/linkboard/actions/runs/{run_id}/jobs` (per-job conclusions: `workflow`, `detect` and `php` must all be `success`; the run list alone carries no job statuses), and records the run URL and head SHA in `handoff.md`. A red run is fixed on the branch and re-pushed; Gate 2 is not requested before this passes.
+- [x] 2.3 `scripts/pregate-verify.sh gate2 fix-ci-php-job` passes; request Gate 2. Verify: floor output has no FAIL line. (Only `handoff.md`/`tasks.md` may change between the green run's head and the Gate 2 commit, so the reviewed workflow file is the one that ran.)
+## Post-merge acceptance (not a Gate 2 task — it can only happen after the merge)
+
+- 2.4 After the user pushes `main`, the executor checks the `main` run the same way as task 2.2 (run list by head SHA, then the jobs endpoint) and reports it before offering the archive; the run URL goes into `handoff.md`. `/opsx:archive` is not offered while that run is red or unverified.
