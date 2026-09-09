@@ -32,6 +32,7 @@ services:
     # Domain repositories are interfaces; the Doctrine implementation is the binding.
     App\Auth\UserRepositoryInterface: '@App\Auth\Repository\DoctrineUserRepository'
     App\Link\LinkRepositoryInterface: '@App\Link\Repository\DoctrineLinkRepository'
+    App\Link\SlugGeneratorInterface: '@App\Link\SlugGenerator'
 
 when@test:
     services:

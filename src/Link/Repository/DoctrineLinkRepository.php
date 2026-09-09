@@ -93,6 +93,7 @@ final readonly class DoctrineLinkRepository implements LinkRepositoryInterface
     {
         $field = 'clickCount' === $query->orderField ? 'l.clickCount' : 'l.createdAt';
 
-        return $qb->orderBy($field, strtoupper($query->direction))->addOrderBy('l.id', 'DESC');
+        // the tiebreaker (UUID v7 is time-ordered) follows the requested direction
+        return $qb->orderBy($field, strtoupper($query->direction))->addOrderBy('l.id', strtoupper($query->direction));
     }
 }
