@@ -15,7 +15,6 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 2a | `fix-ci-php-job` | CI `php` job red on `main` after the scaffold: the service database is named `app_test` while `DATABASE_URL` (and the health probe) expect `app`; set `POSTGRES_DB: app` so `make test-db` creates `app_test` beside it; bump `actions/checkout` and `actions/setup-node` to v7 (Node 20 deprecation warnings) | high |
 | 3 | `add-users-and-security` | `users`, registration (web + API), form-login firewall for the web, JWT firewall for the API, `app:user:promote/demote`, user blocking, voters skeleton, auth rate limit | high |
 | 4 | `add-link-crud` | `links` entity (slug rules, target URL policy, expires_at, max_clicks, is_active, UTM), API Platform resource with owner voters, `shortUrl`, hard delete | high |
 | 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table written synchronously (baseline before async), per-IP redirect limit | medium |

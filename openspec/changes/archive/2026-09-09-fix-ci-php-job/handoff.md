@@ -1,7 +1,7 @@
 # Handoff — fix-ci-php-job
 
 **Updated:** 2026-09-09 · claude
-**State:** ready-to-merge
+**State:** merged
 **Branch:** change/fix-ci-php-job
 
 ## Done this session
@@ -11,6 +11,8 @@
 - Task 2.2: branch run https://github.com/Azazu/linkboard/actions/runs/34319257555 on head 5a218d8 — workflow, detect and php all success (verified through /actions/runs and /actions/runs/{id}/jobs); the first green php job of the repository.
 - Gate 2 Round 1: changes-requested — the green run must be on the reviewed commit itself. Branch re-pushed at 9be010f (the round's record commit): run https://github.com/Azazu/linkboard/actions/runs/34319750884 — workflow, detect, php all success. Finding #1 → fixed (the reviewer's row had no Status cell; only the cell was appended); confirmation confirmed. Between 9be010f and the confirmation head only review.md and handoff.md change (protocol files; the workflow file is byte-identical to the one that ran).
 - Root cause reproduced locally with a postgres configured like CI: `make test-db` passes, the health probe fails because database `app` does not exist (CI creates `app_test` only).
+
+- Merged as 1e665f8; post-merge acceptance 2.4: `main` run https://github.com/Azazu/linkboard/actions/runs/34320849974 — workflow, detect, php all success (verified via run list + jobs endpoint).
 
 ## Next step
 `/git:merge fix-ci-php-job` (user); user pushes `main`; the executor checks the `main` run (post-merge acceptance 2.4: run list by head SHA + jobs endpoint) and reports it before offering `/opsx:archive fix-ci-php-job`. Then `/workflow:start add-users-and-security`.
