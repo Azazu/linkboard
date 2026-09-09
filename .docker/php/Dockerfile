@@ -13,7 +13,8 @@ RUN install-php-extensions pdo_pgsql intl opcache redis gd zip apcu
 COPY --from=composer:2.10.3@sha256:d8f6343d3fae98107426bc49163ccad46ef85aabd4a27d80a74401fab4aba332 \
      /usr/bin/composer /usr/local/bin/composer
 
-RUN apk add --no-cache git unzip postgresql16-client
+# make: lets the CI command path (make test-db EXEC= && make check EXEC=) run inside the container
+RUN apk add --no-cache git unzip postgresql16-client make
 
 COPY conf.d/app.ini /usr/local/etc/php/conf.d/app.ini
 
