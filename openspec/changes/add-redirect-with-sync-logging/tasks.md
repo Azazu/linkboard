@@ -1,6 +1,6 @@
 ## 0. Gate 1 (high tier)
 
-- [ ] 0.1 `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passes; `scripts/gate-run.sh add-redirect-with-sync-logging 1 full`; findings fixed via `/workflow:fix-findings` and confirmed. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed`.
+- [x] 0.1 `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passes; `scripts/gate-run.sh add-redirect-with-sync-logging 1 full`; findings fixed via `/workflow:fix-findings` and confirmed. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed`.
 
 ## 1. Click write model: entity, migration, recorder
 
