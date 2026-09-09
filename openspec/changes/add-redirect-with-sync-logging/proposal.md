@@ -19,7 +19,7 @@ Links can be created, listed and edited, but nothing resolves them: `GET /{slug}
 7. **Per-IP rate limit** on redirects (FR-RED-6): sliding window, default 60 per minute from `RATE_LIMIT_REDIRECT_PER_IP`, Redis storage with the existing lock factory, client IP from the trusted-proxy configuration (FR-KEY-5); over the limit → 429 with `Retry-After`, HTML page or problem details. Same wiring pattern as the auth limiter, including the in-memory storage in the test environment.
 8. **Configuration**: `RATE_LIMIT_REDIRECT_PER_IP=60` and `VISITOR_HASH_SALT` (a non-secret local default in `.env`, a fixed value in `.env.test`; the real value lives in `.env.local`/CI and is referenced by name only; rotation invalidates unique-visitor continuity and is documented).
 9. **Tests**: unit (UTM composition matrix, visitor hash, referer host extraction, redirect decision matrix), integration (migration up/down, the recorder inserts one row and increments in one transaction, concurrent redirects never pass `max_clicks`), web (the full matrix over HTTP, headers, no `Set-Cookie`, `Accept` negotiation, `HEAD`, rate limit 429, a failing recorder → 302 for an unlimited link and 503 for a limited one, deleting a link cascades to its clicks).
-10. **Docs**: how-to gains a "Redirect" section (curl -I examples, the salt and limit variables, the baseline note); roadmap row 5 and requirements §7 row 5 stay as they are.
+10. **Docs**: how-to gains a "Redirect" section (curl -I examples, the salt and limit variables, the baseline note); roadmap row 5 and requirements §7 row 5 record the raised tier; their scope wording stays as it is.
 
 ## Capabilities
 
