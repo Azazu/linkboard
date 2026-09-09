@@ -42,3 +42,20 @@
 
 ### Verification
 Reviewed the branch diff against `main`, change artifacts, tests, and the installed Symfony/API Platform/Monolog implementations underlying the findings. HEAD and branch match the requested review target; `git diff --check main...change/add-users-and-security` passed. Runtime reproduction and a fresh check run were unavailable: `make check` stopped before executing the style checker because access to `/var/run/docker.sock` was denied; no host PHP executable is installed. Findings above are based on source inspection, not claimed runtime reproductions.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-09
+**Reviewed-Commit:** c1e430686bdb4c089941a312fff7a07178734098
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — the runtime fix is supported by source inspection: `UserProvider::refreshUser()` now rejects blocked accounts, the exception subscriber preserves the login error, and `LoginTest::testBlockingEndsAnExistingWebSession()` covers reuse of an existing session. However, the explicitly requested claim correction is unfinished: `src/Auth/Security/BlockedUserChecker.php:15-18` still says this checker runs on session refresh, and design decision 6 still asserts `refreshUser` → checker immediately before its new paragraph correctly says the opposite. Replace those stale assertions with the actual split between authentication checking and provider-enforced session refresh; do not merely append another explanation. |
+| 2 | confirmed — both `auth_ip` and the Redis verification limiter now use `lock.factory`, backed by Redis through `LOCK_DSN`; the installed sliding-window implementation holds that lock across fetch, update and save. `RateLimiterConcurrencyTest` exercises 25 processes against one Redis-backed limiter key and requires exactly 10 acceptances. The fixture provides a no-lock path, and commit c1e4306 records the demonstrated failing input (17/25 accepted without locking versus 10/25 with locking). These execution results are executor evidence, not independently rerun here. |
+| 3 | changes-requested — the dedicated production info-level JSON stream and exclusion from `main` correct the identified configuration defect. The requested verification of both successful actions against that wiring is still missing: `AuditLogWiringTest` only parses YAML; the existing API audit test exercises only block through the test-only `TestHandler`, and the unblock API test does not assert an audit record. Add a verification using the production audit handler wiring that performs successful block and unblock and observes their info records, including actor/target/action, without an unrelated error or fingers-crossed activation. |
+| 4 | changes-requested — the processor now throws the correct API Platform `ValidationException`, whose installed implementation supplies status 422 and email violations. The new integration test reaches the real unique-index conflict and asserts the exception's email violation, but calls the processor directly and never verifies the required HTTP 422 response. Complete the requested regression by reaching that conflict through the API error-handling path and asserting status 422 plus an email violation in the problem response; the existing duplicate-request test still stops at the uniqueness pre-check. |
+
+### Verification
+Reviewed only `380cb567d2873b9e6e49bbdddd1c2ca24df5c1fc..c1e430686bdb4c089941a312fff7a07178734098` and collateral source, configuration, specifications, tests and installed framework code reachable from findings 1–4. Repository searches checked the affected claims. Branch and HEAD match the requested target; the worktree was initially clean and `git diff --check` for the requested range passed. Runtime verification was unavailable: `make ps` failed because Docker socket access was denied, and `command -v php` found no host PHP. No unrelated findings were introduced; only this review file was modified and no git write commands were run.
