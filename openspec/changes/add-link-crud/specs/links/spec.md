@@ -118,6 +118,10 @@ When a user with `ROLE_ADMIN` who is not the owner updates, deactivates, reactiv
 - **WHEN** an admin patches A's link with `{"isActive":false}` and then deletes it
 - **THEN** the audit log contains exactly one `link.deactivate` and one `link.delete` record, each with the admin's `actor_id`, the link's `target_id` and A's `owner_id`, and neither record contains `@` or the slug
 
+#### Scenario: Admin updates and reactivates a user's link
+- **WHEN** an admin patches A's inactive link with `{"targetUrl":"https://example.org/moved"}` and then with `{"isActive":true}`
+- **THEN** the audit log contains exactly one `link.update` and one `link.activate` record with the same three ids; a single patch that changes `isActive` together with another field writes exactly one record, `link.activate` or `link.deactivate`
+
 #### Scenario: Owner is not audited
 - **WHEN** A deactivates their own link
 - **THEN** no audit record is written
