@@ -67,11 +67,23 @@ A custom slug MUST match `^[A-Za-z0-9_-]{3,32}$`, MUST NOT be in the reserved li
 - **THEN** `items` contains only `promo-2`; `GET /api/v1/links?order[createdAt]=asc` returns A's links oldest first
 
 ### Requirement: Update a link
-`PATCH /api/v1/links/{id}` with `application/merge-patch+json` SHALL update any of `targetUrl`, `expiresAt`, `maxClicks`, `utm`, `isActive`, applying the same validation as creation, and return 200 with the updated link and a new `updatedAt`. Deactivated links keep their data.
+`PATCH /api/v1/links/{id}` with `application/merge-patch+json` SHALL update only the fields present in the body, applying the same validation as creation, and return 200 with the updated link and a new `updatedAt`. Null contract: `expiresAt`, `maxClicks` and `utm` present with `null` are cleared; `targetUrl` and `isActive` MUST NOT be `null` when present (422); absent fields are unchanged; a body that is not a JSON object is 400. Deactivated links keep their data.
 
 #### Scenario: Deactivate and change the target
 - **WHEN** the owner patches `{"isActive":false,"targetUrl":"https://example.org/new"}`
 - **THEN** the response status is 200, `isActive` is false and `targetUrl` is `https://example.org/new`
+
+#### Scenario: Absent fields are preserved
+- **WHEN** a link has `maxClicks` 100 and `expiresAt` one day ahead and the owner patches `{"isActive":false}`
+- **THEN** the response status is 200, `isActive` is false, and `maxClicks` and `expiresAt` are unchanged
+
+#### Scenario: Explicit null clears one field
+- **WHEN** the same link is patched with `{"maxClicks":null}`
+- **THEN** the response status is 200, `maxClicks` is null and `expiresAt` is unchanged
+
+#### Scenario: Null where a value is required
+- **WHEN** the owner patches `{"targetUrl":null}` or `{"isActive":null}`
+- **THEN** each response status is 422 with a violation on the field
 
 #### Scenario: Invalid patch
 - **WHEN** the owner patches `{"targetUrl":"http://10.0.0.1/"}`
@@ -94,3 +106,14 @@ Item operations (`GET`, `PATCH`, `DELETE` on `/api/v1/links/{id}`) SHALL be allo
 #### Scenario: Admin listing
 - **WHEN** an admin requests `GET /api/v1/admin/links` while A and B own links
 - **THEN** the response lists both users' links with `ownerId`, and a regular user requesting the same path gets 403
+
+### Requirement: Admin actions on links are audited
+When a user with `ROLE_ADMIN` who is not the owner updates, deactivates, reactivates or deletes a link, the system SHALL write one log record at level `info` on the audit channel with `action` (`link.update`, `link.deactivate`, `link.activate` or `link.delete`), `actor_id`, `target_id` (the link id) and `owner_id`, and without slug, URL or email. Owners acting on their own links are not audited.
+
+#### Scenario: Admin deactivates and deletes a user's link
+- **WHEN** an admin patches A's link with `{"isActive":false}` and then deletes it
+- **THEN** the audit log contains exactly one `link.deactivate` and one `link.delete` record, each with the admin's `actor_id`, the link's `target_id` and A's `owner_id`, and neither record contains `@` or the slug
+
+#### Scenario: Owner is not audited
+- **WHEN** A deactivates their own link
+- **THEN** no audit record is written
