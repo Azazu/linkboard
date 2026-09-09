@@ -8,5 +8,7 @@
 
 ## 2. Wrap-up
 
-- [ ] 2.1 Commit (`ci:` for 1.1–1.2, `docs:` for 1.3) with the agent trailer; `openspec validate fix-ci-php-job --strict`; `scripts/pregate-verify.sh gate2 fix-ci-php-job`; request Gate 2. Verify: floor output has no FAIL line.
-- [ ] 2.2 Acceptance after merge and push (user pushes): the run on `main` shows `php` success; record the run URL in `handoff.md` before archiving.
+- [ ] 2.1 Commit (`ci:` for 1.1–1.2b, `docs:` for 1.3) with the agent trailer; `openspec validate fix-ci-php-job --strict`. Verify: `git log --oneline main..HEAD`.
+- [ ] 2.2 **Green Actions run on the exact branch head before Gate 2** (the only real test of the workflow file and the v7 actions): the user pushes `change/fix-ci-php-job`; the executor polls `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/fix-ci-php-job` until the run for `git rev-parse HEAD` is `completed` with `workflow`, `detect` and `php` all `success`, and records the run URL and head SHA in `handoff.md`. A red run is fixed on the branch and re-pushed; Gate 2 is not requested before this passes.
+- [ ] 2.3 `scripts/pregate-verify.sh gate2 fix-ci-php-job` passes; request Gate 2. Verify: floor output has no FAIL line. (Only `handoff.md`/`tasks.md` may change between the green run's head and the Gate 2 commit, so the reviewed workflow file is the one that ran.)
+- [ ] 2.4 Acceptance after merge (user pushes `main`): the executor checks the `main` run the same way and reports it before offering the archive; the run URL goes into `handoff.md`.
