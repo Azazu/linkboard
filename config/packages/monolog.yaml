@@ -1,6 +1,7 @@
 monolog:
     channels: # To see all channels, run bin/console debug:autowiring logger
         - deprecation # Deprecations are logged in the dedicated "deprecation" channel when it exists
+        - audit # admin actions: action, actor_id, target_id — never emails (spec user-administration)
 
 when@dev:
     monolog:
@@ -18,6 +19,10 @@ when@dev:
 when@test:
     monolog:
         handlers:
+            # in-memory handler so tests can assert audit records
+            audit:
+                type: test
+                channels: [audit]
             main:
                 type: fingers_crossed
                 action_level: error
