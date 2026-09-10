@@ -9,6 +9,9 @@
 parameters:
     # Consumer name for the Redis Streams transport when HOSTNAME is unset
     messenger_consumer_fallback: 'linkboard-worker'
+    # Prefix of the click-counter keys `link:{id}:clicks` (FR-RED-3); '' in dev/prod,
+    # `test:` in the test environment so the suite can clean its keys on a shared Redis
+    app.click_counter_key_prefix: ''
 
 services:
     # default configuration for services in *this* file
@@ -33,7 +36,9 @@ services:
     App\Auth\UserRepositoryInterface: '@App\Auth\Repository\DoctrineUserRepository'
     App\Link\LinkRepositoryInterface: '@App\Link\Repository\DoctrineLinkRepository'
     App\Link\SlugGeneratorInterface: '@App\Link\SlugGenerator'
-    App\Click\ClickRecorderInterface: '@App\Click\Recorder\DbalClickRecorder'
+    # The click write path: counter + message (add-async-click-logging); the
+    # redirect performs no SQL write.
+    App\Click\ClickRecorderInterface: '@App\Click\Recorder\MessengerClickRecorder'
     # Country resolution: the chain selects tagged resolvers by COUNTRY_RESOLVERS
     # (design decision 8); the chain itself is a startup check.
     App\Redirect\Geo\CountryResolverInterface: '@App\Redirect\Geo\ChainCountryResolver'
@@ -45,12 +50,28 @@ services:
         public: true
 
 when@test:
+    parameters:
+        app.click_counter_key_prefix: 'test:'
     services:
         # Rate-limiter storage for the test environment: lives for the process,
         # is not tagged kernel.reset, so a test that sends 11 requests through
         # one kernel (disableReboot) sees one window. Not registered elsewhere.
         app.rate_limiter.test_storage:
             class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        # The framework's in-memory transport factory, minus its kernel.reset tag:
+        # reset between the requests of one test client, it would empty the
+        # transports it created, and a test that redirects several times through
+        # one kernel must keep every message until it consumes them (in
+        # production the Redis stream outlives the request). Tests reset the
+        # transports themselves in tearDown.
+        messenger.transport.in_memory.factory:
+            class: Symfony\Component\Messenger\Transport\InMemory\InMemoryTransportFactory
+            arguments: ['@clock']
+            tags: ['messenger.transport_factory']
+        # Records every SQL string of a request so a test can assert that the
+        # redirect performs no database write (design decision 8)
+        App\Tests\Fixture\StatementRecorder:
+            tags: ['doctrine.middleware']
         # Fixed IP→country map for the test suite (COUNTRY_RESOLVERS=fixed)
         App\Tests\Fixture\FixedMapCountryResolver:
             tags:

@@ -14,20 +14,36 @@ framework:
                     group: linkboard
                     consumer: '%env(default:messenger_consumer_fallback:HOSTNAME)%'
                 retry_strategy:
-                    # FR-CLK-5: 3 attempts, 1 s, 2 s, 4 s
+                    # FR-CLK-5: 3 attempts, exactly 1 s, 2 s, 4 s — jitter 0
+                    # (the framework's 0.1 default would randomise the backoff)
                     max_retries: 3
                     delay: 1000
                     multiplier: 2
                     max_delay: 0
-            failed: 'doctrine://default?queue_name=failed'
+                    jitter: 0
+            # Parked messages; the table comes from a reviewed migration, never
+            # from runtime DDL (messenger_messages)
+            failed:
+                dsn: 'doctrine://default?queue_name=failed'
+                options:
+                    auto_setup: false
 
         routing:
-            # Nothing is routed yet; ClickRecorded arrives with the async click
-            # logging change and is routed here to `async`.
+            # One accepted redirect → one message on the Redis stream (FR-CLK-1)
+            App\Click\Message\ClickRecorded: async
 
 when@test:
     framework:
         messenger:
             transports:
-                async: 'in-memory://'
+                async:
+                    dsn: 'in-memory://'
+                    retry_strategy:
+                        # the same shape as production, milliseconds instead of
+                        # seconds so the Worker lifecycle test runs in a blink
+                        max_retries: 3
+                        delay: 10
+                        multiplier: 2
+                        max_delay: 0
+                        jitter: 0
                 failed: 'in-memory://'
