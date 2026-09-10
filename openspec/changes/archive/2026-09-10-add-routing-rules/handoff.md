@@ -1,7 +1,7 @@
 # Handoff — add-routing-rules
 
-**Updated:** 2026-09-10 · claude (Gate 2 passed, branch run green on the post-fix head)
-**State:** ready-to-merge
+**Updated:** 2026-09-10 · claude (merged d9370df, main run 34477153396 green)
+**State:** archived
 **Branch:** change/add-routing-rules
 
 ## Done this session

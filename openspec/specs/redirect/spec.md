@@ -48,7 +48,7 @@ The endpoint SHALL answer 404 when no link has the slug or the link is inactive;
 - **THEN** the response status is 302 and `Location` is the link's destination
 
 ### Requirement: Destination with UTM appended
-The `Location` of a 302 SHALL be the link's `targetUrl` with the link's UTM keys added to the query string. The query is processed as a sequence of `key=value` pairs, never as a decoded map: every pair whose percent-decoded key is one of the link's UTM keys is removed (all occurrences), every other pair is kept byte for byte and in order (repeated keys, dotted keys, bracket notation and encoded values included), then the link's UTM pairs are appended in a fixed order with percent-encoded values. The fragment MUST be kept. A link without UTM redirects to its `targetUrl` unchanged.
+The `Location` of a 302 SHALL be the destination resolved by the `routing-rules` capability — a matching rule's target, the assigned variant's target, or the link's `targetUrl` when nothing matches or the link has no rules — with the link's UTM keys added to the query string. The query is processed as a sequence of `key=value` pairs, never as a decoded map: every pair whose percent-decoded key is one of the link's UTM keys is removed (all occurrences), every other pair is kept byte for byte and in order (repeated keys, dotted keys, bracket notation and encoded values included), then the link's UTM pairs are appended in a fixed order with percent-encoded values. The fragment MUST be kept. A link without UTM redirects to its resolved destination unchanged. `HEAD` resolves the destination exactly as `GET` does.
 
 #### Scenario: UTM added to a target with a query and a fragment
 - **WHEN** a link targets `https://example.com/p?a=1&utm_source=old#top` and carries UTM `{"utm_source":"newsletter","utm_campaign":"spring sale"}`
@@ -61,6 +61,10 @@ The `Location` of a 302 SHALL be the link's `targetUrl` with the link's UTM keys
 #### Scenario: No UTM
 - **WHEN** a link targets `https://example.com/p?a=1` and has no UTM
 - **THEN** `Location` is exactly `https://example.com/p?a=1`
+
+#### Scenario: UTM on a rule target
+- **WHEN** a link with UTM `{"utm_source":"news"}` has a device rule whose target is `https://apps.apple.com/app/id123?x=1` and an iPhone visitor is redirected with `GET` and then with `HEAD`
+- **THEN** both `Location` headers are `https://apps.apple.com/app/id123?x=1&utm_source=news`
 
 ### Requirement: Headers and bodies
 Every response of the endpoint SHALL carry `Cache-Control: no-store`. The 302 SHALL also carry `Referrer-Policy: no-referrer-when-downgrade`. 404, 410, 429 and 503 bodies SHALL be small HTML pages, or RFC 9457 problem details (`application/problem+json` with `type`, `title`, `status`, `detail`) when the request's `Accept` header includes `application/json`.
