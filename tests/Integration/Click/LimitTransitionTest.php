@@ -124,6 +124,40 @@ final class LimitTransitionTest extends KernelTestCase
         self::assertSame(RecordOutcome::Exhausted, $recorder->record($fresh, $this->visit(), ClickFacts::default()));
     }
 
+    public function testASeedSnapshotThatBecomesStaleBeforeKeyLossReseedsFromTheSnapshot(): void
+    {
+        $link = LinkFactory::new()->limited(3)->create(['owner' => UserFactory::createOne()]);
+        $id = $link->getId();
+        $this->keys[] = $this->counter->key($id);
+        $recorder = $this->recorder();
+
+        // counter 3, three accepted messages queued, persisted count 0
+        self::assertSame([RecordOutcome::Allowed, RecordOutcome::Allowed, RecordOutcome::Allowed], array_map(fn (): RecordOutcome => $recorder->record($link, $this->visit(), ClickFacts::default()), range(1, 3)));
+        self::assertSame('3', $this->redis->get($this->counter->key($id)));
+
+        // three more requests load the row (count 0) and pause before recording
+        $paused = array_fill(0, 3, $this->reload($id));
+        self::assertSame(0, $paused[0]->getClickCount());
+
+        // the worker persists the three queued clicks; nothing unpersisted remains — then the key is lost
+        $handler = new ClickRecordedHandler(self::connection(), new Logger('test', [new TestHandler()]));
+        foreach ($this->queue as $message) {
+            $handler($message);
+        }
+        self::assertSame(3, (int) self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$id->toRfc4122()]));
+        $this->redis->del($this->counter->key($id));
+
+        // the paused requests resume with seed 0: the stated bound counts what was unpersisted when THEIR snapshot was read (three)
+        foreach ($paused as $snapshot) {
+            self::assertSame(RecordOutcome::Allowed, $recorder->record($snapshot, $this->visit(), ClickFacts::default()));
+        }
+        self::assertSame('3', $this->redis->get($this->counter->key($id)));
+        self::assertCount(6, $this->queue, 'six accepted for max 3: the three unpersisted at the snapshot read, re-admitted after the key loss');
+
+        // a fresh snapshot (count 3) lifts nothing further and is exhausted
+        self::assertSame(RecordOutcome::Exhausted, $recorder->record($this->reload($id), $this->visit(), ClickFacts::default()));
+    }
+
     private function recorder(): MessengerClickRecorder
     {
         $bus = $this->createStub(MessageBusInterface::class);

@@ -147,7 +147,7 @@ without a second row or increment. A message whose link was deleted in the
 meantime is acknowledged and discarded with an `info` log line — never
 retried, never parked. Any other failure is retried three times (1 s, 2 s,
 4 s, no jitter) and then parked on the `failed` transport (table
-`messenger_messages`, created by a migration):
+`messenger_messages`, created — or adopted, rows kept — by a migration):
 
 ```bash
 make console ARGS='messenger:failed:show'     # what is parked, and why
@@ -161,8 +161,9 @@ redirect: it lifts an absent or lower key to the link's persisted `clickCount`
 is allowed. Exhausted → 410, nothing dispatched. The key has no TTL and is
 removed with the link. Guarantee boundary: exact while the key exists;
 whenever the key is seeded — first redirect of a limited link, a limit set
-after an unlimited period, a Redis data loss — the seed excludes the accepted
-redirects not persisted yet (queued, dispatch-failed, parked), so the limit may
+after an unlimited period, a Redis data loss — the seed is the count as the
+seeding request read it, so it excludes the accepted redirects not persisted at
+that read (queued or persisted since, dispatch-failed, parked); the limit may
 be exceeded by at most that many, and requests in flight at a limit change
 complete under the limit they loaded. `clicks` stays the exact record. Redis
 runs with AOF in Compose to make key loss exceptional.
