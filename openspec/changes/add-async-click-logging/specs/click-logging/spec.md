@@ -12,11 +12,11 @@ Every `ClickRecorded` message SHALL carry a unique `click_id` that becomes the c
 - **THEN** the link's `clickCount` is unchanged and the failure propagates to the transport's retry policy
 
 ### Requirement: Failed messages are retried, then parked
-A `ClickRecorded` message whose handling throws SHALL be retried 3 times with exponential backoff (1 s, then 2 s, then 4 s) and, after the last failure, moved to the `failed` transport (the `messenger_messages` table) where it can be listed and retried with the Messenger console (`messenger:failed:show`, `messenger:failed:retry`). The `messenger_messages` table SHALL be created by a reversible migration, not at runtime.
+A `ClickRecorded` message whose handling throws SHALL be retried 3 times with exponential backoff of exactly 1 s, 2 s and 4 s (multiplier 2, no jitter) and, after the last failure, moved to the `failed` transport (the `messenger_messages` table) where it can be listed and retried with the Messenger console (`messenger:failed:show`, `messenger:failed:retry`). The `messenger_messages` table SHALL be created by a reversible migration, not at runtime.
 
 #### Scenario: Persistent failure parks the message
 - **WHEN** handling a message fails on every attempt and a worker consumes the transport
-- **THEN** the handler ran four times (the first attempt and three retries, each retry delayed by the configured backoff), the message is then on the `failed` transport exactly once, no click record exists for it, and the link's `clickCount` is unchanged
+- **THEN** the handler ran four times (the first attempt and three retries, each retry carrying exactly the configured delay and a retry count of 1, 2 and 3 in the worker's retry events), the message is then on the `failed` transport exactly once, no click record exists for it, and the link's `clickCount` is unchanged
 
 #### Scenario: Migration is reversible
 - **WHEN** the migration creating `messenger_messages` is executed and then reverted
