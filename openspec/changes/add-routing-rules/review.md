@@ -35,3 +35,21 @@ Reviewed the proposal, design, tasks, all four delta specs, handoff, repository 
 ### Validation
 
 Confirmation scope: the diff from a6250f9f17f9ecf1126aea7f839082fa5f5b6a5b to 7498818e24200f9d08af183ef6c430b9eed11f71 and collateral claims reachable from findings 1–3. All source-round findings were dispositioned as fixed before confirmation. Checked repository instructions/configuration, the affected planning artifacts and normative requirement, and relevant installed Symfony/application source. Branch and HEAD match the requested identifiers. `scripts/pregate-verify.sh gate1 add-routing-rules` passed, including strict OpenSpec validation, with zero warnings. This remains a pre-implementation artifact review; no application test run is claimed.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-10
+**Reviewed-Commit:** 837e28df563eecb4db176d16475a7f7c9d6b45de
+**Verdict:** confirmed
+
+### Findings
+
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Design decisions 1–2 validate the raw request body with JSON objects preserved, then persist the canonical array. The JSON-kind scenario and tasks 2.1/2.3 now cover numeric-keyed objects at all six list positions (rules, device, os, country, language, variants) on POST and PATCH, with exact violation paths and a GET proving unchanged storage after each rejected PATCH. Decisions 1/6 and the spec explicitly limit JSON-kind guarantees to write validation; stored-mode tests now use distinguishable malformed arrays. |
+| 2 | confirmed — Decision 8 and tasks 1.2/3.4 retain the explicit Kernel::boot() override invoking the public StartupChecks service and instantiating the tagged chain. The integration verification boots with bogus without retrieving the chain and includes a successful fixed configuration; the console verification uses about and includes a successful normal configuration. The constructor-only validation gap remains resolved. |
+| 3 | confirmed — The revised FR-RUL-7, proposal, design, delta and tasks distinguish absent/unrecognised inputs from hostile inputs and require the latter to bypass profiling/evaluation, use the default target and emit one notice. Decision 8 and the country/degradation scenarios now distinguish expected database-open failures and address-not-found outcomes from unexpected lookup exceptions: the latter propagate through the chain to the redirect guard. Tasks 3.4/4.3 verify propagation and the reader-error redirect with a matching language rule and variants, asserting the default destination, null dimensions/variant and one notice with link id and exception class; expected non-answers instead select the language rule with their specified warning/no-log behavior. |
+
+### Validation
+
+Confirmation scope: the diff from a6250f9f17f9ecf1126aea7f839082fa5f5b6a5b to 837e28df563eecb4db176d16475a7f7c9d6b45de and collateral effects reachable from findings 1–3, including the outstanding points from Confirmation 1. All source-round findings were dispositioned as fixed. Checked the affected planning artifacts, repository instructions/configuration, normative routing requirements and relevant installed Symfony/application source; repository searches located the related claims. Branch and HEAD match the requested identifiers. `scripts/pregate-verify.sh gate1 add-routing-rules` passed, including strict OpenSpec validation, with zero warnings. This confirms the pre-implementation artifacts; no application test run is claimed. Only this review file was modified; no git write commands were run.
