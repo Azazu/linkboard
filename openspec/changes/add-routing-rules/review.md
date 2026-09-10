@@ -17,3 +17,21 @@
 ### Validation
 
 Reviewed the proposal, design, tasks, all four delta specs, handoff, repository instructions/configuration, relevant current application and installed Symfony source, and the normative routing requirements. The branch and HEAD match the requested identifiers. `scripts/pregate-verify.sh gate1 add-routing-rules` passed, including strict OpenSpec validation, with no warnings. This is an artifact review before implementation; no application test run is claimed.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-10
+**Reviewed-Commit:** 7498818e24200f9d08af183ef6c430b9eed11f71
+**Verdict:** changes-requested
+
+### Findings
+
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The raw-body, object-preserving decode in design decisions 1–2 fixes the write-validation mechanism. However, tasks 2.1/2.3 and the new JSON-object scenario cover only three positions: rules, country and variants; the requested POST/PATCH fixtures for device, os and language lists are still missing. Add those cases with their exact paths and unchanged storage after each rejected PATCH. Also correct task 2.1's stored-mode expectation: after associative decoding, an object with consecutive numeric keys is indistinguishable from a list, so the stored-array parser cannot reject that representation while accepting the equivalent canonical list. Limit the guarantee to type-preserving write validation and use a distinguishable malformed stored fixture (or preserve JSON types on reads as well); align decision 1's claim that any stored deviation yields violations. |
+| 2 | confirmed — Design decision 8 and tasks 1.2/3.4 now specify a public StartupChecks service invoked from the overridable Kernel::boot(), which iterates the tagged checks and constructs the chain. The proposed integration test calls bootKernel() with bogus without retrieving the chain, includes a successful fixed configuration, and the console verification uses about rather than relying on debug:container to instantiate the service. This addresses the boot-time validation gap. |
+| 3 | changes-requested — The absent/unrecognised versus hostile-header policy and the 8 KB language scenario are reconciled, but the newly explicit throwing-input policy remains contradictory for geolocation. FR-RUL-7, proposal item 4 and the hostile-input/failures requirement promise default target, null dimensions and a notice naming the link for any exception inside geolocation. Design decision 8, task 3.4 and the Country resolution reader-failure scenario still catch a reader RuntimeException, log locally and return an unknown country, allowing a matching language rule or variants to win. Choose and state the exception boundary consistently across these artifacts (including the expected missing-database/address-not-found cases), and add a reader-error redirect scenario with a matching language rule and variants that asserts the chosen destination, click facts and logging context. |
+
+### Validation
+
+Confirmation scope: the diff from a6250f9f17f9ecf1126aea7f839082fa5f5b6a5b to 7498818e24200f9d08af183ef6c430b9eed11f71 and collateral claims reachable from findings 1–3. All source-round findings were dispositioned as fixed before confirmation. Checked repository instructions/configuration, the affected planning artifacts and normative requirement, and relevant installed Symfony/application source. Branch and HEAD match the requested identifiers. `scripts/pregate-verify.sh gate1 add-routing-rules` passed, including strict OpenSpec validation, with zero warnings. This remains a pre-implementation artifact review; no application test run is claimed.
