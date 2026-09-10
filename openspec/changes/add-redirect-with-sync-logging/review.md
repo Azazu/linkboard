@@ -65,3 +65,21 @@
 - Reviewed the diff from `6e59b75bb617ada03da5ec51b92935f2a93b041f` to the Reviewed-Commit and collateral context reachable from the six named findings. All source finding statuses were `fixed`; no unrelated findings were introduced.
 - Verified the requested branch and HEAD and an initially clean working tree. Checked the installed rate-limiter factory interface, consumption path and lock acquisition path against the revised failure-test plan.
 - `scripts/pregate-verify.sh gate1 add-redirect-with-sync-logging` passed, including strict OpenSpec validation, with zero warnings. This confirms Gate 1 artifacts; implementation and the planned failing-input demonstrations remain subject to Gate 2.
+
+## Round 1 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-10
+**Reviewed-Commit:** 2e59e5557a54f32bcec7cefa9b12f71dbfd69720
+**Verdict:** approved
+
+### Findings
+
+No blocker, major or minor findings.
+
+### Validation
+
+- Verified branch `change/add-redirect-with-sync-logging`, HEAD equal to the Reviewed-Commit, and an initially clean working tree. Reviewed the implementation diff against `main`, proposal, design, tasks, delta specs, preceding Gate 1 records, handoff, OpenSpec configuration and relevant existing application context.
+- Inspected the conditional SQL increment and transactional click insert, rollback and concurrent-process tests, redirect matrix and HEAD bypass, raw-query UTM preservation, referer column bounds, visitor hashing, firewall boundary, problem-details extraction and rate-limiter failure handling. Checked the installed Symfony limiter/cache/lock implementation and generated service wiring, including lazy Redis connections and failures inside consumption.
+- Reviewed the executor's recorded guard-mutation demonstrations and test evidence (commit `8ecd85e`: `make check` green, 304 tests / 1855 assertions). The handoff records successful Actions run `34353599805` on `6662606`; verified locally that only `tasks.md` and `handoff.md` differ between that commit and the Reviewed-Commit. The remote run was not independently queried.
+- The reviewer reran `scripts/pregate-verify.sh gate2 add-redirect-with-sync-logging`: strict OpenSpec validation, whitespace, task completion, referenced paths and Markdown links passed. Its `make check` step, and a separate `make check` attempt, could not execute because this sandbox cannot access `/var/run/docker.sock`; no native PHP executable is available. This is an execution-environment limitation, not an observed lint or test failure. Runtime validation relies on the executor's recorded evidence above; this approval does not waive the runner's or merge verifier's green-check requirements.
+- Modified only this review file; ran no git write commands.
