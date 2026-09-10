@@ -1,6 +1,6 @@
 ## 0. Gate 1 (high tier)
 
-- [ ] 0.1 `scripts/pregate-verify.sh gate1 add-async-click-logging` passes; `scripts/gate-run.sh add-async-click-logging 1 full`; findings fixed via `/workflow:fix-findings` and confirmed with `scripts/gate-run.sh add-async-click-logging 1 confirm <round>`. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed`.
+- [x] 0.1 `scripts/pregate-verify.sh gate1 add-async-click-logging` passes; `scripts/gate-run.sh add-async-click-logging 1 full`; findings fixed via `/workflow:fix-findings` and confirmed with `scripts/gate-run.sh add-async-click-logging 1 confirm <round>`. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed`.
 
 ## 1. Counter and message
 
