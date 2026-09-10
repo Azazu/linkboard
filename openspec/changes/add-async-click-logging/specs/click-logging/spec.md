@@ -12,15 +12,15 @@ Every `ClickRecorded` message SHALL carry a unique `click_id` that becomes the c
 - **THEN** the link's `clickCount` is unchanged and the failure propagates to the transport's retry policy
 
 ### Requirement: Failed messages are retried, then parked
-A `ClickRecorded` message whose handling throws SHALL be retried 3 times with exponential backoff of exactly 1 s, 2 s and 4 s (multiplier 2, no jitter) and, after the last failure, moved to the `failed` transport (the `messenger_messages` table) where it can be listed and retried with the Messenger console (`messenger:failed:show`, `messenger:failed:retry`). The `messenger_messages` table SHALL be created by a reversible migration, not at runtime.
+A `ClickRecorded` message whose handling throws SHALL be retried 3 times with exponential backoff of exactly 1 s, 2 s and 4 s (multiplier 2, no jitter) and, after the last failure, moved to the `failed` transport (the `messenger_messages` table) where it can be listed and retried with the Messenger console (`messenger:failed:show`, `messenger:failed:retry`). The `messenger_messages` table SHALL be created — or, when the previous configuration's auto-setup transport already created it, adopted with its rows — by a migration, never at runtime; the migration's rollback SHALL keep the table and its rows (the table is shared with the transport, which parks messages in its own transactions — a drop would race a concurrent parking), and re-applying the migration SHALL be idempotent.
 
 #### Scenario: Persistent failure parks the message
 - **WHEN** handling a message fails on every attempt and a worker consumes the transport
 - **THEN** the handler ran four times (the first attempt and three retries, each retry carrying exactly the configured delay and a retry count of 1, 2 and 3 in the worker's retry events), the message is then on the `failed` transport exactly once, no click record exists for it, and the link's `clickCount` is unchanged
 
 #### Scenario: Migration is reversible
-- **WHEN** the migration creating `messenger_messages` is executed and then reverted
-- **THEN** the table exists after the migration and is gone after the revert
+- **WHEN** the migration is executed on a fresh database, reverted, and executed again; and when it is executed on a database whose auto-setup transport already created `messenger_messages` holding a parked message, then reverted
+- **THEN** the table exists after every execution with exactly one index besides the primary key, the revert keeps the table and its rows, the parked message survives adoption and revert alike, and re-applying changes nothing
 
 ### Requirement: Messages for deleted links are discarded
 A `ClickRecorded` message whose link no longer exists SHALL be acknowledged and discarded on its first handling with an `info` log record naming the link id and the `click_id` — never retried and never moved to the failed transport.

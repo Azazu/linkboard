@@ -21,9 +21,12 @@ use Doctrine\Migrations\AbstractMigration;
  * Columns and index as the bridge's Connection::buildSchemaTable() defines
  * them; the sender notifies consumers with pg_notify, no trigger.
  *
- * Rollback: an empty table is dropped; a table that still holds parked
- * messages is kept with its rows (a warning names the count) — the previous
- * configuration's auto_setup transport keeps using it as it is.
+ * Rollback: the table is KEPT with its rows. It is shared with the transport,
+ * which parks messages in its own transactions; a conditional drop would race
+ * a message being parked at that moment (the emptiness check cannot see an
+ * uncommitted insert, and the drop would then take it down once committed).
+ * The previous configuration's auto_setup transport adopts the table as it is;
+ * re-applying the migration is idempotent.
  */
 final class Version20260910142101 extends AbstractMigration
 {
@@ -45,10 +48,7 @@ final class Version20260910142101 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        $parked = $this->connection->fetchOne("SELECT CASE WHEN to_regclass('messenger_messages') IS NULL THEN 0 ELSE (SELECT count(*) FROM messenger_messages) END");
-        $parked = (int) $parked;
-        $this->warnIf($parked > 0, \sprintf('messenger_messages holds %d parked message(s); the table is kept with its rows (inspect with messenger:failed:show).', $parked));
-        // drop only an empty table; a table with parked messages stays for the auto_setup transport of the previous configuration
-        $this->addSql("DO $$ BEGIN IF to_regclass('messenger_messages') IS NOT NULL AND (SELECT count(*) FROM messenger_messages) = 0 THEN DROP TABLE messenger_messages; END IF; END $$");
+        // deliberately no DDL: dropping the table would race a message being parked (see the class comment)
+        $this->warnIf(true, 'messenger_messages is kept with its rows: the table is shared with the failed transport, which parks messages concurrently; the previous configuration adopts it as it is.');
     }
 }

@@ -17,8 +17,9 @@ use Symfony\Component\Uid\Uuid;
  * increment only when allowed. Key `<prefix>link:<uuid>:clicks`, no TTL; the
  * prefix is '' in dev/prod and `test:` in the test environment so the suite
  * can clean its keys on a shared Redis. Guarantee boundary: exact while the key
- * exists; after a seed the redirects accepted but not yet persisted are not
- * in the seed (spec redirect, "Click limit is exact under concurrency").
+ * exists; a seed is the count the calling request read, so the redirects not
+ * persisted at that read — queued, or persisted since — are not in it (spec
+ * redirect, "Click limit is exact under concurrency").
  */
 final class RedisClickCounter implements ClickCounterInterface
 {

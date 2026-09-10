@@ -16,9 +16,10 @@ use Zenstruck\Foundry\Test\ResetDatabase;
  * Spec click-logging "Migration is reversible" plus the upgrade path (Gate 2
  * finding 1): the migration creates messenger_messages on a fresh database,
  * adopts a table the previous auto_setup transport created — rows kept, the
- * bridge's index renamed, no duplicate index — and on rollback drops an empty
- * table but keeps one that still holds parked messages. Runs inside the
- * per-test transaction (PostgreSQL DDL is transactional).
+ * bridge's index renamed, no duplicate index — and its rollback keeps the
+ * table and its rows (a drop would race a concurrent parking); re-applying is
+ * idempotent. Runs inside the per-test transaction (PostgreSQL DDL is
+ * transactional).
  */
 #[CoversNothing]
 final class MessengerMessagesMigrationTest extends KernelTestCase
@@ -39,7 +40,12 @@ final class MessengerMessagesMigrationTest extends KernelTestCase
         self::assertSame(['id', 'body', 'headers', 'queue_name', 'created_at', 'available_at', 'delivered_at'], $this->columns());
 
         $this->execute('--down');
-        self::assertFalse($this->tableExists(), 'an empty table is dropped on rollback');
+        self::assertTrue($this->tableExists(), 'the rollback keeps the table: it is shared with the transport');
+        self::assertSame(0, $this->rows());
+
+        $this->execute('--up');
+        self::assertTrue($this->tableExists(), 're-applying is idempotent');
+        self::assertSame(['idx_messenger_messages_queue', 'messenger_messages_pkey'], $this->indexes(), 'still one index');
     }
 
     public function testUpgradeAdoptsTheAutoCreatedTableAndKeepsItsRows(): void
@@ -57,15 +63,12 @@ final class MessengerMessagesMigrationTest extends KernelTestCase
         self::assertSame(['idx_messenger_messages_queue', 'messenger_messages_pkey'], $this->indexes(), 'renamed, not duplicated');
 
         $this->execute('--down');
-        self::assertTrue($this->tableExists(), 'a table with parked messages is kept on rollback');
+        self::assertTrue($this->tableExists(), 'the rollback keeps the table and its parked messages');
         self::assertSame(1, $this->rows());
 
-        $this->connection()->executeStatement('DELETE FROM messenger_messages');
-        $this->execute('--down');
-        self::assertFalse($this->tableExists(), 'once empty, the rollback drops it');
-
         $this->execute('--up');
-        self::assertTrue($this->tableExists(), 'and the migration re-applies cleanly');
+        self::assertSame(1, $this->rows(), 'and the migration re-applies cleanly, rows intact');
+        self::assertSame(['idx_messenger_messages_queue', 'messenger_messages_pkey'], $this->indexes());
     }
 
     /** A fresh kernel per execution: a migration instance is frozen after it ran once in a process (as one console run does). */
