@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Click\Recorder;
 
+use App\Click\ClickFacts;
 use App\Click\ClickRecorderInterface;
 use App\Click\RecordOutcome;
 use App\Click\RefererHost;
@@ -38,9 +39,9 @@ final readonly class DbalClickRecorder implements ClickRecorderInterface
         $this->clickIdFactory = $clickIdFactory ?? static fn (): Uuid => Uuid::v7();
     }
 
-    public function record(Link $link, Visit $visit): RecordOutcome
+    public function record(Link $link, Visit $visit, ClickFacts $facts): RecordOutcome
     {
-        return $this->connection->transactional(function (Connection $connection) use ($link, $visit): RecordOutcome {
+        return $this->connection->transactional(function (Connection $connection) use ($link, $visit, $facts): RecordOutcome {
             $affected = $connection->executeStatement(
                 'UPDATE links SET click_count = click_count + 1 WHERE id = :id AND (max_clicks IS NULL OR click_count < max_clicks)',
                 ['id' => $link->getId()->toRfc4122()],
@@ -53,15 +54,15 @@ final readonly class DbalClickRecorder implements ClickRecorderInterface
                 'id' => ($this->clickIdFactory)()->toRfc4122(),
                 'link_id' => $link->getId()->toRfc4122(),
                 'occurred_at' => $visit->occurredAt,
-                'country' => null,
-                'device_type' => null,
-                'os' => null,
-                'browser' => null,
-                'is_bot' => false,
+                'country' => $facts->country,
+                'device_type' => $facts->deviceType,
+                'os' => $facts->os,
+                'browser' => $facts->browser,
+                'is_bot' => $facts->isBot,
                 'referer_host' => $this->refererHost->of($visit->referer),
                 'visitor_hash' => $this->hasher->hash($visit),
-                'variant' => null,
-                'resolved_by' => 'default',
+                'variant' => $facts->variant,
+                'resolved_by' => $facts->resolvedBy,
             ], [
                 'occurred_at' => Types::DATETIMETZ_IMMUTABLE,
                 'is_bot' => Types::BOOLEAN,

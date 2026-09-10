@@ -7,6 +7,7 @@ declare(strict_types=1);
 // parallel by DbalClickRecorderTest to prove the conditional UPDATE keeps the
 // click limit exact across processes (design decision 3).
 
+use App\Click\ClickFacts;
 use App\Click\Recorder\DbalClickRecorder;
 use App\Click\RefererHost;
 use App\Click\Visit;
@@ -25,6 +26,6 @@ $container = $kernel->getContainer()->get('test.service_container');
 
 $link = $container->get(LinkRepositoryInterface::class)->findBySlug($slug) ?? throw new RuntimeException('no such link');
 $recorder = new DbalClickRecorder($container->get('doctrine.dbal.default_connection'), new VisitorHasher('test-only-visitor-salt'), new RefererHost('http://localhost:8082'));
-$outcome = $recorder->record($link, new Visit('198.51.100.'.random_int(1, 254), 'race/1.0', null, new DateTimeImmutable()));
+$outcome = $recorder->record($link, new Visit('198.51.100.'.random_int(1, 254), 'race/1.0', null, new DateTimeImmutable()), ClickFacts::default());
 
 echo $outcome->name[0];
