@@ -1,7 +1,7 @@
 # Handoff — add-redirect-with-sync-logging
 
-**Updated:** 2026-09-09 · claude (session ended here: the user's daily quota was nearly spent)
-**State:** awaiting-gate-2
+**Updated:** 2026-09-10 · claude
+**State:** ready-to-merge
 **Branch:** change/add-redirect-with-sync-logging
 
 ## Done this session
@@ -12,10 +12,11 @@
 - Implemented blocks 1–4 (03199ba click write model + migration; 43ef8e0 redirect layer, ProblemDetails in Shared, **security.yaml firewall pattern `^/api(/|$)`**; 8ecd85e Web tests; docs commit). make check: cs 0, stan 0, 304 tests / 1855 assertions. Every guard has a demonstrated failing input in its commit body (eight mutations: WHERE clause, parse_str UTM, firewall pattern, referer bound, record() catch, lookup catch, limiter catch, consume outside catch, limiter check).
 - Deviations recorded in design/tasks: `RefererHost` lives in `src/Click/` (click column; Click must not depend on Redirect); composite index ascending (Doctrine does not model DESC); `RateLimitVerdict` has no `unavailable` — the wrapper logs and reports allowed; recorder integration tests build the recorder by hand (the interface alias is private and only resolvable through its consumer); concurrency proven with ten child processes (`tests/Fixture/record-click.php`) on an autocommitting connection.
 - **Security-sensitive, needs a named developer's review:** api firewall pattern narrowed; untrusted `User-Agent`/`Referer` handling and `Location` composition on the public hot path; hashing of the client IP; fail-open rate limiting.
-- Task 5.2: branch run https://github.com/Azazu/linkboard/actions/runs/34353599805 on head 6662606 — detect, workflow, php all success. Task 5.3 ticked for the gate request; Gate 2 NOT yet started (quota).
+- Task 5.2: branch run https://github.com/Azazu/linkboard/actions/runs/34353599805 on head 6662606 — detect, workflow, php all success (re-verified via the Actions API on 2026-09-10: completed, success).
+- 2026-09-10: local stack brought up; `make check` first failed because the gitignored `config/jwt/test/` keypair had been generated with another passphrase (the how-to's documented case) — keys regenerated with `make jwt-keys`, nothing tracked changed. **Gate 2 Round 1 (2e59e55): approved, no findings** (recorded 7888c79). The reviewer could not run `make check` in its sandbox (no Docker socket) and relied on the recorded evidence; the runner's own floor ran `make check` green on 2e59e55 before invoking the reviewer. Only `tasks.md`, `handoff.md`, `review.md` differ between the green run head 6662606 and this branch head, so the Gate 2 freshness rule holds.
 
 ## Next step
-Next session: `scripts/pregate-verify.sh gate2 add-redirect-with-sync-logging` (expected to pass) then `scripts/gate-run.sh add-redirect-with-sync-logging 2 full` (auto mode). Only protocol files changed since the green run (tasks.md, handoff.md). On changes-requested: `/workflow:fix-findings`, re-push for a green run, `gate-run … 2 confirm <round>`; stop after two failed confirmations on one finding. On approval: `/git:merge add-redirect-with-sync-logging`, push main, check the main run, `/opsx:archive` (syncs specs `redirect`, `click-logging`), update ~/Projects/pet/Linkboard_TZ_RU.md, `/workflow:start add-routing-rules`.
+User: `/git:merge add-redirect-with-sync-logging` (verifier checks Gate 2 freshness), push `main`, confirm the `main` Actions run is green, then `/opsx:archive` (syncs specs `redirect`, `click-logging`), update ~/Projects/pet/Linkboard_TZ_RU.md, `/workflow:start add-routing-rules`. Optional before merge: push the branch so the remote carries the review record (only protocol files changed since the green run).
 
 ## Blockers
 None.
