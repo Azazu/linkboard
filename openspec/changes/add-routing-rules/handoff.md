@@ -1,6 +1,6 @@
 # Handoff — add-routing-rules
 
-**Updated:** 2026-09-10 · claude (branch run green, Gate 2 requested)
+**Updated:** 2026-09-10 · claude (Gate 2 Round 1 findings fixed, confirmation requested)
 **State:** awaiting-gate-2
 **Branch:** change/add-routing-rules
 
