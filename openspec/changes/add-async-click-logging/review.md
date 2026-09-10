@@ -34,3 +34,22 @@ Branch and HEAD match the requested review target; the worktree was clean before
 
 ### Validation
 Reviewed only the requested commit diff and collateral relevant to Round 1 findings, including the current redirect/update paths and installed Messenger listener, retry-strategy and configuration source. Branch and HEAD match the requested target; all source-round findings were dispositioned and the worktree was clean. `scripts/pregate-verify.sh gate1 add-async-click-logging` passed, including strict OpenSpec validation. This confirms planning artifacts, not an implemented runtime. No unrelated findings were introduced; only `review.md` was modified and no git write commands were run.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-10
+**Reviewed-Commit:** f9241820fa4533a0674b17164ecea0d902b16541
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 4 and task 2.1 catch the FK violation outside the rolled-back transaction and return normally. Tasks 3.1/3.3 require the configured Worker event path, first-attempt acknowledgement, no retry/rejection/parking, the info record, and a failing test when the return is replaced by an unrecoverable exception. The deleted-link delta and applicability table agree. |
+| 2 | changes-requested — Snapshot semantics and the queued-unlimited-period scenario now address the missing guarantee boundary, but task 2.2 still does not verify the specified concurrent transition: it executes all ten old-snapshot record() calls before PATCH, so it tests already-queued clicks rather than requests resuming after the new limit has been consumed. Retain the ten snapshots without recording, commit PATCH, run the three new-snapshot calls, then invoke the ten retained snapshots, as the delta scenario requires; explicitly consume all thirteen messages (handling only the named ten produces count 10, not 13). Reconcile the post-persistence assertions too: the unchanged RedirectResolver::isExhausted() returns 410 before calling the recorder at count 13/max 3 or count 14/max 10, so the delta scenarios and task 3.3 cannot assert a Redis lift on that next HTTP redirect. Assert the early 410 with the key unchanged and test the lift separately through the counter seam or after raising the maximum. Finally, carry the in-flight allowance into task 4.2's FR-RED-3 rewrite; it still specifies only unpersisted redirects at seeding. These are the remaining verification and reconciliation gaps of the same transition finding. |
+| 3 | confirmed — The named failure-plus-key-loss case is specified and covered by task 3.3. The seeding bound includes queued, dispatch-failed, parked and pre-dispatch-crash increments and repeated key loss; task 4.2 requires replacing the old backlog-only FR-RED-3 claim. The remaining concurrent-transition reconciliation is tracked under finding 2. |
+| 4 | confirmed — Decision 7, task 1.2 and the click-logging delta explicitly configure jitter 0, making the exact delay assertions compatible with the installed retry strategy. Task 3.3 checks counts 1/2/3 on WorkerMessageRetriedEvent envelopes and distinguishes the failed envelope's final parking stamp (0), matching the installed listeners. Four handler attempts, one failed envelope, unchanged click data and the disabled-failure-routing failing input remain mandatory. |
+
+### Validation
+Reviewed the diff from `06256b3034d1f275a1db340bc0668090cbfc7c5f` to `f9241820fa4533a0674b17164ecea0d902b16541` and collateral reachable from the named findings, including the redirect exhaustion fast path and installed Messenger retry/failure listeners and retry strategy. Branch and HEAD match the requested target; the worktree was initially clean and all source-round findings were dispositioned. `scripts/pregate-verify.sh gate1 add-async-click-logging` passed, including strict OpenSpec validation. This is a review of planning artifacts, not runtime implementation. Only `review.md` was modified; no git write commands were run and no unrelated findings were introduced.
+
+Finding 2 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before another confirmation of that finding.
