@@ -53,3 +53,20 @@ Reviewed only the requested commit diff and collateral relevant to Round 1 findi
 Reviewed the diff from `06256b3034d1f275a1db340bc0668090cbfc7c5f` to `f9241820fa4533a0674b17164ecea0d902b16541` and collateral reachable from the named findings, including the redirect exhaustion fast path and installed Messenger retry/failure listeners and retry strategy. Branch and HEAD match the requested target; the worktree was initially clean and all source-round findings were dispositioned. `scripts/pregate-verify.sh gate1 add-async-click-logging` passed, including strict OpenSpec validation. This is a review of planning artifacts, not runtime implementation. Only `review.md` was modified; no git write commands were run and no unrelated findings were introduced.
 
 Finding 2 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before another confirmation of that finding.
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-10
+**Reviewed-Commit:** 43c8b486f1a5cd67733fc83c6825434de601ea45
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 4 and task 2.1 catch the foreign-key violation outside the rolled-back transaction and return normally. Tasks 3.1/3.3 require the configured Worker event path to prove first-attempt acknowledgement, no rejection/retry/parking and the info record, including a failing input that replaces the return with an unrecoverable exception. The deleted-link delta and applicability table retain this contract. |
+| 2 | confirmed — Task 2.2 now retains ten old unlimited snapshots without recording, commits the limit change, consumes the allowance with three fresh-snapshot calls, then records the ten retained snapshots and handles all thirteen messages. It also covers snapshots retaining a higher maximum after lowering. The queued-unlimited-period scenario remains covered. The redirect delta and task 3.3 now assert the persisted-count fast path's 410 with the Redis key unchanged; they verify the lift after raising the limit, while task 2.2 verifies it separately through the recorder seam. These assertions match the current RedirectResolver. Task 4.2 explicitly carries snapshot semantics and the in-flight allowance into FR-RED-3. The named transition verification and reconciliation gaps are resolved. |
+| 3 | confirmed — The design and redirect delta account for all unpersisted accepted redirects at seeding, including queued, dispatch-failed, parked and pre-dispatch-crash cases, plus repeated key loss and the separately stated in-flight allowance. Task 3.3 retains the concrete three-failed-dispatches/key-loss scenario; tasks 4.1/4.2 cover operational documentation and replacement of the backlog-only FR-RED-3 claim. |
+| 4 | confirmed — The configured Worker lifecycle test remains mandatory: four handler attempts, three retry events with counts 1/2/3 and exact 10/20/40 ms delays, one parked envelope and unchanged click data. Jitter is explicitly zero in every environment; retry-event assertions distinguish the failed envelope's final parking stamp of zero, matching the installed listeners and retry strategy. Disabling failure routing must fail the test. |
+
+### Validation
+Reviewed the diff from `06256b3034d1f275a1db340bc0668090cbfc7c5f` to `43c8b486f1a5cd67733fc83c6825434de601ea45` and collateral reachable from the named findings, including the redirect exhaustion fast path and installed Messenger retry/failure source. This third confirmation follows the user's explicit request after the prior stop; the handoff also records that authorization. Branch and HEAD match the requested target, the worktree was initially clean, and every source-round finding was dispositioned. `scripts/pregate-verify.sh gate1 add-async-click-logging` passed, including strict OpenSpec validation. This confirms planning artifacts, not runtime implementation. No unrelated findings were introduced; only `review.md` was modified and no git write commands were run.
