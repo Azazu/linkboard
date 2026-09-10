@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "rules": [
+    { "match": { "device": ["smartphone", "tablet"], "os": ["iOS"] }, "target": "https://apps.apple.com/app/id123" },
+    { "match": { "os": ["Android"] }, "target": "https://play.google.com/store/apps/details?id=com.example" },
+    { "match": { "country": ["DE", "AT", "CH"] }, "target": "https://example.de/" },
+    { "match": { "language": ["uk", "ru"] }, "target": "https://example.com/ua/" }
+  ],
+  "variants": [
+    { "name": "A", "weight": 50, "target": "https://example.com/landing-a" },
+    { "name": "B", "weight": 50, "target": "https://example.com/landing-b" }
+  ]
+}

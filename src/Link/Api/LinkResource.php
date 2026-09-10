@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Link\Api;
 
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -20,7 +21,7 @@ use App\Link\Entity\Link;
  */
 #[ApiResource(
     shortName: 'Link',
-    // nullable fields (utm, expiresAt, maxClicks) are part of the contract: emit them as null
+    // nullable fields (utm, rules, expiresAt, maxClicks) are part of the contract: emit them as null
     normalizationContext: ['skip_null_values' => false],
     operations: [
         new Post(
@@ -57,7 +58,7 @@ use App\Link\Entity\Link;
             provider: LinkItemProvider::class,
             processor: UpdateLinkProcessor::class,
             security: 'is_granted("LINK_EDIT", object)',
-            description: 'Merge patch: only the fields present in the body change. `expiresAt`, `maxClicks` and `utm` may be cleared with null; `targetUrl` and `isActive` may not be null; `slug` is immutable.',
+            description: 'Merge patch: only the fields present in the body change. `expiresAt`, `maxClicks`, `utm` and `rules` may be cleared with null (a `rules` document replaces the stored one whole); `targetUrl` and `isActive` may not be null; `slug` is immutable.',
         ),
         new Delete(
             uriTemplate: '/links/{id}',
@@ -87,6 +88,7 @@ final readonly class LinkResource
 {
     /**
      * @param array<string, string>|null $utm
+     * @param array<string, mixed>|null  $rules
      */
     public function __construct(
         public string $id,
@@ -95,6 +97,8 @@ final readonly class LinkResource
         public string $shortUrl,
         public string $targetUrl,
         public ?array $utm,
+        #[ApiProperty(description: 'Routing-rules document (version 1; schema: docs/reference/rules-schema.json in the repository) or null for a plain redirect.', openapiContext: ['type' => 'object', 'nullable' => true])]
+        public ?array $rules,
         public ?\DateTimeImmutable $expiresAt,
         public ?int $maxClicks,
         public int $clickCount,
@@ -113,6 +117,7 @@ final readonly class LinkResource
             rtrim($publicBaseUrl, '/').'/'.$link->getSlug(),
             $link->getTargetUrl(),
             $link->getUtm(),
+            $link->getRules(),
             $link->getExpiresAt(),
             $link->getMaxClicks(),
             $link->getClickCount(),

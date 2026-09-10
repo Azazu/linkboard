@@ -81,7 +81,7 @@ curl -s -X DELETE http://localhost:8082/api/v1/links/$ID -H "Authorization: Bear
 ```
 
 A PATCH changes only the fields present in the body; `expiresAt`,
-`maxClicks` and `utm` can be cleared with `null`, the slug never changes.
+`maxClicks`, `utm` and `rules` can be cleared with `null`, the slug never changes.
 Without `slug` a 7-character one is generated. In a shell, quote URLs with
 `[` `]` or pass `-g` to curl (`order[createdAt]=asc`).
 
@@ -114,7 +114,7 @@ The short link itself is `GET /{slug}` — public, no session, no cookie:
 
 ```bash
 curl -sI http://localhost:8082/spring-sale
-# HTTP/1.1 302 Found · Location: <target with the link's UTM appended>
+# HTTP/1.1 302 Found · Location: <resolved destination with the link's UTM appended>
 # Cache-Control: no-store · Referrer-Policy: no-referrer-when-downgrade
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8082/nothing-here   # 404
 curl -s -H 'Accept: application/json' http://localhost:8082/nothing-here        # problem details
@@ -149,6 +149,90 @@ one: if the click cannot be written, a link without `maxClicks` still
 redirects and logs an error; a link with `maxClicks` answers 503 with
 `Retry-After: 5` because its limit cannot be guaranteed; if the link itself
 cannot be looked up, every slug answers 503.
+
+## Routing rules
+
+A link may carry a `rules` document (FR-RUL-2; JSON Schema in
+`docs/reference/rules-schema.json`, the PHP validator is the authority and a
+test keeps the two equal). Up to 20 rules with exactly one dimension each —
+device (`device` and/or `os`), `country`, or `language` — and 2–4 A/B
+variants whose integer weights sum to 100; every target passes the same URL
+policy as `targetUrl`. Send it on `POST /api/v1/links` or replace it whole on
+`PATCH` (`"rules": null` clears it):
+
+```bash
+curl -s -X POST http://localhost:8082/api/v1/links -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d @- <<'JSON'
+{"targetUrl":"https://example.com/","slug":"routed","rules":
+{
+  "version": 1,
+  "rules": [
+    { "match": { "device": ["smartphone", "tablet"], "os": ["iOS"] }, "target": "https://apps.apple.com/app/id123" },
+    { "match": { "os": ["Android"] }, "target": "https://play.google.com/store/apps/details?id=com.example" },
+    { "match": { "country": ["DE", "AT", "CH"] }, "target": "https://example.de/" },
+    { "match": { "language": ["uk", "ru"] }, "target": "https://example.com/ua/" }
+  ],
+  "variants": [
+    { "name": "A", "weight": 50, "target": "https://example.com/landing-a" },
+    { "name": "B", "weight": 50, "target": "https://example.com/landing-b" }
+  ]
+}
+}
+JSON
+```
+
+Invalid documents answer 422 with one violation per problem and its path, for
+example `rules[rules][0][match]` or `rules[variants][1][weight]`. JSON types
+are enforced as written: an object where an array belongs (even with keys
+`"0"`, `"1"`) is a violation.
+
+On redirect the destination is resolved in a fixed order: device rules →
+country rules → language rules → A/B variants → `targetUrl`; the first match
+wins and the click records `resolved_by` and `variant`. Try a device rule with
+a user agent and a language rule with `Accept-Language`:
+
+```bash
+curl -sI -A 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' http://localhost:8082/routed | grep -i location
+curl -sI -H 'Accept-Language: uk' http://localhost:8082/routed | grep -i location
+curl -sI http://localhost:8082/routed | grep -i location   # variant A or B, sticky per IP + user agent
+```
+
+**Input policy** (FR-RUL-4/7). A header that is absent or well-formed but not
+understood (an unknown user agent, `Accept-Language: *`, an IP no resolver
+knows) leaves that dimension unresolved: its rules are skipped, nothing is
+logged. A hostile header — `User-Agent` over 1024 bytes or with control
+characters or invalid UTF-8, `Accept-Language` over 256 bytes or outside the
+header grammar, an oversized client hint — is never parsed: the visitor gets
+`targetUrl` with `resolved_by = default` and one `notice` names the link and
+the issue classes (never the values). Any exception inside detection,
+geolocation or evaluation degrades the same way. The click is recorded in
+every case.
+
+**Country resolution.** `COUNTRY_RESOLVERS` (default `header,geolite2`) names
+the resolvers in order; an unknown name fails every boot of the application —
+try it and watch the console refuse to start:
+
+```bash
+docker compose exec -T -e COUNTRY_RESOLVERS=bogus php bin/console about
+```
+
+- `header` reads the header named by `GEOIP_COUNTRY_HEADER` (default
+  `CF-IPCountry`) **only when the request came through a trusted proxy**
+  (`TRUSTED_PROXIES`); a client talking to the app directly cannot set its own
+  country.
+- `geolite2` reads the MaxMind GeoLite2 country database at
+  `GEOIP_DATABASE_PATH` (default `var/geoip/GeoLite2-Country.mmdb`, gitignored,
+  never committed). Download it with a free MaxMind account
+  (<https://www.maxmind.com/en/geolite2/signup>), place it there and start a
+  new process — the file is opened lazily once per process. While it is
+  missing the resolver disables itself with one `warning` and the country is
+  unknown; an address that is not in the database is unknown too.
+- In the test environment `COUNTRY_RESOLVERS=fixed` uses a constant map
+  (`tests/Fixture/FixedMapCountryResolver.php`).
+
+Device, OS, browser and bot detection use `matomo/device-detector`; its regex
+database is parsed once per deploy into the filesystem pool
+`cache.device_detector`, so the first requests after `cache:clear` are slower.
 
 ## Reset (DESTRUCTIVE)
 
@@ -185,9 +269,11 @@ it yourself.
   (no `_test` suffix; it checks the configured dependency, like in prod),
   so that database must exist wherever the tests run. CI creates `app`
   as the service database and `make test-db` derives `app_test` from it.
-- **`make check` fails in the token tests with a key error** — the keypairs
-  are missing or were generated with another passphrase; run `make jwt-keys`
-  (delete `config/jwt/test/` first if the passphrase in `.env.test` changed).
+- **`make check` fails in the token tests with a key error**, or the dev
+  stack answers `POST /api/v1/auth/token` with a 500 "private key/passphrase" —
+  the keypairs are missing or were generated with another passphrase; run
+  `make jwt-keys` (delete `config/jwt/test/` or `config/jwt/dev/` first if the
+  passphrase in `.env.test` / `.env` changed).
 - **Tests boot the `dev` kernel** — the php container carries `APP_ENV=dev`
   in its real environment and `KernelTestCase` reads `$_ENV` first;
   `phpunit.dist.xml` forces both `$_SERVER` and `$_ENV` to `test`. Keep

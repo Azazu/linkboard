@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Web\Redirect;
 
+use App\Click\ClickFacts;
 use App\Click\ClickRecorderInterface;
 use App\Click\Recorder\DbalClickRecorder;
 use App\Click\RecordOutcome;
@@ -234,7 +235,7 @@ final class RedirectDegradationTest extends RedirectWebTestCase
     {
         // the concrete class is final and cannot be doubled; the container id is replaced by a throwing implementation
         self::getContainer()->set(DbalClickRecorder::class, new class implements ClickRecorderInterface {
-            public function record(Link $link, Visit $visit): RecordOutcome
+            public function record(Link $link, Visit $visit, ClickFacts $facts): RecordOutcome
             {
                 throw new \RuntimeException('click store down');
             }

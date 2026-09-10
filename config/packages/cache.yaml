@@ -14,6 +14,9 @@ framework:
         # APCu (not recommended with heavy random-write workloads as memory fragmentation can cause perf issues)
         #app: cache.adapter.apcu
 
-        # Namespaced pools use the above "app" backend by default
-        #pools:
-            #my.dedicated.cache: null
+        pools:
+            # matomo/device-detector regex database, parsed once per deploy and
+            # kept on local disk: the redirect hot path gains no Redis dependency
+            # (add-routing-rules, design decision 7)
+            cache.device_detector:
+                adapter: cache.adapter.filesystem

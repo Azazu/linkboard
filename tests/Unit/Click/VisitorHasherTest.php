@@ -49,13 +49,4 @@ final class VisitorHasherTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         new VisitorHasher('');
     }
-
-    public function testHeaderBoundsAreAppliedWhenBuildingAVisit(): void
-    {
-        $visit = Visit::fromHeaders(null, str_repeat('u', 5000), str_repeat('r', 5000), new \DateTimeImmutable(), false);
-
-        self::assertSame('', $visit->clientIp);
-        self::assertSame(Visit::USER_AGENT_MAX_BYTES, \strlen($visit->userAgent));
-        self::assertSame(Visit::REFERER_MAX_BYTES, \strlen((string) $visit->referer));
-    }
 }

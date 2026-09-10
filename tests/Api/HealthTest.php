@@ -48,8 +48,7 @@ final class HealthTest extends WebTestCase
         // container is cached without resource tracking, so a stale
         // var/cache/prod from an earlier configuration would test the wrong
         // thing: start from scratch.
-        (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
-        $kernel = self::bootKernel(['environment' => 'prod', 'debug' => false]);
+        $kernel = self::bootProdKernel();
 
         $response = $kernel->handle(Request::create('/health?deep=1'));
 
@@ -69,8 +68,7 @@ final class HealthTest extends WebTestCase
         // Until the API-keys change authorizes the probe for an admin API key,
         // prod refuses it for everyone — including an admin's JWT (spec
         // health-check, MODIFIED by add-users-and-security).
-        (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
-        $kernel = self::bootKernel(['environment' => 'prod', 'debug' => false]);
+        $kernel = self::bootProdKernel();
 
         $request = Request::create('/health?deep=1', server: ['HTTP_AUTHORIZATION' => 'Bearer not-checked-here.admin.jwt']);
         $response = $kernel->handle($request);
@@ -89,5 +87,27 @@ final class HealthTest extends WebTestCase
         $document = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
         $paths = $document['paths'] ?? [];
         self::assertArrayNotHasKey('/health', \is_array($paths) ? $paths : []);
+    }
+
+    /**
+     * The prod container has no `fixed` country resolver (a test-only service),
+     * so the startup check of App\Kernel::boot() would refuse the test
+     * environment's COUNTRY_RESOLVERS; the prod value is used for this boot and
+     * restored afterwards.
+     */
+    private static function bootProdKernel(): \Symfony\Component\HttpKernel\KernelInterface
+    {
+        (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
+        $previous = $_SERVER['COUNTRY_RESOLVERS'] ?? null;
+        $_SERVER['COUNTRY_RESOLVERS'] = $_ENV['COUNTRY_RESOLVERS'] = 'header,geolite2';
+        try {
+            return self::bootKernel(['environment' => 'prod', 'debug' => false]);
+        } finally {
+            if (null === $previous) {
+                unset($_SERVER['COUNTRY_RESOLVERS'], $_ENV['COUNTRY_RESOLVERS']);
+            } else {
+                $_SERVER['COUNTRY_RESOLVERS'] = $_ENV['COUNTRY_RESOLVERS'] = $previous;
+            }
+        }
     }
 }

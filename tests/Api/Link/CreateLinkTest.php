@@ -32,7 +32,7 @@ final class CreateLinkTest extends LinkApiTestCase
         self::assertNull($link['utm']);
         self::assertNull($link['expiresAt']);
         self::assertNull($link['maxClicks']);
-        self::assertSame(['clickCount', 'createdAt', 'expiresAt', 'id', 'isActive', 'maxClicks', 'ownerId', 'shortUrl', 'slug', 'targetUrl', 'updatedAt', 'utm'], array_keys($this->sorted($link)));
+        self::assertSame(['clickCount', 'createdAt', 'expiresAt', 'id', 'isActive', 'maxClicks', 'ownerId', 'rules', 'shortUrl', 'slug', 'targetUrl', 'updatedAt', 'utm'], array_keys($this->sorted($link)));
     }
 
     public function testCustomSlugAndOptionalFields(): void

@@ -13,8 +13,8 @@ use Symfony\Component\Uid\Uuid;
  * The link aggregate (specification §2.2, §3.3). Plain DataMapper entity:
  * intention-revealing methods, no setters for slug, owner or click count.
  * Slug uniqueness is case-sensitive and enforced by the unique index with
- * collation "C" (migration); the routing `rules` column is created here and
- * populated by the routing-rules change.
+ * collation "C" (migration); `rules` holds the canonical routing-rules
+ * document (App\Link\Rules\RulesDocument::toArray()) or null.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'links')]
@@ -106,6 +106,15 @@ class Link
     public function getRules(): ?array
     {
         return $this->rules;
+    }
+
+    /**
+     * @param array<string, mixed>|null $rules the canonical form of a validated document (RulesDocument::toArray()), or null to clear
+     */
+    public function replaceRules(?array $rules, \DateTimeImmutable $now): void
+    {
+        $this->rules = $rules;
+        $this->touch($now);
     }
 
     /**

@@ -10,11 +10,13 @@ use ApiPlatform\Validator\Exception\ValidationException;
 use App\Auth\Entity\User;
 use App\Link\Entity\Link;
 use App\Link\LinkRepositoryInterface;
+use App\Link\Rules\RulesDocumentParser;
 use App\Link\SlugGeneratorInterface;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\ConstraintViolation;
@@ -40,6 +42,7 @@ final readonly class CreateLinkProcessor implements ProcessorInterface
         private Security $security,
         private LoggerInterface $logger,
         private PublicUrl $publicUrl,
+        private RulesDocumentParser $rulesParser,
     ) {
     }
 
@@ -55,9 +58,10 @@ final readonly class CreateLinkProcessor implements ProcessorInterface
             throw new AccessDeniedException();
         }
         $ownerId = $actor->getId();
+        $rules = $this->canonicalRules($context);
 
         if (null !== $data->slug) {
-            return $this->publicUrl->toResource($this->persist($ownerId, $data->slug, $data, clientSupplied: true));
+            return $this->publicUrl->toResource($this->persist($ownerId, $data->slug, $data, $rules, clientSupplied: true));
         }
 
         $collisions = 0;
@@ -68,7 +72,7 @@ final readonly class CreateLinkProcessor implements ProcessorInterface
                 continue; // cheap pre-check; the unique index below is the guarantee
             }
             try {
-                return $this->publicUrl->toResource($this->persist($ownerId, $candidate, $data, clientSupplied: false));
+                return $this->publicUrl->toResource($this->persist($ownerId, $candidate, $data, $rules, clientSupplied: false));
             } catch (UniqueConstraintViolationException) {
                 ++$collisions;
                 // the failed commit closed the manager: replace it and try the next candidate
@@ -80,7 +84,29 @@ final readonly class CreateLinkProcessor implements ProcessorInterface
         throw new \RuntimeException(\sprintf('No free slug after %d attempts.', self::MAX_ATTEMPTS));
     }
 
-    private function persist(Uuid $ownerId, string $slug, CreateLinkInput $data, bool $clientSupplied): Link
+    /**
+     * The canonical form of the validated document, from the raw body (design decision 2).
+     *
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, mixed>|null
+     */
+    private function canonicalRules(array $context): ?array
+    {
+        $request = $context['request'] ?? null;
+        $input = RulesInput::fromRequest($request instanceof Request ? $request : null);
+        if (!$input->present || null === $input->node) {
+            return null;
+        }
+        $document = $this->rulesParser->parse($input->node)->document;
+
+        return $document?->toArray() ?? throw new \LogicException('The rules document was validated before processing.');
+    }
+
+    /**
+     * @param array<string, mixed>|null $rules
+     */
+    private function persist(Uuid $ownerId, string $slug, CreateLinkInput $data, ?array $rules, bool $clientSupplied): Link
     {
         $em = $this->doctrine->getManager();
         \assert($em instanceof \Doctrine\ORM\EntityManagerInterface);
@@ -94,6 +120,9 @@ final readonly class CreateLinkProcessor implements ProcessorInterface
         }
         $link->setExpiry($data->expiresAt, $now);
         $link->setClickLimit($data->maxClicks, $now);
+        if (null !== $rules) {
+            $link->replaceRules($rules, $now);
+        }
         $em->persist($link);
 
         try {

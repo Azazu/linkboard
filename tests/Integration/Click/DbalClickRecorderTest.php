@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Click;
 
+use App\Click\ClickFacts;
 use App\Click\ClickRecorderInterface;
 use App\Click\Recorder\DbalClickRecorder;
 use App\Click\RecordOutcome;
@@ -43,7 +44,8 @@ final class DbalClickRecorderTest extends KernelTestCase
         $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
         $now = new \DateTimeImmutable('2026-09-09T10:00:00+00:00');
 
-        $outcome = self::recorder()->record($link, new Visit('203.0.113.7', 'Probe/1.0', 'https://News.Example.org/story?id=1', $now));
+        $facts = new ClickFacts('DE', 'smartphone', 'iOS', 'Mobile Safari', false, 'variant', 'B');
+        $outcome = self::recorder()->record($link, new Visit('203.0.113.7', 'Probe/1.0', 'https://News.Example.org/story?id=1', $now), $facts);
 
         self::assertSame(RecordOutcome::Allowed, $outcome);
         $rows = self::connection()->fetchAllAssociative('SELECT * FROM clicks WHERE link_id = ?', [$link->getId()->toRfc4122()]);
@@ -55,9 +57,7 @@ final class DbalClickRecorderTest extends KernelTestCase
         self::assertSame('news.example.org', $row['referer_host']);
         self::assertMatchesRegularExpression('/^[0-9a-f]{64}\z/', (string) $row['visitor_hash']);
         self::assertFalse($row['is_bot']);
-        self::assertSame('default', $row['resolved_by']);
-        self::assertNull($row['country']);
-        self::assertNull($row['variant']);
+        self::assertSame(['DE', 'smartphone', 'iOS', 'Mobile Safari', 'variant', 'B'], [$row['country'], $row['device_type'], $row['os'], $row['browser'], $row['resolved_by'], $row['variant']], 'the facts are written as given');
         self::assertStringNotContainsString('203.0.113.7', json_encode($row, \JSON_THROW_ON_ERROR));
         self::assertStringNotContainsString('Probe/1.0', json_encode($row, \JSON_THROW_ON_ERROR));
         self::assertSame(1, self::clickCount($link->getId()));
@@ -69,7 +69,7 @@ final class DbalClickRecorderTest extends KernelTestCase
         $link->setClickLimit(1, new \DateTimeImmutable());
         self::connection()->executeStatement('UPDATE links SET max_clicks = 1, click_count = 1 WHERE id = ?', [$link->getId()->toRfc4122()]);
 
-        $outcome = self::recorder()->record($link, new Visit('203.0.113.7', 'Probe/1.0', null, new \DateTimeImmutable()));
+        $outcome = self::recorder()->record($link, new Visit('203.0.113.7', 'Probe/1.0', null, new \DateTimeImmutable()), ClickFacts::default());
 
         self::assertSame(RecordOutcome::Exhausted, $outcome);
         self::assertSame(0, self::connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$link->getId()->toRfc4122()]));
@@ -86,7 +86,7 @@ final class DbalClickRecorderTest extends KernelTestCase
         $recorder = new DbalClickRecorder($connection, new VisitorHasher('s'), new RefererHost('http://localhost:8082'), static fn (): Uuid => $fixedId);
 
         try {
-            $recorder->record($link, new Visit('203.0.113.7', 'Probe/1.0', null, new \DateTimeImmutable()));
+            $recorder->record($link, new Visit('203.0.113.7', 'Probe/1.0', null, new \DateTimeImmutable()), ClickFacts::default());
             self::fail('the duplicate click id must make the INSERT fail');
         } catch (UniqueConstraintViolationException) {
         }

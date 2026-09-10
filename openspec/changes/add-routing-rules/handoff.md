@@ -1,0 +1,20 @@
+# Handoff — add-routing-rules
+
+**Updated:** 2026-09-10 · claude (Gate 2 passed, branch run green on the post-fix head)
+**State:** ready-to-merge
+**Branch:** change/add-routing-rules
+
+## Done this session
+- Gate 1: Round 1 (a6250f9) changes-requested, three majors; Confirmation 1 (7498818) #2 confirmed, #1/#3 reworked (JSON-kind fixtures at every position, stored-mode guarantee narrowed, geolocation exception boundary); Confirmation 2 (837e28d) all confirmed → Gate 1 passed (recorded 0f7284e).
+- Implemented blocks 1–5, `make check` green on the branch head: cs 0, PHPStan level 8 0 errors, 464 tests / 5964 assertions. Commits: 3f09f8a deps (`matomo/device-detector` 6.5.1, `geoip2/geoip2` v3.4.0; `composer audit` clean; vendor API verified before writing wrappers), 26dff28 rules document (type-preserving parser over the raw body via `RulesInput`, `ValidRules` constraint, canonical storage, `rules` on the resource, JSON Schema + parity test), 3f7c44e visit classification / detection / language / country chain / `StartupChecks` from `Kernel::boot()`, 25f6420 evaluation on the redirect with the hostile short-circuit and guard, `ClickFacts` through the recorder seam, 8e0b28c how-to. Only the branch head is verified green: the interface change of the recorder seam spans commits 3–4.
+- Every guard has a demonstrated failing input (mutation → targeted test red → restored), listed per commit body: one-dimension check, weight sum, target policy, associative re-decode, trusted-proxy condition, Accept-Language grammar, hostile short-circuit, guard catch, document-order evaluation, `% 2` picker, GeoLite2 disabled flag and widened catch, chain name check, `Kernel::boot()` override (console with `bogus` exits 0 without it, 1 with it), schema maxItems/type.
+- Dev-stack verification recorded in the commit bodies and the how-to commands run in their exact form: POST with the example document → 201 with `rules`; `{"0":…}` → 422 `rules[rules]`; GET redirects — iPhone UA → App Store target, `Accept-Language: uk` → `/ua/`, plain → sticky variant; click rows carry `(smartphone, iOS, Mobile Safari, device)`, `(language)`, `(variant B)`; `docker compose exec -T -e COUNTRY_RESOLVERS=bogus php bin/console about` → exit 1.
+- Deviations from the plan, recorded in tasks.md: constraint named `ValidRules` (not `RulesDocument`, which is the model); `DeviceDetectionInterface` added as the container seam for the throwing stub; the chain cannot be replaced in the test container (constructed at boot) — tests replace its consumer `VisitorProfiler`; `Kernel::boot()` skips a container compiled before the checks existed (the upgrade's own `cache:clear` boots the stale container first) — noted in design terms in the commit and the code comment; BrowserKit supplies `Accept-Language: en-us` by default, so "absent" is sent as an empty header in Web tests; `AcceptLanguageTest` no longer carries the oversized/invalid cases (VisitFactory classifies them first).
+- **Security-sensitive, needs a named developer's review:** new dependencies parsing untrusted bytes (3f09f8a); hostile-input classification and the guard around detection/geolocation/evaluation (3f7c44e, 25f6420); the proxy country header honoured only from `TRUSTED_PROXIES`; rule and variant targets under `TargetUrlPolicy` (26dff28); the boot-time configuration check and its stale-container skip (`src/Kernel.php`).
+- Local environment note (not part of the change): the dev and test JWT keypairs under `config/jwt/` had been generated with another passphrase; regenerated with `make jwt-keys` (gitignored). The how-to's troubleshooting entry now names the dev-stack symptom.
+
+## Next step
+`/git:merge add-routing-rules` (verifier checks Gate 2 freshness), push `main`, check the `main` run via the API, `/opsx:archive` (creates spec `routing-rules`, syncs `links`, `redirect`, `click-logging`), update ~/Projects/pet/Linkboard_TZ_RU.md, `/workflow:start add-async-click-logging`.
+
+## Blockers
+None.

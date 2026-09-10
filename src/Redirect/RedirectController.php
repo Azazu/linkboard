@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Redirect;
 
-use App\Click\Visit;
 use App\Shared\Api\ProblemDetails;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,8 +13,8 @@ use Twig\Environment;
 
 /**
  * FR-RED-1…6: the public hot path. HTTP only — rate limit first (no SQL for a
- * flood), bounded headers into a Visit, the resolver's decision into a
- * response. Every response is `Cache-Control: no-store`; the 302 adds the
+ * flood), the request classified into a Visit (VisitFactory), the resolver's
+ * decision into a response. Every response is `Cache-Control: no-store`; the 302 adds the
  * referrer policy; 4xx/5xx bodies are small pages or problem details by
  * Accept. The token is never read, so no session starts and no cookie is set.
  * Lowest priority: every application route wins over a slug.
@@ -26,6 +25,7 @@ final readonly class RedirectController
 
     public function __construct(
         private RedirectRateLimit $rateLimit,
+        private VisitFactory $visits,
         private RedirectResolver $resolver,
         private Environment $twig,
     ) {
@@ -39,13 +39,7 @@ final readonly class RedirectController
             return $this->error($request, 429, 'Too Many Requests', 'Too many redirects from your address. Try again later.', 'redirect/rate_limited.html.twig', ['Retry-After' => (string) $verdict->retryAfter]);
         }
 
-        $visit = Visit::fromHeaders(
-            $request->getClientIp(),
-            $request->headers->get('User-Agent'),
-            $request->headers->get('Referer'),
-            new \DateTimeImmutable(),
-            $request->isMethod('HEAD'),
-        );
+        $visit = $this->visits->fromRequest($request, new \DateTimeImmutable(), $request->isMethod('HEAD'));
         $decision = $this->resolver->resolve($slug, $visit);
 
         return match ($decision->status) {
