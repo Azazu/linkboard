@@ -1,7 +1,7 @@
 # Handoff — add-async-click-logging
 
-**Updated:** 2026-09-10 · claude (Gate 2 confirmation 1 findings fixed, confirmation 2 requested)
-**State:** awaiting-gate-2
+**Updated:** 2026-09-10 · claude (Gate 2 confirmation 2 could not run: Codex spend cap)
+**State:** blocked
 **Branch:** change/add-async-click-logging
 
 ## Done this session
@@ -22,7 +22,7 @@
 - Gate 2 Round 1 (5ab5f65): changes-requested, two majors, fixed: (#1) the migration adopts an auto-created `messenger_messages` — `CREATE TABLE IF NOT EXISTS`, the bridge's generated index (PostgreSQL stores it lower-cased: `idx_75ea…`) renamed to the stable name, `CREATE INDEX IF NOT EXISTS`; rollback drops an empty table and keeps one with parked rows (`warnIf` names the count); `tests/Integration/Click/MessengerMessagesMigrationTest.php` runs `doctrine:migrations:execute --up/--down` (fresh kernel per execution — a migration instance is frozen after one run) against a fresh database and against a table the bridge's `setup()` created with a parked row; on the dev database `migrate prev` kept the table (it held one parked demo message — the designed branch) and `migrate` re-applied cleanly; failing inputs: unconditional `CREATE TABLE` → error on the upgrade case, no index rename → duplicate index, unconditional drop → the kept-rows case. (#2) the overshoot bound is stated at the *seeding request's snapshot read*: the seed is `click_count` as that request read it, so clicks persisted between the read and the `EVAL` are excluded too; reconciled in the delta (new scenario "A seed snapshot that goes stale before a key loss"), proposal, design decision 2 and risks, FR-RED-3, the how-to; the interleaving added to `tests/Integration/Click/LimitTransitionTest.php` (counter 3 with three queued, three paused snapshots at count 0, worker persists, key lost, paused resume → six accepted, a fresh snapshot exhausted). `make check` green: 504 tests / 6674 assertions. **A new branch run is needed before merge** (code changed after run 34491368326). the message carries finished facts (detection/geo/hash happen in the request, as routing requires) — a deviation from the letter of FR-CLK-1/2, reworded in task 4.2; Messenger's PHP serializer is kept; counter keys carry a `test:` prefix only in the test environment; no compensation for a crash between `INCR` and dispatch (bounded, stated); the synchronous recorder and its tests are deleted rather than kept as dead code; the retry-then-park test may fall back to asserting the configured strategy if the in-memory transport cannot exercise delays (task 3.3 records which form was feasible).
 
 ## Next step
-`scripts/gate-run.sh add-async-click-logging 2 confirm 1` (auto mode; confirmation 2 — if #1 or #2 fails again, stop and ask the user to arbitrate). Then the user pushes the branch again and the executor verifies the new run on the exact head via the Actions API before `/git:merge add-async-click-logging`; then push main, check the main run, `/opsx:archive` (syncs `redirect`, `click-logging`, `links`).
+Once the Codex spend cap is raised: `scripts/gate-run.sh add-async-click-logging 2 confirm 1` on head dc351a7 (confirmation 2 — if #1 or #2 fails again, stop and ask the user to arbitrate). Nothing else changes before that run: every fix is committed and `make check` is green on the head. On confirmation: the user pushes the branch, the executor verifies the new run on the exact head via the Actions API, then `/git:merge add-async-click-logging`, push main, check the main run, `/opsx:archive` (syncs `redirect`, `click-logging`, `links`).
 
 ## Blockers
-None.
+The reviewer run of 2026-09-10 exited with "You hit your spend cap set by the owner of your workspace" after the mechanical floor passed; the gate runner recorded nothing (fail-closed). Gate 2 stays open until Codex can run again.
