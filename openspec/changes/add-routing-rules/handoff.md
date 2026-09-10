@@ -1,7 +1,7 @@
 # Handoff — add-routing-rules
 
-**Updated:** 2026-09-10 · claude (Gate 2 Round 1 findings fixed, confirmation requested)
-**State:** awaiting-gate-2
+**Updated:** 2026-09-10 · claude (Gate 2 passed; a green run on the new head is still needed before merge)
+**State:** ready-to-merge
 **Branch:** change/add-routing-rules
 
 ## Done this session
@@ -14,7 +14,7 @@
 - Local environment note (not part of the change): the dev and test JWT keypairs under `config/jwt/` had been generated with another passphrase; regenerated with `make jwt-keys` (gitignored). The how-to's troubleshooting entry now names the dev-stack symptom.
 
 ## Next step
-User pushes `change/add-routing-rules` (head 8e0b28c + this handoff commit). Then task 6.2: query `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-routing-rules` for the head SHA until `completed`/`success`, record URL and SHA here; then 6.3: `openspec validate add-routing-rules --strict`, `scripts/pregate-verify.sh gate2 add-routing-rules`, `scripts/gate-run.sh add-routing-rules 2 full` (auto mode). On changes-requested: `/workflow:fix-findings`, re-push for a green run, `scripts/gate-run.sh add-routing-rules 2 confirm <round>`; stop after two failed confirmations on one finding. On approval: `/git:merge add-routing-rules`, push main, check the main run, `/opsx:archive` (creates spec `routing-rules`, syncs `links`, `redirect`, `click-logging`).
+User pushes `change/add-routing-rules` (head adae0fc + this handoff commit — protocol files only, so Gate 2 stays fresh). The executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-routing-rules` for the new head SHA until `completed`/`success` and records it here; only then `/git:merge add-routing-rules`, push `main`, check the `main` run, `/opsx:archive` (creates spec `routing-rules`, syncs `links`, `redirect`, `click-logging`), update ~/Projects/pet/Linkboard_TZ_RU.md, `/workflow:start add-async-click-logging`.
 
 ## Blockers
 None.
