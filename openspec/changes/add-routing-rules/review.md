@@ -53,3 +53,23 @@ Confirmation scope: the diff from a6250f9f17f9ecf1126aea7f839082fa5f5b6a5b to 74
 ### Validation
 
 Confirmation scope: the diff from a6250f9f17f9ecf1126aea7f839082fa5f5b6a5b to 837e28df563eecb4db176d16475a7f7c9d6b45de and collateral effects reachable from findings 1–3, including the outstanding points from Confirmation 1. All source-round findings were dispositioned as fixed. Checked the affected planning artifacts, repository instructions/configuration, normative routing requirements and relevant installed Symfony/application source; repository searches located the related claims. Branch and HEAD match the requested identifiers. `scripts/pregate-verify.sh gate1 add-routing-rules` passed, including strict OpenSpec validation, with zero warnings. This confirms the pre-implementation artifacts; no application test run is claimed. Only this review file was modified; no git write commands were run.
+
+
+## Round 1 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-10
+**Reviewed-Commit:** c575f318643295e9f666a01abd0aed8cebcc4ac9
+**Verdict:** changes-requested
+
+### Findings
+
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | major | tests/Unit/Redirect/Rules/VariantPickerTest.php:64–68 | The test requires two randomly generated link UUIDs to have different buckets modulo 100. Collisions are valid, so this assertion can fail on correct production code and randomly fail make check / CI; it also contradicts the delta scenario “Different links may differ”, which explicitly requires only self-consistency. For a concrete collision, UUIDs `0192b6f0-0000-7000-8000-000000000007` and `0192b6f0-0000-7000-8000-000000000008`, IP `203.0.113.7` and UA `Probe/1.0` both produce bucket 1 under the implemented CRC32 formula. Replace the random inequality with deterministic fixtures having known distinct buckets (to prove the link id contributes), retain self-consistency assertions, and allow legitimate collisions. | open |
+| 2 | major | src/Redirect/VisitFactory.php:53–61 | Blank normalization happens before the hostile-input checks. A Request whose Accept-Language is `str_repeat(' ', 257)` becomes null with no issue, bypassing the explicit greater-than-256-byte rule; a NUL-only value likewise disappears through trim instead of failing the grammar. With otherwise clean inputs and variants, profiling/evaluation proceeds and selects a variant without a notice, whereas FR-RUL-7 requires the default target, null dimensions and one notice. Check the raw length before blank normalization and limit the blank exception to the intended whitespace, so malformed control bytes cannot disappear. Add VisitFactory cases for oversized whitespace and NUL-only values, plus a redirect regression with variants asserting the default destination, click facts and notice. | open |
+
+### Validation
+
+Reviewed the change artifacts, Gate 1 record, repository instructions/configuration, implementation diff against main, relevant installed dependency source, and parser/API/routing/degradation/boot tests. Branch and HEAD match the requested identifiers; the working tree was initially clean. Inspected the commit bodies recording executor checks and demonstrated failing inputs. Independently calculated the concrete CRC32 collision above with Python zlib over the same UTF-8 bytes and NUL separators; this is a formula-level reproduction, not an execution of the PHP test. Finding 2 follows from the current control flow; its PHP regression was not executed here.
+
+`scripts/pregate-verify.sh gate2 add-routing-rules` passed whitespace, strict OpenSpec validation, risk-tier, task and documentation checks, but its `make check` step could not run: access to `/var/run/docker.sock` is denied in this sandbox. No host PHP executable is installed, so no independent green application-suite run is claimed. The executor records 464 tests / 5964 assertions; task 6.2 cites a successful CI run on ancestor 8077713, and subsequent commits through the reviewed HEAD change only workflow records. Only this review file was modified; no git write commands were run.
