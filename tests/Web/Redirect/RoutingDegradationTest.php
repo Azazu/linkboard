@@ -60,6 +60,30 @@ final class RoutingDegradationTest extends RedirectWebTestCase
         self::assertStringNotContainsString('203.0.113.7', $json);
     }
 
+    public function testBlankLookingAcceptLanguageStillHitsTheBounds(): void
+    {
+        $client = self::createClient();
+        $client->disableReboot();
+        $link = $this->languageRuleWithVariants('blankish', utm: ['utm_source' => 'x']);
+        $this->captureLog();
+
+        self::visit($client, '/blankish', ['HTTP_ACCEPT_LANGUAGE' => str_repeat(' ', 257)]);
+        self::assertResponseHeaderSame('Location', 'https://example.com/default?utm_source=x');
+        self::visit($client, '/blankish', ['HTTP_ACCEPT_LANGUAGE' => "\0"]);
+        self::assertResponseHeaderSame('Location', 'https://example.com/default?utm_source=x');
+
+        $rows = self::clicksOf($link->getId());
+        self::assertCount(2, $rows);
+        foreach ($rows as $row) {
+            self::assertSame(['default', null, null, null, null], [$row['resolved_by'], $row['variant'], $row['device_type'], $row['os'], $row['country']]);
+        }
+        $notices = $this->recordsAtNoticeOrAbove();
+        self::assertCount(2, $notices);
+        self::assertSame([VisitFactory::ISSUE_ACCEPT_LANGUAGE_OVERSIZED], $notices[0]->context['issues']);
+        self::assertSame([VisitFactory::ISSUE_ACCEPT_LANGUAGE_MALFORMED], $notices[1]->context['issues']);
+        self::assertSame((string) $link->getId(), $notices[0]->context['link_id']);
+    }
+
     public function testControlCharactersInTheUserAgent(): void
     {
         $client = self::createClient();

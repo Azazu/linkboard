@@ -86,6 +86,14 @@ final class VisitFactoryTest extends TestCase
             self::assertSame($wellFormed, $visit->acceptLanguage, $wellFormed);
         }
         self::assertNull($this->visit(['HTTP_ACCEPT_LANGUAGE' => '  '])->acceptLanguage, 'blank counts as absent');
+        self::assertSame([], $this->visit(['HTTP_ACCEPT_LANGUAGE' => " \t "])->inputIssues, 'spaces and tabs are the only blank');
+
+        $oversizedBlank = $this->visit(['HTTP_ACCEPT_LANGUAGE' => str_repeat(' ', 257)]);
+        self::assertSame([VisitFactory::ISSUE_ACCEPT_LANGUAGE_OVERSIZED], $oversizedBlank->inputIssues, 'the size bound is judged before the blank exception');
+        self::assertNull($oversizedBlank->acceptLanguage);
+        foreach (["\0", "\0\0", " \0 ", "\x7f"] as $controlOnly) {
+            self::assertSame([VisitFactory::ISSUE_ACCEPT_LANGUAGE_MALFORMED], $this->visit(['HTTP_ACCEPT_LANGUAGE' => $controlOnly])->inputIssues, 'control bytes do not vanish as blank: '.bin2hex($controlOnly));
+        }
     }
 
     public function testClientHintsClassification(): void

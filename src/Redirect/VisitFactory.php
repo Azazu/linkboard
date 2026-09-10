@@ -50,14 +50,16 @@ final readonly class VisitFactory
             $issues[self::ISSUE_USER_AGENT_MALFORMED] = true;
         }
 
+        // order matters: the size bound is judged on the raw value, before the
+        // blank exception, and blank means spaces/tabs only — a NUL-only value
+        // fails the grammar instead of disappearing (Gate 2 finding 2)
         $acceptLanguage = $request->headers->get('Accept-Language');
-        if (null !== $acceptLanguage && '' === trim($acceptLanguage)) {
-            $acceptLanguage = null;
-        }
         if (null !== $acceptLanguage) {
             if (\strlen($acceptLanguage) > Visit::ACCEPT_LANGUAGE_MAX_BYTES) {
                 $issues[self::ISSUE_ACCEPT_LANGUAGE_OVERSIZED] = true;
                 $acceptLanguage = null;
+            } elseif ('' === trim($acceptLanguage, " \t")) {
+                $acceptLanguage = null; // an empty header is an absent one
             } elseif (1 !== preg_match(self::ACCEPT_LANGUAGE_GRAMMAR, $acceptLanguage)) {
                 $issues[self::ISSUE_ACCEPT_LANGUAGE_MALFORMED] = true;
                 $acceptLanguage = null;

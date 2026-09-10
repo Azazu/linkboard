@@ -58,14 +58,36 @@ final class VariantPickerTest extends TestCase
         }
     }
 
-    public function testLinksAreIndependentButEachSelfConsistent(): void
+    /**
+     * The link id is part of the hash input: fixed ids with known, distinct
+     * buckets prove it (crc32 over "<uuid>\0<ip>\0<ua>" computed once and pinned);
+     * two other fixed ids share bucket 1 — a legitimate collision, so a test
+     * must never require two ids to differ (Gate 2 finding 1).
+     */
+    public function testTheLinkIdContributesToTheBucketAndCollisionsAreLegitimate(): void
     {
+        $ip = '203.0.113.7';
+        $ua = 'Probe/1.0';
+        $one = Uuid::fromString('0192b6f0-0000-7000-8000-000000000001');
+        $two = Uuid::fromString('0192b6f0-0000-7000-8000-000000000002');
+        $three = Uuid::fromString('0192b6f0-0000-7000-8000-000000000003');
+
+        self::assertSame(31, VariantPicker::bucket($one, $ip, $ua));
+        self::assertSame(34, VariantPicker::bucket($two, $ip, $ua));
+        self::assertSame(74, VariantPicker::bucket($three, $ip, $ua));
+        self::assertSame(16, VariantPicker::bucket($one, '', $ua), 'an unknown IP is still deterministic');
+
         $variants = self::variants(50, 50);
-        $a = Uuid::v7();
-        $b = Uuid::v7();
-        self::assertSame(VariantPicker::pick($variants, $a, '203.0.113.7', 'Probe/1.0'), VariantPicker::pick($variants, $a, '203.0.113.7', 'Probe/1.0'));
-        self::assertSame(VariantPicker::pick($variants, $b, '203.0.113.7', 'Probe/1.0'), VariantPicker::pick($variants, $b, '203.0.113.7', 'Probe/1.0'));
-        self::assertNotSame(VariantPicker::bucket($a, '203.0.113.7', 'Probe/1.0'), VariantPicker::bucket($b, '203.0.113.7', 'Probe/1.0'), 'the link id is part of the hash input (collision odds 1 in 100 per run)');
+        foreach ([$one, $two, $three] as $link) {
+            self::assertSame(VariantPicker::pick($variants, $link, $ip, $ua), VariantPicker::pick($variants, $link, $ip, $ua), 'self-consistent per link');
+        }
+        self::assertSame('A', VariantPicker::pick($variants, $one, $ip, $ua)->name);
+        self::assertSame('B', VariantPicker::pick($variants, $three, $ip, $ua)->name);
+
+        $seven = Uuid::fromString('0192b6f0-0000-7000-8000-000000000007');
+        $eight = Uuid::fromString('0192b6f0-0000-7000-8000-000000000008');
+        self::assertSame(1, VariantPicker::bucket($seven, $ip, $ua));
+        self::assertSame(1, VariantPicker::bucket($eight, $ip, $ua), 'distinct links may legitimately share a bucket');
     }
 
     /**
