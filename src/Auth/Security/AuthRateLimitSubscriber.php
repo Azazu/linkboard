@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Security;
 
+use App\Shared\Api\ProblemDetails;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -79,7 +80,7 @@ final readonly class AuthRateLimitSubscriber implements EventSubscriberInterface
 
     private function problem(int $retryAfter): Response
     {
-        $response = JwtProblemDetailsSubscriber::problem(429, 'Too Many Requests', 'Too many authentication attempts. Try again later.');
+        $response = ProblemDetails::response(429, 'Too Many Requests', 'Too many authentication attempts. Try again later.');
         $response->headers->set('Retry-After', (string) $retryAfter);
 
         return $response;

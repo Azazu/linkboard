@@ -33,6 +33,7 @@ services:
     App\Auth\UserRepositoryInterface: '@App\Auth\Repository\DoctrineUserRepository'
     App\Link\LinkRepositoryInterface: '@App\Link\Repository\DoctrineLinkRepository'
     App\Link\SlugGeneratorInterface: '@App\Link\SlugGenerator'
+    App\Click\ClickRecorderInterface: '@App\Click\Recorder\DbalClickRecorder'
 
 when@test:
     services:

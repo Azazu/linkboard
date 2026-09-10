@@ -1,0 +1,6 @@
+{% extends 'base.html.twig' %}
+{% block title %}Too many requests — Linkboard{% endblock %}
+{% block body %}
+<h1>Too many requests</h1>
+<p role="alert">Too many redirects from your address. Please wait {{ retry_after }} seconds.</p>
+{% endblock %}

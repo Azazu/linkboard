@@ -33,4 +33,30 @@ final class LinkFactory extends PersistentObjectFactory
             $link->deactivate(new \DateTimeImmutable());
         });
     }
+
+    /** @param array<string, string> $utm */
+    public function withUtm(array $utm): static
+    {
+        return $this->afterInstantiate(static function (Link $link) use ($utm): void {
+            $link->replaceUtm($utm, new \DateTimeImmutable());
+        });
+    }
+
+    public function expiring(\DateTimeImmutable $at): static
+    {
+        return $this->afterInstantiate(static function (Link $link) use ($at): void {
+            $link->setExpiry($at, new \DateTimeImmutable());
+        });
+    }
+
+    /** click_count is written by SQL in production (design decision 4); tests seed it through reflection before persist */
+    public function limited(int $maxClicks, int $clickCount = 0): static
+    {
+        return $this->afterInstantiate(static function (Link $link) use ($maxClicks, $clickCount): void {
+            $link->setClickLimit($maxClicks, new \DateTimeImmutable());
+            if ($clickCount > 0) {
+                new \ReflectionProperty(Link::class, 'clickCount')->setValue($link, $clickCount);
+            }
+        });
+    }
 }
