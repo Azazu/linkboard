@@ -53,6 +53,7 @@ final class ClickLoggingTest extends RedirectWebTestCase
         self::visit($client, '/inactive');
         self::visit($client, '/expired');
 
+        self::assertSame([], self::pendingMessages(), 'non-redirects dispatch nothing');
         self::assertSame(0, (int) self::connection()->fetchOne('SELECT count(*) FROM clicks'));
         self::assertSame(2, self::clickCountOf($inactive->getId()));
         self::assertSame(2, self::clickCountOf($expired->getId()));

@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Web\Redirect;
 
-use App\Click\ClickFacts;
-use App\Click\ClickRecorderInterface;
-use App\Click\Recorder\DbalClickRecorder;
+use App\Click\Counter\ClickCounterInterface;
+use App\Click\Counter\RedisClickCounter;
 use App\Click\RecordOutcome;
-use App\Click\Visit;
 use App\Link\Entity\Link;
 use App\Link\LinkListQuery;
 use App\Link\LinkRepositoryInterface;
@@ -20,6 +18,9 @@ use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Component\Lock\Key;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\PersistingStoreInterface;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\TransportException;
+use Symfony\Component\Messenger\Transport\TransportInterface;
 use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\RateLimiter\LimiterStateInterface;
 use Symfony\Component\RateLimiter\Policy\SlidingWindowLimiter;
@@ -32,40 +33,43 @@ use Symfony\Component\Uid\Uuid;
  * Spec redirect, "Failures of the stores" and "Limiter store unavailable".
  * Each failing dependency is a stub installed in the test container before
  * the first request (disableReboot keeps that container for the whole test);
- * what a stub proves is the controller's and resolver's reaction to that
- * failure, not behaviour during a real outage (design decisions 5, 9, 13).
+ * what a stub proves is the controller's, resolver's and recorder's reaction
+ * to that failure, not behaviour during a real outage. Since
+ * add-async-click-logging the click write is a counter (limited links) and a
+ * message: the counter's failure is the resolver's 503, the transport's
+ * failure is absorbed by the recorder.
  */
 #[CoversNothing]
 final class RedirectDegradationTest extends RedirectWebTestCase
 {
     private TestHandler $log;
 
-    public function testClickWriteFailureOnAnUnlimitedLinkStillRedirects(): void
+    public function testTransportDownStillRedirectsAnUnlimitedLinkAndLogsAnError(): void
     {
         $client = self::createClient();
         $client->disableReboot();
         $link = LinkFactory::createOne(['slug' => 'unlimited', 'targetUrl' => 'https://example.com/u']);
-        $this->failRecorder();
+        $this->failTransport();
         $this->captureLog();
 
         self::visit($client, '/unlimited');
 
         self::assertResponseStatusCodeSame(302);
         self::assertResponseHeaderSame('Location', 'https://example.com/u');
-        self::assertCount(0, self::clicksOf($link->getId()));
-        self::assertTrue($this->log->hasErrorThatContains('Click not recorded'));
+        self::assertCount(0, self::rawClicksOf($link->getId()));
+        self::assertTrue($this->log->hasErrorThatContains('Click message not dispatched'));
         $record = $this->log->getRecords()[array_key_last($this->log->getRecords())];
         self::assertSame((string) $link->getId(), $record->context['link_id']);
-        self::assertSame(\RuntimeException::class, $record->context['exception']);
+        self::assertSame(TransportException::class, $record->context['exception']);
         $this->assertNoPersonalData();
     }
 
-    public function testClickWriteFailureOnALimitedLinkIsUnavailable(): void
+    public function testCounterFailureOnALimitedLinkIsUnavailable(): void
     {
         $client = self::createClient();
         $client->disableReboot();
         LinkFactory::new()->limited(10)->create(['slug' => 'limited']);
-        $this->failRecorder();
+        $this->failCounter();
         $this->captureLog();
 
         self::visit($client, '/limited');
@@ -74,11 +78,29 @@ final class RedirectDegradationTest extends RedirectWebTestCase
         self::assertResponseHeaderSame('Retry-After', '5');
         self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
         self::assertTrue($this->log->hasWarningThatContains('Click limit could not be enforced'));
+        self::assertSame([], self::pendingMessages(), 'nothing is dispatched when the limit cannot be guaranteed');
         $this->assertNoPersonalData();
 
         self::visit($client, '/limited', ['HTTP_ACCEPT' => 'application/json']);
         self::assertResponseStatusCodeSame(503);
         self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
+    }
+
+    public function testCounterFailureDoesNotAffectAnUnlimitedLink(): void
+    {
+        $client = self::createClient();
+        $client->disableReboot();
+        $link = LinkFactory::createOne(['slug' => 'free', 'targetUrl' => 'https://example.com/f']);
+        $this->failCounter();
+        $this->captureLog();
+
+        self::visit($client, '/free');
+
+        self::assertResponseStatusCodeSame(302);
+        self::assertCount(1, self::pendingMessages());
+        self::assertCount(1, self::clicksOf($link->getId()));
+        self::assertFalse($this->log->hasWarningRecords());
+        self::assertFalse($this->log->hasErrorRecords());
     }
 
     public function testLinkLookupFailureIsUnavailableForAnySlug(): void
@@ -231,13 +253,41 @@ final class RedirectDegradationTest extends RedirectWebTestCase
         };
     }
 
-    private function failRecorder(): void
+    private function failCounter(): void
     {
         // the concrete class is final and cannot be doubled; the container id is replaced by a throwing implementation
-        self::getContainer()->set(DbalClickRecorder::class, new class implements ClickRecorderInterface {
-            public function record(Link $link, Visit $visit, ClickFacts $facts): RecordOutcome
+        self::getContainer()->set(RedisClickCounter::class, new class implements ClickCounterInterface {
+            public function increment(Uuid $linkId, int $seed, int $max): RecordOutcome
             {
-                throw new \RuntimeException('click store down');
+                throw new \RuntimeException('Click counter unavailable');
+            }
+
+            public function forget(Uuid $linkId): void
+            {
+                throw new \RuntimeException('Click counter unavailable');
+            }
+        });
+    }
+
+    private function failTransport(): void
+    {
+        self::getContainer()->set('messenger.transport.async', new class implements TransportInterface {
+            public function get(): iterable
+            {
+                return [];
+            }
+
+            public function ack(Envelope $envelope): void
+            {
+            }
+
+            public function reject(Envelope $envelope): void
+            {
+            }
+
+            public function send(Envelope $envelope): Envelope
+            {
+                throw new TransportException('stream unavailable');
             }
         });
     }
