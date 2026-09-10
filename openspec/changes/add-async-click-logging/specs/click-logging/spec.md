@@ -15,8 +15,8 @@ Every `ClickRecorded` message SHALL carry a unique `click_id` that becomes the c
 A `ClickRecorded` message whose handling throws SHALL be retried 3 times with exponential backoff (1 s, then 2 s, then 4 s) and, after the last failure, moved to the `failed` transport (the `messenger_messages` table) where it can be listed and retried with the Messenger console (`messenger:failed:show`, `messenger:failed:retry`). The `messenger_messages` table SHALL be created by a reversible migration, not at runtime.
 
 #### Scenario: Persistent failure parks the message
-- **WHEN** handling a message fails on every attempt
-- **THEN** after the third retry the message is on the `failed` transport, no click record exists for it, and the link's `clickCount` is unchanged
+- **WHEN** handling a message fails on every attempt and a worker consumes the transport
+- **THEN** the handler ran four times (the first attempt and three retries, each retry delayed by the configured backoff), the message is then on the `failed` transport exactly once, no click record exists for it, and the link's `clickCount` is unchanged
 
 #### Scenario: Migration is reversible
 - **WHEN** the migration creating `messenger_messages` is executed and then reverted
@@ -26,8 +26,8 @@ A `ClickRecorded` message whose handling throws SHALL be retried 3 times with ex
 A `ClickRecorded` message whose link no longer exists SHALL be acknowledged and discarded on its first handling with an `info` log record naming the link id and the `click_id` — never retried and never moved to the failed transport.
 
 #### Scenario: Link deleted before the message is handled
-- **WHEN** a visitor is redirected, the link is deleted through `DELETE /api/v1/links/{id}` before the worker handles the message, and the message is then handled
-- **THEN** no click record exists, the message is neither retried nor on the failed transport, and one `info` record names the link id and the `click_id`
+- **WHEN** a visitor is redirected, the link is deleted through `DELETE /api/v1/links/{id}` before the worker handles the message, and a worker then consumes the transport
+- **THEN** no click record exists, the handler ran once, the message is acknowledged on that attempt — neither retried nor on the failed transport — and one `info` record names the link id and the `click_id`; no failure record is written
 
 ### Requirement: The queue carries no raw personal data
 The `ClickRecorded` message SHALL carry the finished click facts — `click_id`, link id, `occurred_at`, `country`, `device_type`, `os`, `browser`, `is_bot`, `resolved_by`, `variant`, `referer_host` and the salted `visitor_hash` — and MUST NOT carry the client IP, the user agent, the `Accept-Language` or `Referer` header values.
