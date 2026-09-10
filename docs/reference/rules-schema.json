@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Azazu/linkboard/blob/main/docs/reference/rules-schema.json",
+  "title": "Linkboard routing rules document (version 1)",
+  "description": "The `rules` member of a link (FR-RUL-2). Evaluated on redirect in a fixed order: device-dimension rules, country rules, language rules (each in document order), then the A/B variants, then the link's targetUrl. Variant weights are integers of at least 1 and MUST sum to exactly 100 — JSON Schema cannot express the sum; the validator enforces it. Every target must satisfy the target URL policy of the links capability. The PHP validator (App\\Link\\Rules\\RulesDocumentParser) is the runtime authority; a test keeps this file in step with it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "anyOf": [{ "required": ["rules"] }, { "required": ["variants"] }],
+  "properties": {
+    "version": { "const": 1 },
+    "rules": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/$defs/rule" } },
+    "variants": { "type": "array", "minItems": 2, "maxItems": 4, "items": { "$ref": "#/$defs/variant" } }
+  },
+  "$defs": {
+    "target": { "type": "string", "format": "uri", "maxLength": 2048, "description": "absolute http(s) URL to a public host (target URL policy)" },
+    "deviceValues": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "enum": ["desktop", "smartphone", "tablet", "other"] } },
+    "osValues": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "enum": ["iOS", "Android", "Windows", "macOS", "Linux", "other"] } },
+    "countryValues": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z]{2}$" } },
+    "languageValues": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z]{2}$" } },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "exactly one dimension: device (device and/or os), country, or language",
+      "properties": {
+        "device": { "$ref": "#/$defs/deviceValues" },
+        "os": { "$ref": "#/$defs/osValues" },
+        "country": { "$ref": "#/$defs/countryValues" },
+        "language": { "$ref": "#/$defs/languageValues" }
+      },
+      "oneOf": [
+        { "anyOf": [{ "required": ["device"] }, { "required": ["os"] }], "not": { "anyOf": [{ "required": ["country"] }, { "required": ["language"] }] } },
+        { "required": ["country"], "not": { "anyOf": [{ "required": ["device"] }, { "required": ["os"] }, { "required": ["language"] }] } },
+        { "required": ["language"], "not": { "anyOf": [{ "required": ["device"] }, { "required": ["os"] }, { "required": ["country"] }] } }
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match", "target"],
+      "properties": { "match": { "$ref": "#/$defs/match" }, "target": { "$ref": "#/$defs/target" } }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "weight", "target"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,16}$" },
+        "weight": { "type": "integer", "minimum": 1 },
+        "target": { "$ref": "#/$defs/target" }
+      }
+    }
+  }
+}

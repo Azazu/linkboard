@@ -9,6 +9,7 @@ use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Auth\Entity\User;
 use App\Link\LinkRepositoryInterface;
+use App\Link\Rules\RulesDocumentParser;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -22,8 +23,9 @@ use Symfony\Component\Validator\ConstraintViolationList;
 /**
  * PATCH /api/v1/links/{id} as a merge patch: only the keys present in the
  * request body change (design decision 6). Null contract: expiresAt,
- * maxClicks, utm may be cleared with null; targetUrl and isActive may not be
- * null; slug is immutable. Admin actions on another user's link are audited
+ * maxClicks, utm and rules may be cleared with null (a rules document
+ * replaces the whole stored one); targetUrl and isActive may not be null;
+ * slug is immutable. Admin actions on another user's link are audited
  * after the flush.
  *
  * @implements ProcessorInterface<UpdateLinkInput, LinkResource>
@@ -36,6 +38,7 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
         private Security $security,
         private LoggerInterface $auditLogger,
         private PublicUrl $publicUrl,
+        private RulesDocumentParser $rulesParser,
     ) {
     }
 
@@ -81,6 +84,9 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
         if (isset($present['maxClicks'])) {
             $link->setClickLimit($data->maxClicks, $now);
         }
+        if (isset($present['rules'])) {
+            $link->replaceRules($this->canonicalRules($context), $now);
+        }
         if (isset($present['isActive']) && null !== $data->isActive) {
             $data->isActive ? $link->activate($now) : $link->deactivate($now);
         }
@@ -103,6 +109,26 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
         }
 
         return $this->publicUrl->toResource($link);
+    }
+
+    /**
+     * The canonical form of the validated document from the raw body, or null
+     * when the member is null (clear) — design decision 2.
+     *
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, mixed>|null
+     */
+    private function canonicalRules(array $context): ?array
+    {
+        $request = $context['request'] ?? null;
+        $input = RulesInput::fromRequest($request instanceof Request ? $request : null);
+        if (null === $input->node) {
+            return null;
+        }
+        $document = $this->rulesParser->parse($input->node)->document;
+
+        return $document?->toArray() ?? throw new \LogicException('The rules document was validated before processing.');
     }
 
     /**
