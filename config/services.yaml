@@ -34,6 +34,15 @@ services:
     App\Link\LinkRepositoryInterface: '@App\Link\Repository\DoctrineLinkRepository'
     App\Link\SlugGeneratorInterface: '@App\Link\SlugGenerator'
     App\Click\ClickRecorderInterface: '@App\Click\Recorder\DbalClickRecorder'
+    # Country resolution: the chain selects tagged resolvers by COUNTRY_RESOLVERS
+    # (design decision 8); the chain itself is a startup check.
+    App\Redirect\Geo\CountryResolverInterface: '@App\Redirect\Geo\ChainCountryResolver'
+
+    # Run from App\Kernel::boot() on every boot, hence public: constructs the
+    # tagged app.startup_check services so a misconfiguration fails before
+    # anything is served.
+    App\Shared\Boot\StartupChecks:
+        public: true
 
 when@test:
     services:
@@ -42,3 +51,7 @@ when@test:
         # one kernel (disableReboot) sees one window. Not registered elsewhere.
         app.rate_limiter.test_storage:
             class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        # Fixed IP→country map for the test suite (COUNTRY_RESOLVERS=fixed)
+        App\Tests\Fixture\FixedMapCountryResolver:
+            tags:
+                - { name: app.country_resolver, key: fixed }
