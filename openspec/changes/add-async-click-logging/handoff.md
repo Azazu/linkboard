@@ -1,7 +1,7 @@
 # Handoff — add-async-click-logging
 
-**Updated:** 2026-09-10 · claude (blocks 1–4 implemented, awaiting the branch push)
-**State:** implementing
+**Updated:** 2026-09-10 · claude (branch run green, Gate 2 requested)
+**State:** awaiting-gate-2
 **Branch:** change/add-async-click-logging
 
 ## Done this session
@@ -18,10 +18,11 @@
 - Dev-stack verification (commit bodies, how-to commands in their exact form): redirect → `messenger:stats` async 1 → `messenger:consume async --limit=1` → one row and `click_count` 1, counter key 1; a poison message on the real stream → three retries → `failed` 1 → `messenger:failed:show` (PostgreSQL reason) → `messenger:failed:retry --force` → `messenger:failed:remove --all --force`.
 - Deviations from the plan, recorded in tasks.md: the in-memory transport factory is redefined under `when@test` without `kernel.reset` (the per-request service reset emptied the transports between the requests of one test client; an attempt to redefine the transports themselves failed on the unused `HOSTNAME` env placeholder); the Web-test helpers disable the client's kernel reboot; attempts in the retry test are counted through the received-message events, not a handler decorator; the counting decorator counts Redis commands; the dev database carried an auto-created `messenger_messages` (dropped before generating the migration); the diff's partial-index noise on `clicks` was removed from the migration by hand; the deleted synchronous recorder's tests were replaced rather than adapted.
 - **Security-sensitive, needs a named developer's review:** Messenger retry/failure handling and the orphan-discard path (c1eca6f, 476b3e2); the Redis counter as the limit authority under concurrency and after key loss, with the stated overshoot bound (90abde8); the `messenger_messages` migration; personal data kept off the queue (message contents asserted).
+- Task 5.2: branch run https://github.com/Azazu/linkboard/actions/runs/34491368326 on head a083523 — completed, success (verified via the Actions API).
 - Assumptions recorded in the artifacts: the message carries finished facts (detection/geo/hash happen in the request, as routing requires) — a deviation from the letter of FR-CLK-1/2, reworded in task 4.2; Messenger's PHP serializer is kept; counter keys carry a `test:` prefix only in the test environment; no compensation for a crash between `INCR` and dispatch (bounded, stated); the synchronous recorder and its tests are deleted rather than kept as dead code; the retry-then-park test may fall back to asserting the configured strategy if the in-memory transport cannot exercise delays (task 3.3 records which form was feasible).
 
 ## Next step
-User pushes `change/add-async-click-logging` (head 30606bc + this handoff commit). Then task 5.2: query `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-async-click-logging` for the head SHA until `completed`/`success`, record URL and SHA here; then 5.1 tick, 5.3: `openspec validate add-async-click-logging --strict`, `scripts/pregate-verify.sh gate2 add-async-click-logging`, `scripts/gate-run.sh add-async-click-logging 2 full` (auto mode). On changes-requested: `/workflow:fix-findings`, re-push for a green run, `scripts/gate-run.sh add-async-click-logging 2 confirm <round>`; stop after two failed confirmations on one finding. On approval: `/git:merge add-async-click-logging`, push main, check the main run, `/opsx:archive` (syncs `redirect`, `click-logging`, `links`).
+`scripts/gate-run.sh add-async-click-logging 2 full` (auto mode). On changes-requested: `/workflow:fix-findings`, re-push for a green run, `scripts/gate-run.sh add-async-click-logging 2 confirm <round>`; stop after two failed confirmations on one finding. On approval: `/git:merge add-async-click-logging` (only after a green run on the exact merge head), push main, check the main run, `/opsx:archive` (syncs `redirect`, `click-logging`, `links`).
 
 ## Blockers
-None. Tasks 5.1–5.3 wait for the user's push (5.1 is ticked at the Gate 2 request together with 5.3, as in the previous changes).
+None.
