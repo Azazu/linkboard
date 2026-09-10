@@ -73,3 +73,22 @@ Confirmation scope: the diff from a6250f9f17f9ecf1126aea7f839082fa5f5b6a5b to 83
 Reviewed the change artifacts, Gate 1 record, repository instructions/configuration, implementation diff against main, relevant installed dependency source, and parser/API/routing/degradation/boot tests. Branch and HEAD match the requested identifiers; the working tree was initially clean. Inspected the commit bodies recording executor checks and demonstrated failing inputs. Independently calculated the concrete CRC32 collision above with Python zlib over the same UTF-8 bytes and NUL separators; this is a formula-level reproduction, not an execution of the PHP test. Finding 2 follows from the current control flow; its PHP regression was not executed here.
 
 `scripts/pregate-verify.sh gate2 add-routing-rules` passed whitespace, strict OpenSpec validation, risk-tier, task and documentation checks, but its `make check` step could not run: access to `/var/run/docker.sock` is denied in this sandbox. No host PHP executable is installed, so no independent green application-suite run is claimed. The executor records 464 tests / 5964 assertions; task 6.2 cites a successful CI run on ancestor 8077713, and subsequent commits through the reviewed HEAD change only workflow records. Only this review file was modified; no git write commands were run.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-10
+**Reviewed-Commit:** ee0147106a392dc12906af69faa02275217afff5
+**Verdict:** confirmed
+
+### Findings
+
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — VariantPickerTest replaces the random bucket inequality with fixed UUIDs and pinned buckets 31, 34 and 74, retains per-link self-consistency and the unknown-IP case, and explicitly accepts the two reported UUIDs sharing bucket 1. The fixtures prove that the link id contributes without requiring arbitrary distinct links to avoid legitimate collisions. Independently recomputed all six pinned bucket values using Python zlib and the production formula's bytes and NUL separators; every value agrees. |
+| 2 | confirmed — VisitFactory now checks the raw Accept-Language byte length before treating spaces/tabs as absent. Oversized whitespace is classified as oversized, while NUL-only and other tested control-only values reach grammar rejection and are classified as malformed. Unit regressions cover both cases and the intended whitespace exception. The new redirect regression uses a link with a language rule and variants and checks both requests' default destination with UTM, default/null click facts and one issue-bearing notice per request. The existing hostile-input guard bypasses profiling/evaluation, supplies unknown dimensions and logs the link id, so these inputs can no longer select a variant silently. |
+
+### Validation
+
+Confirmation scope: only the diff from c575f318643295e9f666a01abd0aed8cebcc4ac9 to ee0147106a392dc12906af69faa02275217afff5 and collateral effects reachable from Gate 2 Round 1 findings 1–2. Both source-round major findings were dispositioned as fixed; there were no blockers. Branch and HEAD match the requested identifiers and the working tree was initially clean. Reviewed the changed implementation/tests, the downstream hostile-input routing and click-facts flow, associated specification claims and the executor's commit record of demonstrated failing regressions. No unrelated findings were introduced.
+
+`scripts/pregate-verify.sh gate2 add-routing-rules` passed whitespace, strict OpenSpec validation, risk-tier, task and documentation checks. Its `make check` step could not execute because this sandbox cannot access `/var/run/docker.sock`; no host PHP executable is available. No independent PHP test pass or mutation-test execution is claimed. The bucket calculation above is an independent formula-level check. Only this review file was modified; no git write commands were run.
