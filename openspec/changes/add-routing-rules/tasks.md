@@ -35,7 +35,7 @@
 ## 6. Wrap-up
 
 - [ ] 6.1 `make check` green (cs, stan level 8, all suites); commits per block (`chore(deps):` 1.1, `chore(config):` 1.2, `feat(link):` 2.x, `feat(redirect):` 3.x, `feat(redirect):` 4.1, `test(redirect):` 4.2–4.4, `docs:` 5.x) with the agent trailer; every guard's commit body names its demonstrated failing input; commit bodies and `handoff.md` flag the security-sensitive parts (new dependencies, rule evaluation over untrusted input, hostile-input classification, trusted-proxy country header, rule targets under the URL policy, the boot check). Verify: `git log --oneline main..HEAD`.
-- [ ] 6.2 Green Actions run on the exact branch head before Gate 2: the user pushes change/add-routing-rules; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-routing-rules` for the head SHA until `status` is `completed` and `conclusion` is `success`; URL and SHA recorded in `handoff.md`.
+- [x] 6.2 Green Actions run on the exact branch head before Gate 2: the user pushes change/add-routing-rules; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-routing-rules` for the head SHA until `status` is `completed` and `conclusion` is `success`; URL and SHA recorded in `handoff.md`. Done: run 34472866803 on 8077713 — completed, success (https://github.com/Azazu/linkboard/actions/runs/34472866803).
 - [ ] 6.3 `openspec validate add-routing-rules --strict` and `scripts/pregate-verify.sh gate2 add-routing-rules` pass; `scripts/gate-run.sh add-routing-rules 2 full`. Verify: no FAIL line.
 
 ## Post-merge acceptance (not a Gate 2 task)

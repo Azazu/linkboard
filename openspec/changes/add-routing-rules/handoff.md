@@ -1,7 +1,7 @@
 # Handoff — add-routing-rules
 
-**Updated:** 2026-09-10 · claude (blocks 1–5 implemented, awaiting the branch push)
-**State:** implementing
+**Updated:** 2026-09-10 · claude (branch run green, Gate 2 requested)
+**State:** awaiting-gate-2
 **Branch:** change/add-routing-rules
 
 ## Done this session
@@ -17,4 +17,4 @@
 User pushes `change/add-routing-rules` (head 8e0b28c + this handoff commit). Then task 6.2: query `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-routing-rules` for the head SHA until `completed`/`success`, record URL and SHA here; then 6.3: `openspec validate add-routing-rules --strict`, `scripts/pregate-verify.sh gate2 add-routing-rules`, `scripts/gate-run.sh add-routing-rules 2 full` (auto mode). On changes-requested: `/workflow:fix-findings`, re-push for a green run, `scripts/gate-run.sh add-routing-rules 2 confirm <round>`; stop after two failed confirmations on one finding. On approval: `/git:merge add-routing-rules`, push main, check the main run, `/opsx:archive` (creates spec `routing-rules`, syncs `links`, `redirect`, `click-logging`).
 
 ## Blockers
-None. Tasks 6.2–6.3 wait for the user's push.
+None.
