@@ -1,7 +1,7 @@
 # Handoff — add-redirect-with-sync-logging
 
-**Updated:** 2026-09-10 · claude
-**State:** ready-to-merge
+**Updated:** 2026-09-10 · claude (merged b910f87, main run 34448509736 green)
+**State:** archived
 **Branch:** change/add-redirect-with-sync-logging
 
 ## Done this session

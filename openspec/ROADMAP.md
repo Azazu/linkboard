@@ -11,12 +11,6 @@ exit criterion. Each row is a summary; the change's `proposal.md`
 carries the full scope and the declared tier (the tier here is the
 minimum). Ids are stable between the specification and this file.
 
-## Stage 1 — skeleton, accounts, links, synchronous redirect
-
-| # | Change id | Scope (summary) | Tier |
-|---|---|---|---|
-| 5 | `add-redirect-with-sync-logging` | public `GET /{slug}`, 404/410/302 matrix, UTM append, `clicks` table written synchronously (baseline before async), per-IP redirect limit | high (raised from medium by the user: anonymous hot path, concurrency, personal data) |
-
 ## Stage 2 — smart routing and async click logging
 
 | # | Change id | Scope (summary) | Tier |
