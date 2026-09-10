@@ -1,7 +1,7 @@
 # Handoff — add-routing-rules
 
-**Updated:** 2026-09-10 · claude (Gate 1 confirmation 1 findings fixed, confirmation 2 requested)
-**State:** awaiting-gate-1
+**Updated:** 2026-09-10 · claude (Gate 1 passed)
+**State:** implementing
 **Branch:** change/add-routing-rules
 
 ## Done this session
@@ -11,10 +11,11 @@
 - **Security-sensitive, flagged for the reviewer:** new dependencies `matomo/device-detector` and `geoip2/geoip2` parsing attacker-controlled bytes (bounded first; `composer audit` in task 1.1); rule evaluation over untrusted headers behind a catch-all guard; the proxy country header honoured only from `TRUSTED_PROXIES`; rule and variant targets under `TargetUrlPolicy`.
 - Gate 1 Round 1 (a6250f9): changes-requested, 3 majors, all fixed in the artifacts: (1) `rules` is validated from the raw request body decoded with objects preserved (`RulesInput`), so JSON objects where arrays are required — numeric keys included — are violations; stored form is canonical `RulesDocument::toArray()`; fixtures for every list position on POST and PATCH; (2) `COUNTRY_RESOLVERS` is validated at every boot: `App\Kernel::boot()` runs `StartupChecks`, which instantiates the chain; integration test boots with `bogus` (fails) and `fixed` (boots); console verification `docker compose exec -T -e COUNTRY_RESOLVERS=bogus php bin/console about`; (3) one input policy in three classes — absent/unrecognised → skipped dimension, no log (FR-RUL-4); hostile (oversized/malformed UA, Accept-Language, client hints, proxy country header) → never parsed, default target, one `notice` with issue classes (FR-RUL-7); throwing → same with the exception class — reconciled across the brief (FR-RUL-7 reworded in `docs/explanation/requirements.md`), proposal, spec, design and tasks, with tests against a link that has both a matching language rule and variants.
 - Confirmation 1 (7498818): #2 confirmed; #1 and #3 changes-requested, fixed: (#1) JSON-kind fixtures at all nine positions (six numeric-keyed objects at every list position incl. `device`, `os`, `language`; three arrays where objects are required) on POST and PATCH with unchanged storage; the stored-mode claim narrowed — the stored parser trusts the writer for JSON kinds (numeric-keyed object ≡ list after associative decoding) and detects only distinguishable deviations (`version` 2, string `rules`, two-dimension `match`, string weight); (#3) geolocation exception boundary stated once in design decision 8: open failure → disabled + one `warning` → unknown; `AddressNotFoundException` → unknown, no log; any other lookup throwable propagates to the resolver guard → default target + one `notice` with the exception class; spec scenarios for the three cases against a link with a `country` rule, a `language` rule and variants; tasks 3.4/4.3 updated with the propagation test and its failing input.
+- Confirmation 2 (837e28d): #1 and #3 confirmed → Gate 1 passed (recorded 0f7284e); task 0.1 ticked.
 - Assumptions recorded in the artifacts: `rules` list needs ≥ 1 entry and a document needs `rules` or `variants`; weights are integers ≥ 1; variant names `^[A-Za-z0-9_-]{1,16}$`; value arrays ≤ 64 distinct entries; phablets count as smartphones; bots are evaluated like other visitors; `XX`/`T1` from Cloudflare mean unknown; NUL separators in the crc32 input; empty `{}`/`[]` is one violation on `rules`; the `Accept-Language` grammar of design decision 4 defines "well-formed".
 
 ## Next step
-`scripts/gate-run.sh add-routing-rules 1 confirm 1` (auto mode; confirmation 2 — if #1 or #3 fails again, stop and ask the user to arbitrate). On changes-requested: `/workflow:fix-findings`, then `scripts/gate-run.sh add-routing-rules 1 confirm <round>`; stop after two failed confirmations on one finding. On approval: tick task 0.1, `/opsx:apply` starting with block 1 (dependencies — verify the vendor API before writing wrappers, task 1.1).
+`/opsx:apply add-routing-rules` — block 1 first (task 1.1: `make composer ARGS='require matomo/device-detector:^6.5 geoip2/geoip2:^3.4'`, `composer audit`, then verify the vendor API named in design decisions 7–9 with the `rg` commands of the task before writing any wrapper), then blocks 2–5 in order, commit per block with the security-sensitive flags, then 6.1–6.3 (green branch run, Gate 2).
 
 ## Blockers
 None.
