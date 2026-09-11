@@ -75,3 +75,25 @@ Reviewed only f2f86ac88a1125e2429e5477643fa8ea76594e87..2c3c4951fc5ffd55fb457c33
 ### Validation
 
 Reviewed only ff0c4836b7ef0e4f7008a718a12ced4d0ca1f21d..3c0c1d01e8340b0317f5f14d4c505efaa012fb45 and collateral code, tests and artifacts reachable from the four named major findings, using AGENTS.md and openspec/config.yaml. Branch and HEAD match the requested identity; all source-round findings are dispositioned. The range's git diff --check and openspec validate add-analytics-read-model --strict passed. Runtime tests, mutation demonstrations and performance measurements were inspected in source and executor evidence, not rerun: Docker socket access is denied and no local PHP executable is available. The benchmark script is a local ignored artifact, not part of the reviewed commit. Only review.md was modified; no git write commands were run.
+
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-11
+**Reviewed-Commit:** d734ef96f8e79008f9632d8edbab2d4924bdbc94
+**Verdict:** changes-requested
+
+### Findings
+
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The proposal declares high tier and the applicable deletion, authorization and input-handling triggers; design.md supplies the applicability table. The named guards have tests and recorded failing mutations, including fresh-seed/reset rollback after replacement writes. Gate 1 Confirmation 1 records confirmed at 2c3c4951fc5ffd55fb457c3310f85119452794fc. This closes the source finding's omitted tier, applicability and Gate 1 decision. |
+| 2 | confirmed — The revised contract explicitly derives an omitted from from the effective to minus 30 days, while an omitted to keeps the next-day default. Period::of, FromParameter, the analytics specification, brief, design and how-to agree, and LinkReportsTest asserts both one-bound cases over HTTP. As in Confirmation 1, this confirms the revised contract rather than the originally requested fixed default start. |
+| 3 | confirmed — Admin summary is explicitly exempt from period parameters and echo. AdminStatsProvider passes withPeriod: false; ReportRequestFactory does not read supplied dates for this report, so they cannot affect validation or its cache key. The resource documents the exception and AdminStatsTest covers its shape and malformed ignored dates. |
+| 4 | changes-requested — The proposal's User decisions and commit eab0416 now record acceptance of the global-timeseries and index-clause revisions; task 5.1 agrees with the FK-index evidence, and the historical rationale distinguishes main's brief from the source-round contract. However, restoring top-links uses a lossy replacement for the required distinct visitor_hash count: BreakdownQuery.php:100 groups by left(visitor_hash, 16), discarding 192 bits. For two clicks of the same link in the same period with hashes repeat('a', 16) + repeat('0', 48) and repeat('a', 16) + repeat('1', 48), the shipped grouping returns uniqueVisitors = 1 while the specified full-hash count is 2. These are valid 64-character hex values; the existing tests do not cover equal prefixes with different suffixes. The probability under normal SHA-256 generation is very low, as design decision 2 acknowledges, but this is still an approximate count, contrary to the recorded user decision that the original exact contract is met. The 260 ms measurement therefore does not demonstrate the promised exact report within the target. Preserve full-hash equality (with a same-prefix regression case) and remeasure, or obtain explicit acceptance of approximate top-links counts and reconcile the contract and exactness claims. This is collateral to the performance/scope fix, not an unrelated finding. |
+
+### Validation
+
+Reviewed only ff0c4836b7ef0e4f7008a718a12ced4d0ca1f21d..d734ef96f8e79008f9632d8edbab2d4924bdbc94 and collateral code, tests and artifacts reachable from the four named major findings, using AGENTS.md and openspec/config.yaml. Branch and HEAD match the requested identity; all source-round findings are dispositioned. The range's git diff --check and openspec validate add-analytics-read-model --strict passed. A read-only Python reproduction of the prefix equivalence returned two distinct full hashes versus one prefix; PostgreSQL execution of the corresponding VALUES-only CTE was attempted but Docker exec was denied access to the Docker socket. Runtime suites, mutation demonstrations and million-click performance measurements were inspected in source and executor evidence, not rerun. The benchmark script is a local ignored artifact, not part of the reviewed commit. Only review.md was modified; no git write commands were run.
+
+Finding 4 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or obtain user arbitration before proceeding.
