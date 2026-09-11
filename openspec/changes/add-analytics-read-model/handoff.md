@@ -25,9 +25,11 @@
 **Security-relevant (this session):** the seed's `--reset` deletion path — rollback under failure injection is now asserted; `FailingStatement` is registered under `when@test` only (`config/services.yaml`).
 
 - Gate 1 passed: Confirmation 1 (`627955d`, Reviewed-Commit `2c3c495`) — all three findings confirmed.
+- Branch run 34597813548 on `3c0c1d0`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34597813548).
+- Gate 2 Confirmation 1 (`f392838`, Reviewed-Commit `3c0c1d0`): findings 1–3 confirmed, finding 4 changes-requested — the reviewer asked for the user's explicit decision on the revised requirement (global reports without unique visitors, NFR-PERF-2 index wording) and for task 5.1 to match its evidence. The user decided (recorded in `proposal.md`, User decisions): top-links keeps its unique visitors (restored in `eab0416` as a two-level (link, 64-bit visitor) statement — 260 ms p95 on a fresh one-million seed, failing input in the commit body), the global timeseries stays without them (every formulation measured 356–575 ms), NFR-PERF-2's index clause as reworded. Task 5.1 and the "brief never asked" claims reconciled. `make check` green.
 
 ## Next step
-The branch head has moved since the green run on `331fc7b`: the user pushes `change/add-analytics-read-model`; the executor confirms a completed, successful Actions run whose `head_sha` equals `git rev-parse HEAD` (task 5.3) and records it here; then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1` (Gate 2 confirmation of round 1 on the code diff, which now also carries the Gate 1 fixes: `f0df821`). Then `/git:merge`.
+`scripts/gate-run.sh add-analytics-read-model 2 confirm 1` — the second confirmation on finding 4; if it fails again, stop and ask the user to arbitrate (AGENTS.md: no third loop). Then the user pushes the branch, the executor confirms a green Actions run on the exact head (task 5.3), then `/git:merge`.
 
 ## Blockers
 None.
