@@ -37,3 +37,21 @@ Reviewed the branch diff against main, change artifacts, query services, API res
 ### Validation
 
 Reviewed AGENTS.md, openspec/config.yaml, all change artifacts and delta specifications, the relevant brief/roadmap requirements, and the existing timeseries, cache and demo-seed code/tests to distinguish planning gaps from implementation choices. The branch and HEAD match the requested identity. `openspec validate add-analytics-read-model --strict` and `scripts/pregate-verify.sh gate1 add-analytics-read-model` passed (zero warnings). This is a Gate 1 artifact review, not a confirmation of Gate 2 round 1; runtime tests and performance measurements were not rerun. Only review.md was modified; no git write commands were run.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-11
+**Reviewed-Commit:** 2c3c4951fc5ffd55fb457c3310f85119452794fc
+**Verdict:** confirmed
+
+### Findings
+
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The timeseries requirement and scenario now specify every intersecting UTC bucket with clicks filtered by the original half-open bounds, including partial and sub-bucket windows for link and global reports. Decision 2 uses truncated series boundaries and correct 337/367 maxima. Task 1.4 supplies query and HTTP verification, with a recorded failing mutation using raw series bounds; the shared query implementation agrees with the corrected contract. |
+| 2 | confirmed — The demo-data contract now includes failed-reset preservation and fresh-seed rollback scenarios. Task 3.2 and the test-only DBAL failure injector exercise failure after deletion and replacement writes, checking original account/link ids, click count and a working original password, or zero rows for a fresh seed. The outer-transaction removal failure is recorded in commit f0df821. Decision 10 now places counter/cache invalidation after commit, consistently with the applicability table and command. This closes the Gate 1 verification-plan gap. |
+| 3 | confirmed — The named sibling claims now omit global distinct-visitor counts, declare high tier and Gate 1, and describe tasks 0.1/5.4 as recording review rounds rather than claiming passing verdicts. Historical performance evidence remains distinguished from the revised measurements. |
+
+### Validation
+
+Reviewed only f2f86ac88a1125e2429e5477643fa8ea76594e87..2c3c4951fc5ffd55fb457c3310f85119452794fc and collateral artifacts/code/tests reachable from the named Gate 1 findings, using AGENTS.md and openspec/config.yaml. Branch and HEAD match the requested identity; all source-round findings are dispositioned. The range's `git diff --check`, `openspec validate add-analytics-read-model --strict`, and `scripts/pregate-verify.sh gate1 add-analytics-read-model` passed (zero warnings). Runtime tests and mutation demonstrations were inspected in source and executor evidence, not rerun: Docker socket access is denied and no local PHP executable is available. This confirms Gate 1 round 1 only, not Gate 2. Only review.md was modified; no git write commands were run.
