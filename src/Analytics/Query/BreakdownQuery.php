@@ -79,9 +79,14 @@ final readonly class BreakdownQuery
     }
 
     /**
-     * Global: the links with the most clicks in the period, with their slug and
-     * owner — clicks only, no distinct visitors (design appendix: the distinct
-     * count over every link's rows was what missed the performance target).
+     * Global: the links with the most clicks in the period, with their slug,
+     * owner, clicks and distinct visitors. The distinct count is computed in two
+     * levels — (link, visitor) pairs first, then one row per link — with the
+     * visitor as the first 64 bits of the hex SHA-256 `visitor_hash` (spec
+     * click-logging) compared as a bigint: the pairs level sorts 24-byte rows in
+     * parallel workers instead of collated 64-character texts, which is what
+     * `count(DISTINCT visitor_hash)` over every link's rows cost (design
+     * decision 2 and appendix: 810 ms → 260 ms p95 on one million clicks).
      *
      * @return Grouped<TopLinkRow>
      */
@@ -91,22 +96,28 @@ final readonly class BreakdownQuery
             throw new \InvalidArgumentException('The top-links report is global.');
         }
         $sql = <<<SQL
-            SELECT c.link_id AS key, l.slug, l.owner_id,
-                   count(*) AS clicks,
-                   round(100.0 * count(*) / sum(count(*)) OVER (), 1) AS share,
-                   rank() OVER (ORDER BY count(*) DESC) AS rank,
-                   sum(count(*)) OVER () AS total
-            FROM clicks c
-            JOIN links l ON l.id = c.link_id
-            WHERE c.occurred_at >= :from AND c.occurred_at < :to{$this->bots($request, 'c.')}
-            GROUP BY c.link_id, l.slug, l.owner_id
-            ORDER BY clicks DESC, l.slug
+            WITH pairs AS (
+                SELECT link_id, ('x' || left(visitor_hash, 16))::bit(64)::bigint AS visitor, count(*) AS n
+                FROM clicks
+                WHERE occurred_at >= :from AND occurred_at < :to{$this->bots($request)}
+                GROUP BY 1, 2
+            ), per_link AS (
+                SELECT link_id, sum(n)::bigint AS clicks, count(*) AS uniques
+                FROM pairs
+                GROUP BY 1
+            )
+            SELECT p.link_id AS key, l.slug, l.owner_id, p.clicks, p.uniques,
+                   rank() OVER (ORDER BY p.clicks DESC) AS rank,
+                   sum(p.clicks) OVER () AS total
+            FROM per_link p
+            JOIN links l ON l.id = p.link_id
+            ORDER BY p.clicks DESC, l.slug
             LIMIT :limit
             SQL;
         $rows = $this->connection->fetchAllAssociative($sql, Sql::params($request) + ['limit' => $request->limit], Sql::types());
 
         return new Grouped((int) ($rows[0]['total'] ?? 0), array_map(static fn (array $r): TopLinkRow => new TopLinkRow(
-            (string) $r['key'], (string) $r['slug'], (string) $r['owner_id'], (int) $r['clicks'], (int) $r['rank'],
+            (string) $r['key'], (string) $r['slug'], (string) $r['owner_id'], (int) $r['clicks'], (int) $r['uniques'], (int) $r['rank'],
         ), $rows));
     }
 
@@ -144,8 +155,8 @@ final readonly class BreakdownQuery
         return Sql::link($request);
     }
 
-    private function bots(ReportRequest $request, string $alias = ''): string
+    private function bots(ReportRequest $request): string
     {
-        return $request->includeBots ? '' : " AND NOT {$alias}is_bot";
+        return Sql::bots($request);
     }
 }

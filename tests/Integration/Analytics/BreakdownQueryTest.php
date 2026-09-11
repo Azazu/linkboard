@@ -127,8 +127,8 @@ final class BreakdownQueryTest extends AnalyticsQueryTestCase
 
         self::assertSame(12, $top->total);
         self::assertEquals([
-            new TopLinkRow((string) $a1->getId(), 'a-one', (string) $a->getId(), 5, 1),
-            new TopLinkRow((string) $b1->getId(), 'b-one', (string) $b->getId(), 4, 2),
+            new TopLinkRow((string) $a1->getId(), 'a-one', (string) $a->getId(), 5, 1, 1),
+            new TopLinkRow((string) $b1->getId(), 'b-one', (string) $b->getId(), 4, 4, 2),
         ], $top->items);
     }
 

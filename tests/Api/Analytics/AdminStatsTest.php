@@ -40,8 +40,8 @@ final class AdminStatsTest extends AnalyticsApiTestCase
         $top = $this->get($client, $admin, '/api/v1/admin/stats/top-links?'.self::PERIOD.'&limit=2');
         self::assertSame(12, $top['total']);
         self::assertSame([
-            ['linkId' => (string) $a1->getId(), 'slug' => 'a-one', 'ownerId' => (string) $a->getId(), 'clicks' => 5, 'rank' => 1],
-            ['linkId' => (string) $b1->getId(), 'slug' => 'b-one', 'ownerId' => (string) $b->getId(), 'clicks' => 4, 'rank' => 2],
+            ['linkId' => (string) $a1->getId(), 'slug' => 'a-one', 'ownerId' => (string) $a->getId(), 'clicks' => 5, 'uniqueVisitors' => 1, 'rank' => 1],
+            ['linkId' => (string) $b1->getId(), 'slug' => 'b-one', 'ownerId' => (string) $b->getId(), 'clicks' => 4, 'uniqueVisitors' => 4, 'rank' => 2],
         ], $top['items']);
 
         $series = $this->get($client, $admin, '/api/v1/admin/stats/timeseries?'.self::PERIOD);

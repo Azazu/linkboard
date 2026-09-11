@@ -23,7 +23,7 @@ use App\Analytics\Report\ReportRequest;
             uriTemplate: '/admin/stats/top-links',
             provider: AdminStatsProvider::class,
             parameters: ['from' => new FromParameter(), 'to' => new ToParameter(), 'limit' => new LimitParameter(), 'includeBots' => new IncludeBotsParameter()],
-            description: 'The `limit` links with the most clicks in the period, with slug, owner, clicks, share-free rank; `total` is the period\'s clicks over every link. Admin only.',
+            description: 'The `limit` links with the most clicks in the period, with slug, owner, clicks, unique visitors and rank (ties share one); `total` is the period\'s clicks over every link. Admin only.',
         ),
     ],
 )]

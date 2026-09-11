@@ -350,9 +350,10 @@ pool never touches the dev stack's entries.
 period — only `includeBots`), `/admin/stats/timeseries` (clicks and running
 total per bucket over every link, same parameters as a link's timeseries, no
 unique visitors) and `/admin/stats/top-links?limit=10` (the links with the
-most clicks in the period with `slug`, `ownerId`, `clicks`, `rank`). The
-global reports carry no distinct-visitor counts: over every link's rows that
-count is what would put them over the 300 ms target. Same cache, tag
+most clicks in the period with `slug`, `ownerId`, `clicks`, `uniqueVisitors`,
+`rank`). The global timeseries carries no distinct-visitor count: over every
+link's rows and every bucket that count is what puts it over the 300 ms
+target (an accepted revision, see the change's proposal). Same cache, tag
 `global`, invalidated when a link is deleted.
 
 ```bash
@@ -362,8 +363,8 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" 'http://localhost:8082/api/v1/ad
 Per-link report queries are bounded by the link's indexes (the planner picks
 the `(link_id)` index or the composite `(link_id, occurred_at)` one depending
 on the window) and spend most of their time on `count(DISTINCT visitor_hash)`;
-on one million seeded clicks every per-link report answers in under 300 ms
-uncached, the two admin reports over every link in under a second. Plans and
+on one million seeded clicks every report — per-link and the admin ones over
+every link — answers in under 300 ms uncached. Plans and
 timings are recorded in the appendix of the change's design
 (`openspec/changes/archive/*-add-analytics-read-model/design.md` after the
 archive).
