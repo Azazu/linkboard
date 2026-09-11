@@ -4,7 +4,7 @@ High tier (new dependency + authorization boundary, AGENTS.md): Gate 1 on the ar
 
 ## 0. Gate 1 (high tier)
 
-- [ ] 0.1 `scripts/pregate-verify.sh gate1 add-qr-codes` passes and `scripts/gate-run.sh add-qr-codes 1 full` is run on the completed artifacts (proposal with tier and Non-goals, specs `qr-codes` + `api-docs` delta, design with the applicability table, tasks); findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-qr-codes 1 confirm <round>`. Verify: review.md carries a Gate 1 round bound to the requested commit; the merge verifier checks that the last Gate 1 decision reads approved/confirmed.
+- [x] 0.1 `scripts/pregate-verify.sh gate1 add-qr-codes` passes and `scripts/gate-run.sh add-qr-codes 1 full` is run on the completed artifacts (proposal with tier and Non-goals, specs `qr-codes` + `api-docs` delta, design with the applicability table, tasks); findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-qr-codes 1 confirm <round>`. Verify: review.md carries a Gate 1 round bound to the requested commit; the merge verifier checks that the last Gate 1 decision reads approved/confirmed. Done: round 1 recorded at `af515f7` (changes-requested: blocker — custom controller bypasses the pipeline; minors — enum `from`, 401 before 404), fixed in `2db3fd4`, Confirmation 1 `b3605f2` confirmed (Reviewed-Commit `f99b7cb`).
 
 ## 1. Dependency and renderer
 
