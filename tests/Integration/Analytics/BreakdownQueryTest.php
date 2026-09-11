@@ -132,6 +132,20 @@ final class BreakdownQueryTest extends AnalyticsQueryTestCase
         ], $top->items);
     }
 
+    public function testTopLinksCountVisitorsByTheWholeHash(): void
+    {
+        // two visitors whose hashes share the first 16 hex characters and differ only afterwards —
+        // an exact count is 2; any prefix-based shortcut of the hash collapses them into 1
+        $link = LinkFactory::createOne(['slug' => 'prefix']);
+        self::click($link, '2026-09-02T10:00:00Z', ['visitorHash' => str_repeat('a', 16).str_repeat('0', 48)]);
+        self::click($link, '2026-09-02T10:00:00Z', ['visitorHash' => str_repeat('a', 16).str_repeat('1', 48)]);
+        self::click($link, '2026-09-02T11:00:00Z', ['visitorHash' => str_repeat('a', 16).str_repeat('1', 48)]);
+
+        $top = $this->query()->topLinks($this->request(null, self::FROM, self::TO, limit: 1));
+
+        self::assertSame([3, 2], [$top->items[0]->clicks, $top->items[0]->uniqueVisitors]);
+    }
+
     private function query(): BreakdownQuery
     {
         return new BreakdownQuery(self::connection());

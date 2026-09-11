@@ -80,13 +80,13 @@ final readonly class BreakdownQuery
 
     /**
      * Global: the links with the most clicks in the period, with their slug,
-     * owner, clicks and distinct visitors. The distinct count is computed in two
-     * levels — (link, visitor) pairs first, then one row per link — with the
-     * visitor as the first 64 bits of the hex SHA-256 `visitor_hash` (spec
-     * click-logging) compared as a bigint: the pairs level sorts 24-byte rows in
-     * parallel workers instead of collated 64-character texts, which is what
+     * owner, clicks and distinct visitors. The exact distinct count is computed
+     * in two levels — (link, visitor) pairs first, then one row per link — with
+     * the full `visitor_hash` compared under `COLLATE "C"` (byte equality, the
+     * same equality as the column's, without the locale comparison): the pairs
+     * level sorts in parallel workers without collation work, which is what
      * `count(DISTINCT visitor_hash)` over every link's rows cost (design
-     * decision 2 and appendix: 810 ms → 260 ms p95 on one million clicks).
+     * decision 2 and appendix: 810 ms → 273 ms p95 on one million clicks).
      *
      * @return Grouped<TopLinkRow>
      */
@@ -97,7 +97,7 @@ final readonly class BreakdownQuery
         }
         $sql = <<<SQL
             WITH pairs AS (
-                SELECT link_id, ('x' || left(visitor_hash, 16))::bit(64)::bigint AS visitor, count(*) AS n
+                SELECT link_id, visitor_hash COLLATE "C" AS visitor, count(*) AS n
                 FROM clicks
                 WHERE occurred_at >= :from AND occurred_at < :to{$this->bots($request)}
                 GROUP BY 1, 2

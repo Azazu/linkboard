@@ -12,7 +12,8 @@ use Symfony\Component\Uid\Uuid;
  * Click rows for the analytics tests, inserted through the DBAL with the
  * handler's twelve columns. `visitor` is a label hashed like the real
  * visitor_hash (64 hex characters), so two rows with the same label are one
- * visitor.
+ * visitor; `visitorHash` stores the given 64-hex string as is (for rows whose
+ * hashes must relate in a chosen way, e.g. a shared prefix).
  */
 final class ClickRows
 {
@@ -21,7 +22,7 @@ final class ClickRows
     }
 
     /**
-     * @param array{country?: ?string, deviceType?: ?string, os?: ?string, browser?: ?string, bot?: bool, referer?: ?string, visitor?: string, variant?: ?string, resolvedBy?: string} $facts
+     * @param array{country?: ?string, deviceType?: ?string, os?: ?string, browser?: ?string, bot?: bool, referer?: ?string, visitor?: string, visitorHash?: string, variant?: ?string, resolvedBy?: string} $facts
      *
      * @return string the click id
      */
@@ -38,7 +39,7 @@ final class ClickRows
             'browser' => $facts['browser'] ?? null,
             'is_bot' => $facts['bot'] ?? false,
             'referer_host' => $facts['referer'] ?? null,
-            'visitor_hash' => hash('sha256', $facts['visitor'] ?? $id),
+            'visitor_hash' => $facts['visitorHash'] ?? hash('sha256', $facts['visitor'] ?? $id),
             'variant' => $facts['variant'] ?? null,
             'resolved_by' => $facts['resolvedBy'] ?? (isset($facts['variant']) ? 'variant' : 'default'),
         ], ['occurred_at' => Types::DATETIMETZ_IMMUTABLE, 'is_bot' => Types::BOOLEAN]);
@@ -47,7 +48,7 @@ final class ClickRows
     }
 
     /**
-     * @param array{country?: ?string, deviceType?: ?string, os?: ?string, browser?: ?string, bot?: bool, referer?: ?string, visitor?: string, variant?: ?string, resolvedBy?: string} $facts
+     * @param array{country?: ?string, deviceType?: ?string, os?: ?string, browser?: ?string, bot?: bool, referer?: ?string, visitor?: string, visitorHash?: string, variant?: ?string, resolvedBy?: string} $facts
      */
     public static function many(Connection $connection, Uuid $linkId, int $count, string $occurredAt, array $facts = []): void
     {
