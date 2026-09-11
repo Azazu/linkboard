@@ -1,7 +1,7 @@
 # Handoff — add-async-click-logging
 
-**Updated:** 2026-09-11 · claude (Gate 2 passed, branch run green on the post-fix head)
-**State:** ready-to-merge
+**Updated:** 2026-09-11 · claude (merged 13feacb, main run 34577963361 green)
+**State:** archived
 **Branch:** change/add-async-click-logging
 
 ## Done this session
