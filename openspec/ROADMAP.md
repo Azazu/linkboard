@@ -15,7 +15,7 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 8 | `add-analytics-read-model` | six reports (summary, timeseries, countries, devices, referrers, variants) via window functions; read-only query services and DTOs; Redis tag cache with invalidation; admin global stats; `app:demo:seed` | medium |
+| 8 | `add-analytics-read-model` | six reports (summary, timeseries, countries, devices, referrers, variants) via window functions; read-only query services and DTOs; Redis tag cache with invalidation; admin global stats; `app:demo:seed` | high (raised from medium by the user at Gate 2) |
 | 9 | `add-qr-codes` | `endroid/qr-code`, owner-only `GET /api/v1/links/{id}/qr` as SVG/PNG | low |
 | 10 | `add-api-keys-and-rate-limiting` | hashed API keys (plaintext once), access-token authenticator, per-key/per-user API limit with rate-limit headers, trusted-proxy handling; the prod deep health probe becomes available to a valid admin API key | high |
 

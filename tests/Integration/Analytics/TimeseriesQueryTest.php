@@ -1,0 +1,117 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration\Analytics;
+
+use App\Analytics\Dto\ClickBucket;
+use App\Analytics\Dto\TimeBucket;
+use App\Analytics\Query\TimeseriesQuery;
+use App\Analytics\Report\Granularity;
+use PHPUnit\Framework\Attributes\CoversClass;
+
+/** Spec analytics "Timeseries report": gap filling, UTC bucketing, hourly buckets, running total. */
+#[CoversClass(TimeseriesQuery::class)]
+final class TimeseriesQueryTest extends AnalyticsQueryTestCase
+{
+    public function testGapsAreFilledAndTheRunningTotalAccumulates(): void
+    {
+        $link = $this->link();
+        self::click($link, '2026-09-02T10:00:00Z', ['visitor' => 'a'], 2);
+        self::click($link, '2026-09-02T12:00:00Z', ['visitor' => 'b']);
+        self::click($link, '2026-09-05T23:59:59Z', ['visitor' => 'a']);
+        self::click($link, '2026-09-08T00:00:00Z'); // `to` is exclusive
+        self::click($link, '2026-08-31T23:59:59Z'); // before `from`
+
+        $buckets = $this->query()->buckets($this->request($link, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z'));
+
+        self::assertCount(7, $buckets);
+        self::assertSame('2026-09-01T00:00:00+00:00', $buckets[0]->bucket->format('c'));
+        self::assertSame('2026-09-07T00:00:00+00:00', $buckets[6]->bucket->format('c'));
+        self::assertSame([0, 3, 0, 0, 1, 0, 0], array_map(static fn (TimeBucket $b): int => $b->clicks, $buckets));
+        self::assertSame([0, 2, 0, 0, 1, 0, 0], array_map(static fn (TimeBucket $b): int => $b->uniqueVisitors, $buckets));
+        self::assertSame([0, 3, 3, 3, 4, 4, 4], array_map(static fn (TimeBucket $b): int => $b->cumulativeClicks, $buckets));
+    }
+
+    public function testBucketsAreUtcWhateverTheOffsetOrSessionZone(): void
+    {
+        $link = $this->link();
+        self::click($link, '2026-03-29T00:30:00+02:00'); // 2026-03-28T22:30Z
+        self::click($link, '2026-03-29T03:30:00+02:00'); // 2026-03-29T01:30Z
+        self::click($link, '2026-03-28T23:30:00Z'); // 00:30 on the 29th in Berlin, still the 28th in UTC
+        self::connection()->executeStatement("SET TIME ZONE 'Europe/Berlin'");
+
+        try {
+            $buckets = $this->query()->buckets($this->request($link, '2026-03-28T00:00:00Z', '2026-03-30T00:00:00Z'));
+        } finally {
+            self::connection()->executeStatement("SET TIME ZONE 'UTC'");
+        }
+
+        self::assertSame(['2026-03-28T00:00:00+00:00', '2026-03-29T00:00:00+00:00'], array_map(static fn (TimeBucket $b): string => $b->bucket->format('c'), $buckets));
+        self::assertSame([2, 1], array_map(static fn (TimeBucket $b): int => $b->clicks, $buckets));
+    }
+
+    public function testHourlyBuckets(): void
+    {
+        $link = $this->link();
+        self::click($link, '2026-09-01T09:15:00Z', [], 2);
+        self::click($link, '2026-09-01T23:59:00Z');
+
+        $buckets = $this->query()->buckets($this->request($link, '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z', Granularity::Hour));
+
+        self::assertCount(24, $buckets);
+        $byHour = [];
+        foreach ($buckets as $b) {
+            $byHour[$b->bucket->format('c')] = $b->clicks;
+        }
+        self::assertSame(2, $byHour['2026-09-01T09:00:00+00:00']);
+        self::assertSame(1, $byHour['2026-09-01T23:00:00+00:00']);
+        self::assertSame(3, array_sum($byHour));
+        self::assertSame(3, $buckets[23]->cumulativeClicks);
+    }
+
+    public function testBotsToggleAndGlobalVariant(): void
+    {
+        $a = $this->link();
+        $b = $this->link();
+        self::click($a, '2026-09-02T10:00:00Z', [], 5);
+        self::click($a, '2026-09-02T10:00:00Z', ['bot' => true], 2);
+        self::click($b, '2026-09-05T10:00:00Z', [], 3);
+
+        $sum = static fn (array $buckets): int => array_sum(array_map(static fn (TimeBucket $x): int => $x->clicks, $buckets));
+        self::assertSame(5, $sum($this->query()->buckets($this->request($a, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z'))));
+        self::assertSame(7, $sum($this->query()->buckets($this->request($a, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z', includeBots: true))));
+        $global = $this->query()->clickBuckets($this->request(null, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z'));
+        self::assertCount(7, $global);
+        self::assertSame([0, 5, 0, 0, 3, 0, 0], array_map(static fn (ClickBucket $x): int => $x->clicks, $global));
+        self::assertSame([0, 5, 5, 5, 8, 8, 8], array_map(static fn (ClickBucket $x): int => $x->cumulativeClicks, $global));
+    }
+
+    public function testUnalignedBoundsGivePartialBucketsForLinkAndGlobal(): void
+    {
+        $link = $this->link();
+        foreach (['2026-09-01T10:00:00Z', '2026-09-01T15:00:00Z', '2026-09-02T11:00:00Z', '2026-09-02T13:00:00Z'] as $at) {
+            self::click($link, $at);
+        }
+
+        $buckets = $this->query()->buckets($this->request($link, '2026-09-01T12:00:00Z', '2026-09-02T12:00:00Z'));
+        self::assertSame(['2026-09-01T00:00:00+00:00', '2026-09-02T00:00:00+00:00'], array_map(static fn (TimeBucket $b): string => $b->bucket->format('c'), $buckets));
+        self::assertSame([1, 1], array_map(static fn (TimeBucket $b): int => $b->clicks, $buckets), 'the 10:00 and 13:00 clicks are outside the period');
+        self::assertSame([1, 2], array_map(static fn (TimeBucket $b): int => $b->cumulativeClicks, $buckets));
+
+        $global = $this->query()->clickBuckets($this->request(null, '2026-09-01T12:00:00Z', '2026-09-02T12:00:00Z'));
+        self::assertSame([1, 1], array_map(static fn (ClickBucket $b): int => $b->clicks, $global));
+
+        $one = $this->query()->buckets($this->request($link, '2026-09-01T10:30:00Z', '2026-09-01T11:30:00Z'));
+        self::assertCount(1, $one, 'a period shorter than a bucket has one bucket');
+        self::assertSame(['2026-09-01T00:00:00+00:00', 0], [$one[0]->bucket->format('c'), $one[0]->clicks]);
+
+        self::assertCount(337, $this->query()->buckets($this->request($link, '2026-09-01T00:30:00Z', '2026-09-15T00:30:00Z', Granularity::Hour)), 'an unaligned 14-day hourly window touches 337 buckets');
+        self::assertCount(367, $this->query()->clickBuckets($this->request(null, '2025-01-01T12:00:00Z', '2026-01-02T12:00:00Z')), 'an unaligned 366-day daily window touches 367 buckets');
+    }
+
+    private function query(): TimeseriesQuery
+    {
+        return new TimeseriesQuery(self::connection());
+    }
+}

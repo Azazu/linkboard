@@ -14,9 +14,23 @@ framework:
         # APCu (not recommended with heavy random-write workloads as memory fragmentation can cause perf issues)
         #app: cache.adapter.apcu
 
+        # Per-environment namespaces: the test suite and the dev stack share one
+        # Redis, and a `clear()` of the test pool must never touch dev entries.
+        prefix_seed: 'linkboard/%kernel.environment%'
+
         pools:
             # matomo/device-detector regex database, parsed once per deploy and
             # kept on local disk: the redirect hot path gains no Redis dependency
             # (add-routing-rules, design decision 7)
             cache.device_detector:
                 adapter: cache.adapter.filesystem
+            # Analytics reports (FR-ANL-3): tag-aware Redis, TTL 300 s, entries
+            # tagged `link-{id}` / `global` and invalidated by the link processors.
+            # RedisTagAwareAdapter needs the `noeviction` or a `volatile-*`
+            # maxmemory-policy (the compose Redis sets no maxmemory → noeviction).
+            # Behind App\Analytics\Cache\ReportCache, which computes without the
+            # cache when Redis is unavailable (add-analytics-read-model, decision 7).
+            cache.reports:
+                adapter: cache.adapter.redis_tag_aware
+                provider: '%env(REDIS_URL)%'
+                default_lifetime: 300
