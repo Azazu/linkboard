@@ -20,8 +20,12 @@
 
 - Finding #1: the user raised the tier to `high` (2026-09-11). `proposal.md` carries the new tier and rationale, `design.md` the applicability table, `tasks.md` a Gate 1 task (0.1).
 
+- Gate 1 round 1 (`6e0ded1`, Reviewed-Commit `f2f86ac`): changes-requested, two majors + one minor. Fixed in `f0df821`: #1 — the timeseries contract is "every UTC bucket intersecting the period, clicks filtered by the exact half-open bounds" (partial first/last buckets, 337/367 maxima, sub-bucket period), spec scenario + design sketch + tests for link, global and HTTP (task 1.4; failing input: series from the raw bounds); #2 — the seed's one-transaction guarantee has two spec scenarios and a failure-injection test through the test-only DBAL middleware `tests/Fixture/FailingStatement.php` (fresh seed → nothing; failed `--reset` → former ids, password, links, clicks intact), the command exits 1 with the reason, decision 10 reconciled with the applicability table (task 3.2; failing input: closure without `transactional()`); #3 — proposal/design/tasks/ROADMAP drift reconciled (no global `uniqueVisitors`, high tier everywhere, tasks 0.1/5.4 claim the recorded round, not the verdict). `make check` green: 558 tests / 7326 assertions. Statuses in review.md → fixed.
+
+**Security-relevant (this session):** the seed's `--reset` deletion path — rollback under failure injection is now asserted; `FailingStatement` is registered under `when@test` only (`config/services.yaml`).
+
 ## Next step
-`scripts/gate-run.sh add-analytics-read-model 1 full` (Gate 1 on the completed artifacts; the floor `scripts/pregate-verify.sh gate1 add-analytics-read-model` passes), then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1`.
+`scripts/gate-run.sh add-analytics-read-model 1 confirm 1` (the floor `scripts/pregate-verify.sh gate1 add-analytics-read-model` passes). Then the branch head has moved since the green run on `331fc7b`: the user pushes the branch, the executor confirms a green run on the exact head (task 5.3), then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1`.
 
 ## Blockers
 None.
