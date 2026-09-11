@@ -355,9 +355,12 @@ cache, tag `global`, invalidated when a link is deleted.
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" 'http://localhost:8082/api/v1/admin/stats/top-links?limit=3'
 ```
 
-Report queries use the `(link_id, occurred_at)` index and its `NOT is_bot`
-partial twin; the plans and the uncached timings on one million seeded clicks
-are recorded in the appendix of the change's design
+Per-link report queries are bounded by the link's indexes (the planner picks
+the `(link_id)` index or the composite `(link_id, occurred_at)` one depending
+on the window) and spend most of their time on `count(DISTINCT visitor_hash)`;
+on one million seeded clicks every per-link report answers in under 300 ms
+uncached, the two admin reports over every link in under a second. Plans and
+timings are recorded in the appendix of the change's design
 (`openspec/changes/archive/*-add-analytics-read-model/design.md` after the
 archive).
 
