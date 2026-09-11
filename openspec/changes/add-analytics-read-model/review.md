@@ -55,3 +55,23 @@ Reviewed AGENTS.md, openspec/config.yaml, all change artifacts and delta specifi
 ### Validation
 
 Reviewed only f2f86ac88a1125e2429e5477643fa8ea76594e87..2c3c4951fc5ffd55fb457c3310f85119452794fc and collateral artifacts/code/tests reachable from the named Gate 1 findings, using AGENTS.md and openspec/config.yaml. Branch and HEAD match the requested identity; all source-round findings are dispositioned. The range's `git diff --check`, `openspec validate add-analytics-read-model --strict`, and `scripts/pregate-verify.sh gate1 add-analytics-read-model` passed (zero warnings). Runtime tests and mutation demonstrations were inspected in source and executor evidence, not rerun: Docker socket access is denied and no local PHP executable is available. This confirms Gate 1 round 1 only, not Gate 2. Only review.md was modified; no git write commands were run.
+
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-11
+**Reviewed-Commit:** 3c0c1d01e8340b0317f5f14d4c505efaa012fb45
+**Verdict:** changes-requested
+
+### Findings
+
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The proposal now declares high tier with the applicable deletion, authorization and input-handling rationale; design.md supplies the applicability table. Guard tests and recorded failing mutations cover the named boundaries, including the added fresh-seed/reset rollback injection. Gate 1 Confirmation 1 is confirmed at 2c3c4951fc5ffd55fb457c3310f85119452794fc; subsequent changes before this reviewed commit are review/handoff records, without another scope change. |
+| 2 | confirmed — Resolved by explicitly revising the period contract: an omitted from is 30 days before the effective to, while an omitted to retains the next-day default. The analytics requirement and one-bound scenario, brief, design and how-to now agree with Period::of, FromParameter and the unit test. LinkReportsTest adds HTTP assertions for both one-bound cases. This confirms the revised contract, not an implementation of the originally requested fixed default start. |
+| 3 | confirmed — The specification and design explicitly exempt admin summary from period parameters and echo. AdminStatsProvider passes withPeriod: false, so ReportRequestFactory uses defaults without reading or parsing supplied dates; arbitrary dates cannot alter its cache key. The resource documents this exception and declares includeBots only. AdminStatsTest asserts the response shape and successful handling of malformed ignored from/to values. |
+| 4 | changes-requested — The SQL changes remove global distinct counts, and the appendix records improved uncached p95 values of 119/75 ms on a fresh million-click seed; the available var/bench.php calls the shipped query services for 20 uncached runs. However, the resolution also changes the normative NFR-PERF-2 index requirement to allow the single-column FK index and removes previously specified global uniqueVisitors. No explicit user acceptance of that requirement revision is recorded in the reviewed artifacts or commit messages, although round 1 expressly required it for a revised requirement; the recorded user decision raises the risk tier only. The claim that the brief never requested global unique visitors is contradicted by FR-ANL-4 at the source commit, which explicitly includes them in top-links. In addition, checked task 5.1 still requires every per-link plan to use idx_clicks_link_occurred_human or idx_clicks_link_occurred, while its evidence names the FK index. Record explicit user acceptance of the revised requirement/scope (or meet the original contract), and reconcile task 5.1 and the historical rationale. Gate 1 confirmation does not supply user acceptance for this Gate 2 finding. |
+
+### Validation
+
+Reviewed only ff0c4836b7ef0e4f7008a718a12ced4d0ca1f21d..3c0c1d01e8340b0317f5f14d4c505efaa012fb45 and collateral code, tests and artifacts reachable from the four named major findings, using AGENTS.md and openspec/config.yaml. Branch and HEAD match the requested identity; all source-round findings are dispositioned. The range's git diff --check and openspec validate add-analytics-read-model --strict passed. Runtime tests, mutation demonstrations and performance measurements were inspected in source and executor evidence, not rerun: Docker socket access is denied and no local PHP executable is available. The benchmark script is a local ignored artifact, not part of the reviewed commit. Only review.md was modified; no git write commands were run.
