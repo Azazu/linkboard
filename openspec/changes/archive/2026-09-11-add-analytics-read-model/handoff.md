@@ -1,7 +1,7 @@
 # Handoff — add-analytics-read-model
 
 **Updated:** 2026-09-11 · claude
-**State:** ready-to-merge
+**State:** archived
 **Branch:** change/add-analytics-read-model
 
 ## Done this session
@@ -33,8 +33,12 @@
 - Gate 2 passed: Confirmation 3 (`4b3b6cb`, Reviewed-Commit `e1f872e`) — all four findings confirmed, including the exact top-links count and the recorded user decisions.
 - Branch run 34601749713 on `cc5cf48`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34601749713) — task 5.3 satisfied for the merge head.
 
+- Merged into `main` as `e4b882e` (2026-09-11, `--no-ff`, verifier passed).
+
+- `main` run 34604831226 on `e4b882e`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34604831226). Archived 2026-09-11: specs `analytics` and `demo-data` created, `links` "Update a link" / "Delete a link" synced, ROADMAP row 8 removed.
+
 ## Next step
-`/git:merge` (green run recorded above) (the verifier checks Gate 2 freshness: only review.md/handoff.md/tasks.md differ from `e1f872e`). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive`.
+None — archived. Next change per `openspec/ROADMAP.md`: row 9 `add-qr-codes`. (the verifier checks Gate 2 freshness: only review.md/handoff.md/tasks.md differ from `e1f872e`). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive`.
 
 ## Blockers
 None.
