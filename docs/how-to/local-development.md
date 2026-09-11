@@ -45,7 +45,7 @@ http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
 | test database | `make test-db` (create + migrate `<db>_test`; also run by `make init`) |
 | JWT keys | `make jwt-keys` (dev + test keypairs, skips existing; also run by `make init`) |
 | make an admin | `make console ARGS='app:user:promote you@example.com'` (`app:user:demote` reverts) — the only way roles change |
-| async worker (foreground) | `make worker` in a second terminal — needed from `add-async-click-logging` on; until then clicks are written synchronously (see Redirect) |
+| async worker (foreground) | `make worker` in a second terminal — clicks land in `clicks` only while a worker consumes the `async` transport (see Redirect) |
 | async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile, so `make up` does not start it unless asked |
 | the gate floor | `make check` (php-cs-fixer + PHPStan level 8 + PHPUnit; suites `Unit`, `Integration`, `Api`, `Web`) |
 | one suite | `docker compose exec php vendor/bin/phpunit --testsuite Unit` (also `Integration`, `Api`) |
@@ -124,12 +124,59 @@ Unknown or inactive slug → 404; expired or click limit reached → 410 Gone;
 otherwise 302 (never 301). Bodies are small HTML pages, or RFC 9457 problem
 details for `Accept: application/json`. `HEAD` answers like `GET` but records
 nothing. The click limit is exact under concurrency: check and increment are
-one SQL statement, so a link with `maxClicks` 3 answers 302 exactly three times.
+one atomic Redis script (see **Click limit** below), so a link with `maxClicks`
+3 answers 302 exactly three times.
 
-Every `GET` 302 writes one row into `clicks` and increments the link's
-`clickCount` in the same transaction. The row stores a salted hash of the
-visitor (`visitor_hash`) and the referer host — never the IP or the user
-agent. The salt is `VISITOR_HASH_SALT`: the value in `.env` is a
+Every `GET` 302 dispatches one `ClickRecorded` message to the `async`
+transport (Redis Streams); the request itself runs one `SELECT` (the link),
+for a link with `maxClicks` one Redis command (the click counter), and no SQL
+write. A **worker** turns the message into one row in `clicks` and one
+increment of the link's `clickCount`, in one transaction — so `clickCount` in
+the API is eventually consistent and lags by the queue backlog:
+
+```bash
+make worker                                   # foreground consumer, Ctrl-C to stop
+docker compose --profile worker up -d         # or as a background compose service
+make console ARGS='messenger:stats'           # messages waiting on async / failed
+```
+
+The message carries the finished click facts and the salted visitor hash —
+never the IP, the user agent or header values. Handling is idempotent: the
+message's `click_id` is the row's primary key, so a redelivery is acknowledged
+without a second row or increment. A message whose link was deleted in the
+meantime is acknowledged and discarded with an `info` log line — never
+retried, never parked. Any other failure is retried three times (1 s, 2 s,
+4 s, no jitter) and then parked on the `failed` transport (table
+`messenger_messages`, created — or adopted, rows kept — by a migration):
+
+```bash
+make console ARGS='messenger:failed:show'     # what is parked, and why
+make console ARGS='messenger:failed:retry --force'   # replay everything parked (add an id to replay one)
+```
+
+**Click limit.** For a link with `maxClicks` the authority is the Redis
+counter `link:{id}:clicks`, driven by one `EVAL` of a fixed Lua script per
+redirect: it lifts an absent or lower key to the link's persisted `clickCount`
+(never lowers it), compares with `maxClicks`, increments only when the redirect
+is allowed. Exhausted → 410, nothing dispatched. The key has no TTL and is
+removed with the link. Guarantee boundary: exact while the key exists;
+whenever the key is seeded — first redirect of a limited link, a limit set
+after an unlimited period, a Redis data loss — the seed is the count as the
+seeding request read it, so it excludes the accepted redirects not persisted at
+that read (queued or persisted since, dispatch-failed, parked); the limit may
+be exceeded by at most that many, and requests in flight at a limit change
+complete under the limit they loaded. `clicks` stays the exact record. Redis
+runs with AOF in Compose to make key loss exceptional.
+
+**When something is down.** Database unreachable → 503 for every slug (the
+link cannot be looked up). Redis unreachable → 503 with `Retry-After: 5` for
+links **with** `maxClicks` only (the limit cannot be guaranteed); unlimited
+links never touch Redis and redirect normally. Transport unreachable → 302 for
+every link and an `error` log line: the redirect never waits for or fails on
+logging, only that click's record is lost. `HEAD` issues no counter command
+and no message.
+
+The visitor hash's salt is `VISITOR_HASH_SALT`: the value in `.env` is a
 local-development default; set the real one in `.env.local` (gitignored) or
 the deployment's environment, never in the repository. Rotating it breaks
 unique-visitor continuity: visitors before and after the rotation count as
@@ -137,18 +184,9 @@ different people.
 
 Redirects are rate limited per client IP, `RATE_LIMIT_REDIRECT_PER_IP`
 (default 60 per minute, sliding window, counter in Redis with the shared
-lock); over the limit → 429 with `Retry-After`. This limiter is the only Redis
-use on the redirect path and it fails **open**: while Redis is down redirects
-are served unlimited and each request logs a warning.
-
-**Baseline note (stage 1).** Until `add-async-click-logging` (roadmap row 7)
-the click is written synchronously inside the redirect request — one SELECT,
-one UPDATE and one INSERT — which deliberately contradicts FR-RED-2 ("no SQL
-write on the hot path") for now. The failure contract is already the final
-one: if the click cannot be written, a link without `maxClicks` still
-redirects and logs an error; a link with `maxClicks` answers 503 with
-`Retry-After: 5` because its limit cannot be guaranteed; if the link itself
-cannot be looked up, every slug answers 503.
+lock); over the limit → 429 with `Retry-After`. The limiter fails **open**:
+while Redis is down redirects are served unlimited and each request logs a
+warning.
 
 ## Routing rules
 
@@ -251,10 +289,10 @@ it yourself.
 - **Compose does not see my `.env.local`** — Docker Compose reads only
   `.env`; for compose-level overrides (ports, project name) use
   `docker compose --env-file .env.local` or export them in the shell.
-- **Redirects work but analytics stay empty** — from `add-async-click-logging`
-  on: no worker is consuming the `async` transport; run `make worker`, or
-  check `make console ARGS='messenger:stats'`. Before that change clicks land
-  in `clicks` synchronously and no worker is involved.
+- **Redirects work but `clicks` stays empty and `clickCount` does not move** —
+  no worker is consuming the `async` transport; run `make worker` (or the
+  `worker` compose profile) and check `make console ARGS='messenger:stats'`.
+  Messages that failed three times sit on `failed`: `messenger:failed:show`.
 - **Permission denied on `var/`** — the php image must run as your ids;
   rebuild with `HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose build php`
   (see `.docker/php/Dockerfile`).

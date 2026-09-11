@@ -19,7 +19,9 @@ use Psr\Log\LoggerInterface;
  * inactive → 410 for expired or exhausted (fast path, no write) → routing
  * (profile → evaluate, inside one guard: hostile input or any exception →
  * the default target, one notice — FR-RUL-7) → HEAD answers from the link
- * state alone → record the click with its facts → 302 / 410 / the
+ * state alone → record the click with its facts (the counter for a limited
+ * link, then one message; a counter failure is the write failure below, a
+ * dispatch failure is absorbed by the recorder) → 302 / 410 / the
  * write-failure policy. Log records carry ids, issue classes and exception
  * classes only — never the IP, user agent, header values, slug or target.
  */

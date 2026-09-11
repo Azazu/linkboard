@@ -98,6 +98,7 @@ final class RedirectMatrixTest extends RedirectWebTestCase
         self::assertResponseStatusCodeSame(302);
         self::assertResponseHeaderSame('Location', 'https://example.com/a');
 
+        self::consumeAsync(); // the count is written by the worker
         $token = $this->token($client, 'a@example.com');
         self::assertSame(3, $this->apiGet($client, $token, '/api/v1/links/'.$link->getId())['clickCount']);
 

@@ -7,6 +7,7 @@ namespace App\Link\Api;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Auth\Entity\User;
+use App\Click\Counter\ClickCounterInterface;
 use App\Link\LinkRepositoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -16,8 +17,10 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * DELETE /api/v1/links/{id} — hard delete (FR-LNK-10); dependents cascade
- * through the FK contract. Admin deletions of another user's link are audited
- * after the flush.
+ * through the FK contract, the Redis click counter is removed best effort after
+ * the flush (a counter failure is logged, never fails the deletion), queued
+ * click messages are discarded by their handler. Admin deletions of another
+ * user's link are audited after the flush.
  *
  * @implements ProcessorInterface<LinkResource, null>
  */
@@ -28,6 +31,8 @@ final readonly class DeleteLinkProcessor implements ProcessorInterface
         private EntityManagerInterface $em,
         private Security $security,
         private LoggerInterface $auditLogger,
+        private ClickCounterInterface $counter,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -44,6 +49,12 @@ final readonly class DeleteLinkProcessor implements ProcessorInterface
 
         $this->links->remove($link);
         $this->em->flush();
+
+        try {
+            $this->counter->forget($link->getId());
+        } catch (\Throwable $e) {
+            $this->logger->warning('Click counter key not removed with the link', ['link_id' => $linkId, 'exception' => $e::class]);
+        }
 
         $actor = $this->security->getUser();
         if ($actor instanceof User && (string) $actor->getId() !== $ownerId) {
