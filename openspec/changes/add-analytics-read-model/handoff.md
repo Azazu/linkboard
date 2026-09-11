@@ -31,9 +31,10 @@
 - Gate 2 Confirmation 2 (`5965648`, Reviewed-Commit `d734ef9`): finding 4 changes-requested again — the 64-bit hash prefix was lossy against the specified exact count. Two failed confirmations → the user arbitrated (2026-09-11): exact formulation, third confirmation authorised. Fixed in `88d8b8f`: pairs over the whole `visitor_hash COLLATE "C"` — 239 ms p95 through the real service on a fresh one-million seed; same-prefix regression case; both failing inputs demonstrated; proposal User decisions, design decision 2/appendix and task 2.4 updated. `make check` green: 559 tests / 7331 assertions.
 
 - Gate 2 passed: Confirmation 3 (`4b3b6cb`, Reviewed-Commit `e1f872e`) — all four findings confirmed, including the exact top-links count and the recorded user decisions.
+- Branch run 34601749713 on `cc5cf48`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34601749713) — task 5.3 satisfied for the merge head.
 
 ## Next step
-The user pushes `change/add-analytics-read-model`; the executor confirms a completed, successful Actions run whose `head_sha` equals `git rev-parse HEAD` (task 5.3; the last green run 34597813548 was on `3c0c1d0`, code changed since in `eab0416` and `88d8b8f`) and records it here; then `/git:merge` (the verifier checks Gate 2 freshness: only review.md/handoff.md/tasks.md differ from `e1f872e`). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive`.
+`/git:merge` (green run recorded above) (the verifier checks Gate 2 freshness: only review.md/handoff.md/tasks.md differ from `e1f872e`). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive`.
 
 ## Blockers
 None.
