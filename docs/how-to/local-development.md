@@ -47,6 +47,7 @@ http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
 | make an admin | `make console ARGS='app:user:promote you@example.com'` (`app:user:demote` reverts) — the only way roles change |
 | async worker (foreground) | `make worker` in a second terminal — clicks land in `clicks` only while a worker consumes the `async` transport (see Redirect) |
 | async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile, so `make up` does not start it unless asked |
+| demo data | `make console ARGS='app:demo:seed'` — two accounts (passwords printed once), ten links with rules, 50 000 clicks over 60 days; `--reset` to start over (see Analytics) |
 | the gate floor | `make check` (php-cs-fixer + PHPStan level 8 + PHPUnit; suites `Unit`, `Integration`, `Api`, `Web`) |
 | one suite | `docker compose exec php vendor/bin/phpunit --testsuite Unit` (also `Integration`, `Api`) |
 
@@ -271,6 +272,94 @@ docker compose exec -T -e COUNTRY_RESOLVERS=bogus php bin/console about
 Device, OS, browser and bot detection use `matomo/device-detector`; its regex
 database is parsed once per deploy into the filesystem pool
 `cache.device_detector`, so the first requests after `cache:clear` are slower.
+
+## Analytics
+
+Reports are the read side of the click pipeline (FR-ANL-1…5): every number
+is computed by PostgreSQL over `clicks` — aggregates and window functions,
+never PHP loops — and returned as an immutable report. Six reports per link,
+for the owner or an admin (403 for anyone else, 401 anonymous, 404 for an
+unknown id, exactly like the link itself):
+
+| Report | Returns |
+|---|---|
+| `GET /api/v1/links/{id}/stats/summary` | all-time `totalClicks`, `uniqueVisitors`, `firstClickAt`, `lastClickAt`; `clicksToday` (UTC); `clicksInPeriod` vs `clicksInPreviousPeriod` (the same length before `from`) and `deltaPercent` (null when the previous period is empty) |
+| `…/stats/timeseries` | one UTC bucket per `granularity` (`hour` for periods of at most 14 days, or `day`) with `clicks`, `uniqueVisitors`, `cumulativeClicks`; every bucket present, zeros where nothing happened |
+| `…/stats/countries` | the `limit` countries with the most clicks, `share` (% of the period total, one decimal) and `rank` (ties share a rank); `country: null` groups unknown origins |
+| `…/stats/devices` | `byDeviceType` and `byOs` breakdowns with shares; `null` groups what detection did not recognise |
+| `…/stats/referrers` | the `limit` referrer hosts with share and rank; clicks without a referrer are the `direct` group |
+| `…/stats/variants` | clicks, `uniqueVisitors` and share per A/B variant among the clicks a variant resolved (`total`); rule- and default-resolved clicks are not part of it |
+
+Parameters, all optional: `from` and `to` (RFC 3339; the period is half-open,
+`from` inclusive and `to` exclusive, evaluated in UTC, at most 366 days;
+default: the current UTC day and the 29 before it — `to` is the start of the
+next UTC day, so identical default requests share one cache entry all day),
+`includeBots` (`true`/`false`, default `false` — bots are stored but excluded),
+`granularity` (timeseries), `limit` (1–50, default 10; countries and
+referrers). A malformed, out-of-range or inconsistent parameter answers 422
+problem details with one violation per parameter (`propertyPath` is the
+parameter name). Every report echoes its effective parameters and carries
+`generatedAt`, the UTC time its numbers were computed. Seed the instance and
+try them:
+
+```bash
+make console ARGS='app:demo:seed'    # prints demo@example.com / admin@example.com with generated passwords
+curl -s -X POST http://localhost:8082/api/v1/auth/token -H 'Content-Type: application/json' \
+  -d '{"email":"demo@example.com","password":"<the printed password>"}'
+# → {"token":"…"}; then, with ID = the id of one of the demo links (GET /api/v1/links):
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8082/api/v1/links/$ID/stats/summary"
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8082/api/v1/links/$ID/stats/timeseries?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z&granularity=day"
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8082/api/v1/links/$ID/stats/countries?limit=3&includeBots=true"
+```
+
+`app:demo:seed` creates two accounts, ten links with routing documents
+(device, country and language rules, A/B variants, click limits, an expired
+one, UTM sets) and 50 000 synthetic clicks over the last 60 days with
+realistic distributions — several countries and an unknown share, consistent
+device/OS/browser triples, referrer hosts and direct traffic, a 5 % bot share,
+repeat visitors — in one transaction and one SQL statement per link (`--clicks`
+and `--days` change the volume). The passwords are generated per run from a
+CSPRNG, hashed like any account's and shown only once on the console; there is
+no password in the repository, so if you lose them run
+`make console ARGS='app:demo:seed --reset'`, which deletes the two accounts
+(their links and clicks follow) and seeds anew with new passwords. The command
+refuses to run twice without `--reset` and never runs in `prod`. The click
+rows have the handler's shape — no raw IP or user agent anywhere.
+
+**Cache.** Reports are served through the pool `cache.reports` — Redis, tag
+aware (`RedisTagAwareAdapter`), TTL 300 s — keyed by the report and every
+effective parameter and tagged `link-{id}` (link reports) or `global` (admin
+reports). Two identical requests within the TTL return the same body including
+`generatedAt`; clicks recorded in between become visible when the entry
+expires — a staleness of at most five minutes, which the web UI will state. A
+successful `PATCH` on a link (including deactivation) drops the link's
+entries; a `DELETE` drops them and the global ones. The cache is never a
+dependency: while Redis is down every report is computed from PostgreSQL and
+answered 200, the adapter logs `Failed to fetch key … Connection refused` at
+`warning`, and a `PATCH`/`DELETE` whose invalidation was refused still
+succeeds with a `Report cache not invalidated` warning naming the link id.
+`RedisTagAwareAdapter` requires Redis to run the `noeviction` or a `volatile-*`
+`maxmemory-policy`; the compose Redis sets no `maxmemory`, so it is
+`noeviction` — keep that when you point `REDIS_URL` elsewhere. Cache keys are
+namespaced per environment (`framework.cache.prefix_seed`), so the test suite's
+pool never touches the dev stack's entries.
+
+**Admin statistics** (`ROLE_ADMIN` only): `GET /api/v1/admin/stats/summary`
+(`totalUsers`, `totalLinks`, `activeLinks`, `totalClicks`, `clicksToday`),
+`/admin/stats/timeseries` (the timeseries over every link, same parameters)
+and `/admin/stats/top-links?limit=10` (the links with the most clicks in the
+period with `slug`, `ownerId`, `clicks`, `uniqueVisitors`, `rank`). Same
+cache, tag `global`, invalidated when a link is deleted.
+
+```bash
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" 'http://localhost:8082/api/v1/admin/stats/top-links?limit=3'
+```
+
+Report queries use the `(link_id, occurred_at)` index and its `NOT is_bot`
+partial twin; the plans and the uncached timings on one million seeded clicks
+are recorded in the appendix of the change's design
+(`openspec/changes/archive/*-add-analytics-read-model/design.md` after the
+archive).
 
 ## Reset (DESTRUCTIVE)
 

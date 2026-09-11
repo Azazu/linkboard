@@ -15,6 +15,7 @@ Authoritative live source: `make help`.
 | `make test-db` | create and migrate the test database (`<DATABASE_URL db>_test`); called by `make init` |
 | `make jwt-keys` | generate the dev and test JWT keypairs under `config/jwt/<env>/` (skips existing); called by `make init` and CI |
 | `make console ARGS='app:user:promote <email>'` / `app:user:demote` | grant / remove `ROLE_ADMIN`; exit 1 for an unknown email |
+| `make console ARGS='app:demo:seed [--clicks=50000] [--days=60] [--reset]'` | demo dataset: two accounts (generated passwords printed once), ten links with rules, synthetic clicks; exit 1 in `prod` or when the demo accounts exist without `--reset` |
 | `make worker` | consume the async Messenger transport (foreground) |
 | `docker compose --profile worker up -d` | the same consumer as a background compose service (profile `worker`, not started by `make up`) |
 | `make test` / `make stan` / `make cs` / `make cs-fix` | PHPUnit / PHPStan / style check / style fix |

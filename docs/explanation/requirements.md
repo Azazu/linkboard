@@ -130,19 +130,19 @@ Requirement ids (`FR-<AREA>-<n>`) are stable references for specs, tasks and tes
 ### 2.6 Analytics (ANL)
 
 - **FR-ANL-1** Analytics is a read model: query services in `src/Analytics/` return immutable DTOs computed by SQL; they never load `Click` entities and never aggregate in PHP.
-- **FR-ANL-2** Reports per link, each over a period `from`/`to` (default last 30 days, max 366 days) and with `include_bots` (default false):
+- **FR-ANL-2** Reports per link, each over a half-open UTC period `from`/`to` (`from` inclusive, `to` exclusive; default: the current UTC day and the 29 before it — `to` is the start of the next UTC day, so identical default requests share one cache entry all day; max 366 days) and with `includeBots` (default false); a malformed, out-of-range or inconsistent parameter is 422 with one violation per parameter; every report echoes its effective parameters and carries `generatedAt`:
 
   | Report | Content | SQL mechanism |
   |---|---|---|
-  | `summary` | total clicks, unique visitors, first/last click, clicks today, clicks in period vs previous period (delta %) | `count`, `count(distinct visitor_hash)`, `lag()` over period buckets |
-  | `timeseries` | clicks and unique visitors per bucket, `granularity` ∈ {`hour`, `day`} (hour allowed for periods ≤ 14 days); gaps filled with zeros | `date_trunc` + `generate_series` left join; running total via `sum() over (order by bucket)` |
-  | `countries` | top N (default 10, max 50) countries with count and share | `count`, `sum() over ()` for share, `rank() over (order by count desc)` |
-  | `devices` | breakdown by device type and by OS, count and share | as above, grouped twice |
+  | `summary` | all-time total clicks, unique visitors, first/last click; clicks today (UTC); clicks in period vs the previous period of the same length (delta %, null when the previous period is empty) | `count`, `count(distinct visitor_hash)`, `count(*) FILTER (WHERE …)` per window |
+  | `timeseries` | clicks and unique visitors per bucket, `granularity` ∈ {`hour`, `day`} (hour allowed for periods ≤ 14 days); gaps filled with zeros; running total | `date_trunc` (in UTC) + `generate_series` left join; `sum() over (order by bucket)` |
+  | `countries` | top N (default 10, max 50) countries with count and share; unknown country is one group (`null`) | `count`, `sum() over ()` for share, `rank() over (order by count desc)` (ties share a rank) |
+  | `devices` | breakdown by device type and by OS, count and share (`null` = unrecognised) | as above, grouped twice |
   | `referrers` | top N referrer hosts, `direct` for null | as above |
-  | `variants` | clicks and uniques per A/B variant, share | as above |
+  | `variants` | clicks and uniques per A/B variant, share — over the clicks a variant resolved only | as above, `WHERE resolved_by = 'variant'` |
 
-- **FR-ANL-3** Reports SHALL be served through the Redis cache (Symfony Cache, tag-aware): key includes link id, report, period, granularity, bots flag; TTL 300 s; every cached entry is tagged `link-{id}`; the tag is invalidated on link update, deactivation and deletion. Clicks arriving between refreshes are visible after TTL — bounded staleness is accepted and stated in the UI ("updated up to 5 minutes ago").
-- **FR-ANL-4** Global admin statistics: totals of users, links, clicks per day for 30 days, top 10 links by clicks in period — same mechanisms, cached under tag `global`.
+- **FR-ANL-3** Reports SHALL be served through the Redis cache (Symfony Cache, tag-aware, keys namespaced per environment): key includes link id, report, period, granularity, limit, bots flag; TTL 300 s; every cached entry is tagged `link-{id}`; the tag is invalidated on link update, deactivation and deletion (deletion also invalidates `global`, because the top-links report names links). The cache is never a dependency: while Redis is unavailable a report is computed from PostgreSQL and answered 200 with a `warning` record, and a refused invalidation never fails the link write (a `warning` names the link id). Clicks arriving between refreshes are visible after TTL — bounded staleness is accepted, `generatedAt` states it, and the UI shows it ("updated up to 5 minutes ago").
+- **FR-ANL-4** Global admin statistics: `summary` (totals of users, links, active links, clicks; clicks today), `timeseries` (clicks per bucket over every link, same parameters as the per-link one), `top-links` (top N links by clicks in period with slug, owner id, clicks, unique visitors, rank) — same mechanisms, cached under tag `global`.
 - **FR-ANL-5** Analytics queries are tested against real PostgreSQL with fixture clicks; every report has at least one test that asserts numbers, and the timeseries test covers gap filling and DST-free UTC bucketing (all timestamps stored and bucketed in UTC).
 
 ### 2.7 QR codes (QR)
