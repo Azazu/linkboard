@@ -1,7 +1,7 @@
 # Handoff — add-analytics-read-model
 
 **Updated:** 2026-09-11 · claude
-**State:** awaiting-gate-1
+**State:** awaiting-gate-2
 **Branch:** change/add-analytics-read-model
 
 ## Done this session
@@ -24,8 +24,10 @@
 
 **Security-relevant (this session):** the seed's `--reset` deletion path — rollback under failure injection is now asserted; `FailingStatement` is registered under `when@test` only (`config/services.yaml`).
 
+- Gate 1 passed: Confirmation 1 (`627955d`, Reviewed-Commit `2c3c495`) — all three findings confirmed.
+
 ## Next step
-`scripts/gate-run.sh add-analytics-read-model 1 confirm 1` (the floor `scripts/pregate-verify.sh gate1 add-analytics-read-model` passes). Then the branch head has moved since the green run on `331fc7b`: the user pushes the branch, the executor confirms a green run on the exact head (task 5.3), then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1`.
+The branch head has moved since the green run on `331fc7b`: the user pushes `change/add-analytics-read-model`; the executor confirms a completed, successful Actions run whose `head_sha` equals `git rev-parse HEAD` (task 5.3) and records it here; then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1` (Gate 2 confirmation of round 1 on the code diff, which now also carries the Gate 1 fixes: `f0df821`). Then `/git:merge`.
 
 ## Blockers
 None.
