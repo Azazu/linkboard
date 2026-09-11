@@ -26,7 +26,8 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Spec demo-data (design decision 10): two accounts with passwords generated
  * for the run and printed once, ten links with routing documents, synthetic
- * click rows generated in SQL with realistic distributions — one transaction,
+ * click rows generated in SQL with realistic distributions — one transaction
+ * (a failure anywhere rolls everything back, the previous dataset stays),
  * refused in prod and refused twice without --reset. The rows have the
  * handler's shape: no raw IP or user agent anywhere.
  */
@@ -76,49 +77,57 @@ final class DemoSeedCommand
         /** @var list<Link> $links */
         $links = [];
 
-        $this->connection->transactional(function () use ($existing, $now, $passwords, $clicks, $days, &$formerLinkIds, &$links): void {
-            if ([] !== $existing) {
-                $formerLinkIds = $this->linkIdsOf($existing);
-                foreach ($existing as $user) {
-                    $this->em->remove($user); // links and clicks follow through the FK cascades
+        try {
+            $this->connection->transactional(function () use ($existing, $now, $passwords, $clicks, $days, &$formerLinkIds, &$links): void {
+                if ([] !== $existing) {
+                    $formerLinkIds = $this->linkIdsOf($existing);
+                    foreach ($existing as $user) {
+                        $this->em->remove($user); // links and clicks follow through the FK cascades
+                    }
+                    $this->em->flush();
+                }
+
+                $hasher = $this->hasherFactory->getPasswordHasher(User::class);
+                $user = new User(DemoDataset::USER_EMAIL, $hasher->hash($passwords[DemoDataset::USER_EMAIL]), $now);
+                $admin = new User(DemoDataset::ADMIN_EMAIL, $hasher->hash($passwords[DemoDataset::ADMIN_EMAIL]), $now);
+                $admin->promoteToAdmin($now);
+                $this->users->add($user);
+                $this->users->add($admin);
+
+                foreach (DemoDataset::links() as $spec) {
+                    $link = new Link($user, $spec['slug'], $spec['target'], $now);
+                    $node = json_decode(json_encode($spec['rules'], \JSON_THROW_ON_ERROR), false, 512, \JSON_THROW_ON_ERROR);
+                    $document = $this->rulesParser->parse($node)->document ?? throw new \LogicException(\sprintf('The demo document of %s is invalid.', $spec['slug']));
+                    $link->replaceRules($document->toArray(), $now);
+                    if (isset($spec['maxClicks'])) {
+                        $link->setClickLimit($spec['maxClicks'], $now);
+                    }
+                    if (isset($spec['expiresAt'])) {
+                        $link->setExpiry($now->modify($spec['expiresAt']), $now);
+                    }
+                    if (isset($spec['utm'])) {
+                        $link->replaceUtm($spec['utm'], $now);
+                    }
+                    $this->em->persist($link);
+                    $links[] = $link;
                 }
                 $this->em->flush();
-            }
 
-            $hasher = $this->hasherFactory->getPasswordHasher(User::class);
-            $user = new User(DemoDataset::USER_EMAIL, $hasher->hash($passwords[DemoDataset::USER_EMAIL]), $now);
-            $admin = new User(DemoDataset::ADMIN_EMAIL, $hasher->hash($passwords[DemoDataset::ADMIN_EMAIL]), $now);
-            $admin->promoteToAdmin($now);
-            $this->users->add($user);
-            $this->users->add($admin);
+                $remaining = $clicks;
+                $specs = DemoDataset::links();
+                foreach ($links as $i => $link) {
+                    $share = $i === \count($links) - 1 ? $remaining : (int) floor($clicks * $specs[$i]['weight'] / 100);
+                    $remaining -= $share;
+                    $this->seedClicks($link, $specs[$i], $share, $now->modify(\sprintf('-%d days', $days)), $now);
+                }
+            });
+        } catch (\Throwable $e) {
+            // the transaction rolled back: the former dataset (if any) is intact, nothing new exists
+            $this->em->clear();
+            $io->error(\sprintf('Seeding failed; nothing was written (the previous dataset, if any, is intact): %s', $e->getMessage()));
 
-            foreach (DemoDataset::links() as $spec) {
-                $link = new Link($user, $spec['slug'], $spec['target'], $now);
-                $node = json_decode(json_encode($spec['rules'], \JSON_THROW_ON_ERROR), false, 512, \JSON_THROW_ON_ERROR);
-                $document = $this->rulesParser->parse($node)->document ?? throw new \LogicException(\sprintf('The demo document of %s is invalid.', $spec['slug']));
-                $link->replaceRules($document->toArray(), $now);
-                if (isset($spec['maxClicks'])) {
-                    $link->setClickLimit($spec['maxClicks'], $now);
-                }
-                if (isset($spec['expiresAt'])) {
-                    $link->setExpiry($now->modify($spec['expiresAt']), $now);
-                }
-                if (isset($spec['utm'])) {
-                    $link->replaceUtm($spec['utm'], $now);
-                }
-                $this->em->persist($link);
-                $links[] = $link;
-            }
-            $this->em->flush();
-
-            $remaining = $clicks;
-            $specs = DemoDataset::links();
-            foreach ($links as $i => $link) {
-                $share = $i === \count($links) - 1 ? $remaining : (int) floor($clicks * $specs[$i]['weight'] / 100);
-                $remaining -= $share;
-                $this->seedClicks($link, $specs[$i], $share, $now->modify(\sprintf('-%d days', $days)), $now);
-            }
-        });
+            return Command::FAILURE;
+        }
 
         foreach ([...$formerLinkIds, ...array_map(static fn (Link $l): string => $l->getId()->toRfc4122(), $links)] as $id) {
             $uuid = Uuid::fromString($id);

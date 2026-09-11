@@ -72,6 +72,10 @@ when@test:
         # redirect performs no database write (design decision 8)
         App\Tests\Fixture\StatementRecorder:
             tags: ['doctrine.middleware']
+        # Throws on an armed SQL needle so a test can fail a multi-statement
+        # transaction at a chosen point (the demo seed's rollback guarantee)
+        App\Tests\Fixture\FailingStatement:
+            tags: ['doctrine.middleware']
         # Fixed IP→country map for the test suite (COUNTRY_RESOLVERS=fixed)
         App\Tests\Fixture\FixedMapCountryResolver:
             tags:

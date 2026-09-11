@@ -187,6 +187,23 @@ final class LinkReportsTest extends AnalyticsApiTestCase
         self::assertSame([0, []], [$variants['total'], $variants['items']]);
     }
 
+    public function testUnalignedWindowGivesPartialBucketsOverHttp(): void
+    {
+        $client = self::createClient();
+        $a = UserFactory::createOne(['email' => 'a@example.com']);
+        $link = LinkFactory::createOne(['owner' => $a]);
+        foreach (['2026-09-01T10:00:00Z', '2026-09-01T15:00:00Z', '2026-09-02T11:00:00Z', '2026-09-02T13:00:00Z'] as $at) {
+            self::click($link->getId(), $at);
+        }
+        $token = $this->token($client, 'a@example.com');
+
+        $series = $this->get($client, $token, "/api/v1/links/{$link->getId()}/stats/timeseries?from=2026-09-01T12:00:00Z&to=2026-09-02T12:00:00Z");
+
+        self::assertSame(['2026-09-01T00:00:00+00:00', '2026-09-02T00:00:00+00:00'], array_column($series['buckets'], 'bucket'));
+        self::assertSame([1, 1], array_column($series['buckets'], 'clicks'));
+        self::assertSame(['2026-09-01T12:00:00+00:00', '2026-09-02T12:00:00+00:00'], [$series['from'], $series['to']], 'the exact bounds are echoed, not the bucket bounds');
+    }
+
     public function testOpenApiDocumentsTheSixReportsAndTheirParameters(): void
     {
         $client = self::createClient();

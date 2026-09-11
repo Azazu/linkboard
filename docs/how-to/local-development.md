@@ -284,7 +284,7 @@ unknown id, exactly like the link itself):
 | Report | Returns |
 |---|---|
 | `GET /api/v1/links/{id}/stats/summary` | all-time `totalClicks`, `uniqueVisitors`, `firstClickAt`, `lastClickAt`; `clicksToday` (UTC); `clicksInPeriod` vs `clicksInPreviousPeriod` (the same length before `from`) and `deltaPercent` (null when the previous period is empty) |
-| `…/stats/timeseries` | one UTC bucket per `granularity` (`hour` for periods of at most 14 days, or `day`) with `clicks`, `uniqueVisitors`, `cumulativeClicks`; every bucket present, zeros where nothing happened |
+| `…/stats/timeseries` | one UTC bucket per `granularity` (`hour` for periods of at most 14 days, or `day`) with `clicks`, `uniqueVisitors`, `cumulativeClicks`; every bucket the period touches present, zeros where nothing happened; the first and last bucket are partial when `from`/`to` are not aligned to the granularity (only clicks inside the period count) |
 | `…/stats/countries` | the `limit` countries with the most clicks, `share` (% of the period total, one decimal) and `rank` (ties share a rank); `country: null` groups unknown origins |
 | `…/stats/devices` | `byDeviceType` and `byOs` breakdowns with shares; `null` groups what detection did not recognise |
 | `…/stats/referrers` | the `limit` referrer hosts with share and rank; clicks without a referrer are the `direct` group |

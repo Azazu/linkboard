@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Shared;
 use App\Auth\Entity\User;
 use App\Shared\Demo\DemoDataset;
 use App\Shared\Demo\DemoSeedCommand;
+use App\Tests\Fixture\FailingStatement;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -88,6 +89,48 @@ final class DemoSeedCommandTest extends WebTestCase
         }
 
         return $m[1];
+    }
+
+    protected function tearDown(): void
+    {
+        FailingStatement::reset();
+        parent::tearDown();
+    }
+
+    public function testAFailureRollsBackAFreshSeedAndAReset(): void
+    {
+        $client = self::createClient();
+        $client->disableReboot();
+        $kernel = self::$kernel;
+        self::assertInstanceOf(KernelInterface::class, $kernel);
+        $c = self::connection();
+
+        // fresh seed failing while the click rows are written: nothing exists afterwards
+        FailingStatement::failOn('UPDATE links SET click_count');
+        $failed = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+        self::assertSame(1, $failed->execute(['--clicks' => '50', '--days' => '2']));
+        self::assertStringContainsString('Injected failure on: UPDATE links SET click_count', $failed->getDisplay(), 'the run died on the injected failure, not earlier');
+        self::assertSame([0, 0, 0], [(int) $c->fetchOne('SELECT count(*) FROM users'), (int) $c->fetchOne('SELECT count(*) FROM links'), (int) $c->fetchOne('SELECT count(*) FROM clicks')]);
+
+        // a good dataset
+        $ok = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+        self::assertSame(0, $ok->execute(['--clicks' => '100', '--days' => '3']), $ok->getDisplay());
+        $password = self::printedPassword($ok->getDisplay());
+        $userIds = $c->fetchFirstColumn('SELECT id FROM users ORDER BY email');
+        $linkIds = $c->fetchFirstColumn('SELECT id FROM links ORDER BY slug');
+        self::assertCount(10, $linkIds);
+        self::getContainer()->get('doctrine')->getManager()->clear(); // every CLI run is a fresh process; the kernel is shared here
+
+        // a reset failing after the former accounts were deleted and the replacement accounts, links and rows written
+        FailingStatement::failOn('UPDATE links SET click_count');
+        $reset = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+        self::assertSame(1, $reset->execute(['--reset' => true, '--clicks' => '40', '--days' => '1']));
+        self::assertStringContainsString('Injected failure on: UPDATE links SET click_count', $reset->getDisplay(), 'the run died on the injected failure, after the former accounts were deleted and the replacement rows written');
+        self::assertSame($userIds, $c->fetchFirstColumn('SELECT id FROM users ORDER BY email'), 'the former accounts, same ids');
+        self::assertSame($linkIds, $c->fetchFirstColumn('SELECT id FROM links ORDER BY slug'), 'the former links, no replacement');
+        self::assertSame(100, (int) $c->fetchOne('SELECT count(*) FROM clicks'));
+        $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => DemoDataset::USER_EMAIL, 'password' => $password]);
+        self::assertResponseStatusCodeSame(200, 'the former password still logs in');
     }
 
     private static function connection(): Connection

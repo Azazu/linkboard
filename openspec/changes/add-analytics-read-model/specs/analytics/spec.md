@@ -69,11 +69,15 @@ Every `GET /api/v1/links/{id}/stats/{report}` SHALL be served to the link's owne
 - **THEN** the response status is 200 with every count 0, `firstClickAt`, `lastClickAt` and `deltaPercent` null
 
 ### Requirement: Timeseries report
-`GET /api/v1/links/{id}/stats/timeseries` SHALL return `granularity` and `buckets`, one element per UTC bucket of the period in ascending order — every bucket between `from` and `to` present, buckets without clicks carrying zeros — each with `bucket` (the RFC 3339 UTC start of the bucket), `clicks`, `uniqueVisitors` (distinct `visitor_hash` within the bucket) and `cumulativeClicks` (the running total of `clicks` from the first bucket). Bucketing MUST be done in UTC regardless of the server's or the client's time zone: a click at `2026-03-29T00:30:00+02:00` belongs to the day bucket `2026-03-28`.
+`GET /api/v1/links/{id}/stats/timeseries` SHALL return `granularity` and `buckets`, one element per UTC bucket that intersects the period, in ascending order — the first and last bucket may be partial when `from` or `to` is not aligned to the granularity, every intersecting bucket present, buckets without clicks carrying zeros, and a period shorter than one bucket still yielding the bucket it lies in (two when it straddles a bucket boundary) — each with `bucket` (the RFC 3339 UTC start of the bucket), `clicks`, `uniqueVisitors` (distinct `visitor_hash` within the bucket) and `cumulativeClicks` (the running total of `clicks` from the first bucket). Only clicks inside the half-open period count, whatever their bucket: a partial first bucket holds the clicks from `from` onwards, a partial last one those before `to`. Consequently a 366-day period may span 367 day buckets and a 14-day period 337 hourly ones. Bucketing MUST be done in UTC regardless of the server's or the client's time zone: a click at `2026-03-29T00:30:00+02:00` belongs to the day bucket `2026-03-28`.
 
 #### Scenario: Gaps are filled
 - **WHEN** a link has 3 clicks on 2026-09-02 and 1 click on 2026-09-05 (UTC) and the owner requests `.../stats/timeseries?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z`
 - **THEN** `buckets` has exactly 7 elements starting at `2026-09-01T00:00:00+00:00`, their `clicks` are `[0, 3, 0, 0, 1, 0, 0]` and their `cumulativeClicks` are `[0, 3, 3, 3, 4, 4, 4]`
+
+#### Scenario: Unaligned bounds give partial buckets
+- **WHEN** a link has clicks at `2026-09-01T10:00:00Z`, `2026-09-01T15:00:00Z`, `2026-09-02T11:00:00Z` and `2026-09-02T13:00:00Z` and the owner requests `.../stats/timeseries?from=2026-09-01T12:00:00Z&to=2026-09-02T12:00:00Z`
+- **THEN** `buckets` has exactly 2 elements, `2026-09-01T00:00:00+00:00` with 1 click and `2026-09-02T00:00:00+00:00` with 1 click (the 10:00 and 13:00 clicks are outside the period); `.../stats/timeseries?from=2026-09-01T10:30:00Z&to=2026-09-01T11:30:00Z` has exactly 1 bucket, `2026-09-01T00:00:00+00:00`, with 0 clicks; the global timeseries behaves the same
 
 #### Scenario: UTC bucketing across a DST change
 - **WHEN** a link has one click at `2026-03-29T00:30:00+02:00` and one at `2026-03-29T03:30:00+02:00` and the owner requests `.../stats/timeseries?from=2026-03-28T00:00:00Z&to=2026-03-30T00:00:00Z`

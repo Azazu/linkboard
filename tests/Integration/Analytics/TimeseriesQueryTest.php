@@ -87,6 +87,29 @@ final class TimeseriesQueryTest extends AnalyticsQueryTestCase
         self::assertSame([0, 5, 5, 5, 8, 8, 8], array_map(static fn (ClickBucket $x): int => $x->cumulativeClicks, $global));
     }
 
+    public function testUnalignedBoundsGivePartialBucketsForLinkAndGlobal(): void
+    {
+        $link = $this->link();
+        foreach (['2026-09-01T10:00:00Z', '2026-09-01T15:00:00Z', '2026-09-02T11:00:00Z', '2026-09-02T13:00:00Z'] as $at) {
+            self::click($link, $at);
+        }
+
+        $buckets = $this->query()->buckets($this->request($link, '2026-09-01T12:00:00Z', '2026-09-02T12:00:00Z'));
+        self::assertSame(['2026-09-01T00:00:00+00:00', '2026-09-02T00:00:00+00:00'], array_map(static fn (TimeBucket $b): string => $b->bucket->format('c'), $buckets));
+        self::assertSame([1, 1], array_map(static fn (TimeBucket $b): int => $b->clicks, $buckets), 'the 10:00 and 13:00 clicks are outside the period');
+        self::assertSame([1, 2], array_map(static fn (TimeBucket $b): int => $b->cumulativeClicks, $buckets));
+
+        $global = $this->query()->clickBuckets($this->request(null, '2026-09-01T12:00:00Z', '2026-09-02T12:00:00Z'));
+        self::assertSame([1, 1], array_map(static fn (ClickBucket $b): int => $b->clicks, $global));
+
+        $one = $this->query()->buckets($this->request($link, '2026-09-01T10:30:00Z', '2026-09-01T11:30:00Z'));
+        self::assertCount(1, $one, 'a period shorter than a bucket has one bucket');
+        self::assertSame(['2026-09-01T00:00:00+00:00', 0], [$one[0]->bucket->format('c'), $one[0]->clicks]);
+
+        self::assertCount(337, $this->query()->buckets($this->request($link, '2026-09-01T00:30:00Z', '2026-09-15T00:30:00Z', Granularity::Hour)), 'an unaligned 14-day hourly window touches 337 buckets');
+        self::assertCount(367, $this->query()->clickBuckets($this->request(null, '2025-01-01T12:00:00Z', '2026-01-02T12:00:00Z')), 'an unaligned 366-day daily window touches 367 buckets');
+    }
+
     private function query(): TimeseriesQuery
     {
         return new TimeseriesQuery(self::connection());
