@@ -11,7 +11,6 @@ final readonly class TopLinkRow
         public string $slug,
         public string $ownerId,
         public int $clicks,
-        public int $uniqueVisitors,
         public int $rank,
     ) {
     }

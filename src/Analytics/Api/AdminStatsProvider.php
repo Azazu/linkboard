@@ -45,6 +45,7 @@ final readonly class AdminStatsProvider implements ProviderInterface
             null,
             withGranularity: AdminTimeseriesReport::class === $class,
             withLimit: AdminTopLinksReport::class === $class,
+            withPeriod: AdminSummaryReport::class !== $class, // the summary is all-time + today: no period, `from`/`to` ignored
         );
         $name = 'admin-'.strtolower((string) preg_replace('/^Admin(\w+)Report$/', '$1', substr($class, strrpos($class, '\\') + 1)));
 
@@ -60,7 +61,7 @@ final readonly class AdminStatsProvider implements ProviderInterface
 
         return match ($class) {
             AdminSummaryReport::class => AdminSummaryReport::of($report, $this->totals->totals($report, $this->requests->startOfToday()), $now),
-            AdminTimeseriesReport::class => AdminTimeseriesReport::of($report, $this->timeseries->buckets($report), $now),
+            AdminTimeseriesReport::class => AdminTimeseriesReport::of($report, $this->timeseries->clickBuckets($report), $now),
             AdminTopLinksReport::class => AdminTopLinksReport::of($report, $this->breakdown->topLinks($report), $now),
             default => throw new \LogicException(\sprintf('No report for %s.', $class)),
         };

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Analytics;
 
+use App\Analytics\Dto\ClickBucket;
 use App\Analytics\Dto\TimeBucket;
 use App\Analytics\Query\TimeseriesQuery;
 use App\Analytics\Report\Granularity;
@@ -80,9 +81,10 @@ final class TimeseriesQueryTest extends AnalyticsQueryTestCase
         $sum = static fn (array $buckets): int => array_sum(array_map(static fn (TimeBucket $x): int => $x->clicks, $buckets));
         self::assertSame(5, $sum($this->query()->buckets($this->request($a, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z'))));
         self::assertSame(7, $sum($this->query()->buckets($this->request($a, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z', includeBots: true))));
-        $global = $this->query()->buckets($this->request(null, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z'));
+        $global = $this->query()->clickBuckets($this->request(null, '2026-09-01T00:00:00Z', '2026-09-08T00:00:00Z'));
         self::assertCount(7, $global);
-        self::assertSame([0, 5, 0, 0, 3, 0, 0], array_map(static fn (TimeBucket $x): int => $x->clicks, $global));
+        self::assertSame([0, 5, 0, 0, 3, 0, 0], array_map(static fn (ClickBucket $x): int => $x->clicks, $global));
+        self::assertSame([0, 5, 5, 5, 8, 8, 8], array_map(static fn (ClickBucket $x): int => $x->cumulativeClicks, $global));
     }
 
     private function query(): TimeseriesQuery

@@ -19,7 +19,7 @@ use App\Analytics\Report\ReportRequest;
             uriTemplate: '/admin/stats/summary',
             provider: AdminStatsProvider::class,
             parameters: ['includeBots' => new IncludeBotsParameter()],
-            description: 'Instance totals: users, links, active links, clicks and clicks today (UTC). Admin only. Cached 300 s (`generatedAt`).',
+            description: 'Instance totals: users, links, active links, clicks and clicks today (UTC). No period: `from`/`to` are not part of this report and are ignored. Admin only. Cached 300 s (`generatedAt`).',
         ),
     ],
 )]

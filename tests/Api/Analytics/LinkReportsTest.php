@@ -87,6 +87,11 @@ final class LinkReportsTest extends AnalyticsApiTestCase
         self::assertNull($summary['firstClickAt']);
         self::assertNull($summary['deltaPercent']);
 
+        $toOnly = $this->get($client, $token, "/api/v1/links/{$link->getId()}/stats/summary?to=2026-09-08T00:00:00Z");
+        self::assertSame(['2026-08-09T00:00:00+00:00', '2026-09-08T00:00:00+00:00'], [$toOnly['from'], $toOnly['to']], 'to alone: the 30 days before it');
+        $fromOnly = $this->get($client, $token, "/api/v1/links/{$link->getId()}/stats/summary?from={$expectedTo->modify('-3 days')->format('Y-m-d\\TH:i:s\\Z')}");
+        self::assertSame([$expectedTo->modify('-3 days')->format('c'), $expectedTo->format('c')], [$fromOnly['from'], $fromOnly['to']], 'from alone: up to the default to');
+
         $series = $this->get($client, $token, "/api/v1/links/{$link->getId()}/stats/timeseries?".self::PERIOD.'&granularity=hour&includeBots=true');
         self::assertSame(['2026-09-01T00:00:00+00:00', '2026-09-08T00:00:00+00:00', 'hour', true], [$series['from'], $series['to'], $series['granularity'], $series['includeBots']]);
         self::assertCount(168, $series['buckets']);

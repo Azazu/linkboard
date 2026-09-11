@@ -33,16 +33,21 @@ final class AdminStatsTest extends AnalyticsApiTestCase
         $summary = $this->get($client, $admin, '/api/v1/admin/stats/summary');
         self::assertSame([3, 3, 2, 12, 0, false], [$summary['totalUsers'], $summary['totalLinks'], $summary['activeLinks'], $summary['totalClicks'], $summary['clicksToday'], $summary['includeBots']]);
         self::assertSame(13, $this->get($client, $admin, '/api/v1/admin/stats/summary?includeBots=true')['totalClicks']);
+        self::assertSame(['includeBots', 'totalUsers', 'totalLinks', 'activeLinks', 'totalClicks', 'clicksToday', 'generatedAt'], array_keys($summary), 'no period on the summary');
+        $ignored = $this->get($client, $admin, '/api/v1/admin/stats/summary?from=yesterday&to=2026');
+        self::assertSame($summary['totalClicks'], $ignored['totalClicks'], 'from/to are ignored by the summary, not validated');
 
         $top = $this->get($client, $admin, '/api/v1/admin/stats/top-links?'.self::PERIOD.'&limit=2');
         self::assertSame(12, $top['total']);
         self::assertSame([
-            ['linkId' => (string) $a1->getId(), 'slug' => 'a-one', 'ownerId' => (string) $a->getId(), 'clicks' => 5, 'uniqueVisitors' => 1, 'rank' => 1],
-            ['linkId' => (string) $b1->getId(), 'slug' => 'b-one', 'ownerId' => (string) $b->getId(), 'clicks' => 4, 'uniqueVisitors' => 4, 'rank' => 2],
+            ['linkId' => (string) $a1->getId(), 'slug' => 'a-one', 'ownerId' => (string) $a->getId(), 'clicks' => 5, 'rank' => 1],
+            ['linkId' => (string) $b1->getId(), 'slug' => 'b-one', 'ownerId' => (string) $b->getId(), 'clicks' => 4, 'rank' => 2],
         ], $top['items']);
 
         $series = $this->get($client, $admin, '/api/v1/admin/stats/timeseries?'.self::PERIOD);
         self::assertSame([0, 8, 0, 0, 4, 0, 0], array_column($series['buckets'], 'clicks'));
+        self::assertSame([0, 8, 8, 8, 12, 12, 12], array_column($series['buckets'], 'cumulativeClicks'));
+        self::assertSame(['bucket', 'clicks', 'cumulativeClicks'], array_keys($series['buckets'][0]), 'no unique visitors in the global timeseries');
         self::assertSame('day', $series['granularity']);
 
         StatementRecorder::reset();

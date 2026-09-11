@@ -1,7 +1,7 @@
 # Handoff — add-analytics-read-model
 
 **Updated:** 2026-09-11 · claude
-**State:** awaiting-gate-2
+**State:** fixing-g2
 **Branch:** change/add-analytics-read-model
 
 ## Done this session
@@ -16,8 +16,10 @@
 
 **Security-relevant parts for review:** the new read endpoints' authorization (the provider asks `LinkVoter::VIEW` on the link; admin operations rely on `security` + `access_control`), query-parameter handling (declared constraints + domain checks, values bound to SQL, enum literals only in fragments), the demo seed (creates accounts with generated credentials; environment guard).
 
+- Gate 2 round 1 (`1bbc1b7`, Reviewed-Commit `ff0c483`): changes-requested, four majors. Fixed: #2 — an omitted `from` is now defined as 30 days before the effective `to` (spec, brief, how-to, design; HTTP test for both one-bound cases); #3 — the admin summary declares no period, ignores `from`/`to` and the provider no longer parses them (spec exception, test); #4 — the global reports dropped the distinct-visitor count the brief never asked of them and re-measured at 119 / 75 ms p95 on one million clicks (target 300); NFR-PERF-2's index clause reworded to what the plans do, the 300 ms target unchanged. `make check` green after the fixes.
+
 ## Next step
-5.4 — `scripts/pregate-verify.sh gate2 add-analytics-read-model`, then `scripts/gate-run.sh add-analytics-read-model 2 full`; findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-analytics-read-model 2 confirm <round>`.
+Finding #1 (tier) awaits the user's decision: raise to `high` (applicability table in `design.md`, `scripts/gate-run.sh add-analytics-read-model 1 full` on the existing artifacts, then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1`) or waive. Then the Gate 2 confirmation of round 1.
 
 ## Blockers
-None.
+Finding #1 needs the user (tier is the user's call; a `major` cannot be closed by the executor alone).

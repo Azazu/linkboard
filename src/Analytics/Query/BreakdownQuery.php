@@ -79,7 +79,9 @@ final readonly class BreakdownQuery
     }
 
     /**
-     * Global: the links with the most clicks in the period, with their slug and owner.
+     * Global: the links with the most clicks in the period, with their slug and
+     * owner — clicks only, no distinct visitors (design appendix: the distinct
+     * count over every link's rows was what missed the performance target).
      *
      * @return Grouped<TopLinkRow>
      */
@@ -91,7 +93,6 @@ final readonly class BreakdownQuery
         $sql = <<<SQL
             SELECT c.link_id AS key, l.slug, l.owner_id,
                    count(*) AS clicks,
-                   count(DISTINCT c.visitor_hash) AS uniques,
                    round(100.0 * count(*) / sum(count(*)) OVER (), 1) AS share,
                    rank() OVER (ORDER BY count(*) DESC) AS rank,
                    sum(count(*)) OVER () AS total
@@ -105,7 +106,7 @@ final readonly class BreakdownQuery
         $rows = $this->connection->fetchAllAssociative($sql, Sql::params($request) + ['limit' => $request->limit], Sql::types());
 
         return new Grouped((int) ($rows[0]['total'] ?? 0), array_map(static fn (array $r): TopLinkRow => new TopLinkRow(
-            (string) $r['key'], (string) $r['slug'], (string) $r['owner_id'], (int) $r['clicks'], (int) $r['uniques'], (int) $r['rank'],
+            (string) $r['key'], (string) $r['slug'], (string) $r['owner_id'], (int) $r['clicks'], (int) $r['rank'],
         ), $rows));
     }
 

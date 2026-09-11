@@ -29,11 +29,14 @@ final readonly class ReportRequestFactory
     {
     }
 
-    public function fromRequest(?Request $request, ?Uuid $linkId, bool $withGranularity = false, bool $withLimit = false): ReportRequest
+    /**
+     * @param bool $withPeriod false for a report without a period (the admin summary): `from`/`to` are ignored and the default period stands
+     */
+    public function fromRequest(?Request $request, ?Uuid $linkId, bool $withGranularity = false, bool $withLimit = false, bool $withPeriod = true): ReportRequest
     {
         $query = null === $request ? new \Symfony\Component\HttpFoundation\InputBag() : $request->query;
         try {
-            $period = Period::of($query->get('from'), $query->get('to'), $this->clock);
+            $period = $withPeriod ? Period::of($query->get('from'), $query->get('to'), $this->clock) : Period::defaults($this->clock);
             $granularity = Granularity::Day;
             if ($withGranularity && $query->has('granularity')) {
                 $granularity = Granularity::tryFrom((string) $query->get('granularity')) ?? throw new InvalidReportParameter('granularity', 'granularity must be hour or day.');

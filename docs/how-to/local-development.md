@@ -293,7 +293,8 @@ unknown id, exactly like the link itself):
 Parameters, all optional: `from` and `to` (RFC 3339; the period is half-open,
 `from` inclusive and `to` exclusive, evaluated in UTC, at most 366 days;
 default: the current UTC day and the 29 before it — `to` is the start of the
-next UTC day, so identical default requests share one cache entry all day),
+next UTC day, so identical default requests share one cache entry all day;
+`to` alone gives the 30 days before it, `from` alone runs up to the default `to`),
 `includeBots` (`true`/`false`, default `false` — bots are stored but excluded),
 `granularity` (timeseries), `limit` (1–50, default 10; countries and
 referrers). A malformed, out-of-range or inconsistent parameter answers 422
@@ -345,11 +346,14 @@ namespaced per environment (`framework.cache.prefix_seed`), so the test suite's
 pool never touches the dev stack's entries.
 
 **Admin statistics** (`ROLE_ADMIN` only): `GET /api/v1/admin/stats/summary`
-(`totalUsers`, `totalLinks`, `activeLinks`, `totalClicks`, `clicksToday`),
-`/admin/stats/timeseries` (the timeseries over every link, same parameters)
-and `/admin/stats/top-links?limit=10` (the links with the most clicks in the
-period with `slug`, `ownerId`, `clicks`, `uniqueVisitors`, `rank`). Same
-cache, tag `global`, invalidated when a link is deleted.
+(`totalUsers`, `totalLinks`, `activeLinks`, `totalClicks`, `clicksToday`; no
+period — only `includeBots`), `/admin/stats/timeseries` (clicks and running
+total per bucket over every link, same parameters as a link's timeseries, no
+unique visitors) and `/admin/stats/top-links?limit=10` (the links with the
+most clicks in the period with `slug`, `ownerId`, `clicks`, `rank`). The
+global reports carry no distinct-visitor counts: over every link's rows that
+count is what would put them over the 300 ms target. Same cache, tag
+`global`, invalidated when a link is deleted.
 
 ```bash
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" 'http://localhost:8082/api/v1/admin/stats/top-links?limit=3'

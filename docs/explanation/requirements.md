@@ -130,7 +130,7 @@ Requirement ids (`FR-<AREA>-<n>`) are stable references for specs, tasks and tes
 ### 2.6 Analytics (ANL)
 
 - **FR-ANL-1** Analytics is a read model: query services in `src/Analytics/` return immutable DTOs computed by SQL; they never load `Click` entities and never aggregate in PHP.
-- **FR-ANL-2** Reports per link, each over a half-open UTC period `from`/`to` (`from` inclusive, `to` exclusive; default: the current UTC day and the 29 before it — `to` is the start of the next UTC day, so identical default requests share one cache entry all day; max 366 days) and with `includeBots` (default false); a malformed, out-of-range or inconsistent parameter is 422 with one violation per parameter; every report echoes its effective parameters and carries `generatedAt`:
+- **FR-ANL-2** Reports per link, each over a half-open UTC period `from`/`to` (`from` inclusive, `to` exclusive; default: the current UTC day and the 29 before it — `to` is the start of the next UTC day, so identical default requests share one cache entry all day; `to` alone gives the 30 days before it, `from` alone runs to the default `to`; max 366 days) and with `includeBots` (default false); a malformed, out-of-range or inconsistent parameter is 422 with one violation per parameter; every report echoes its effective parameters and carries `generatedAt`:
 
   | Report | Content | SQL mechanism |
   |---|---|---|
@@ -142,7 +142,7 @@ Requirement ids (`FR-<AREA>-<n>`) are stable references for specs, tasks and tes
   | `variants` | clicks and uniques per A/B variant, share — over the clicks a variant resolved only | as above, `WHERE resolved_by = 'variant'` |
 
 - **FR-ANL-3** Reports SHALL be served through the Redis cache (Symfony Cache, tag-aware, keys namespaced per environment): key includes link id, report, period, granularity, limit, bots flag; TTL 300 s; every cached entry is tagged `link-{id}`; the tag is invalidated on link update, deactivation and deletion (deletion also invalidates `global`, because the top-links report names links). The cache is never a dependency: while Redis is unavailable a report is computed from PostgreSQL and answered 200 with a `warning` record, and a refused invalidation never fails the link write (a `warning` names the link id). Clicks arriving between refreshes are visible after TTL — bounded staleness is accepted, `generatedAt` states it, and the UI shows it ("updated up to 5 minutes ago").
-- **FR-ANL-4** Global admin statistics: `summary` (totals of users, links, active links, clicks; clicks today), `timeseries` (clicks per bucket over every link, same parameters as the per-link one), `top-links` (top N links by clicks in period with slug, owner id, clicks, unique visitors, rank) — same mechanisms, cached under tag `global`.
+- **FR-ANL-4** Global admin statistics: `summary` (totals of users, links, active links, clicks; clicks today; no period, `includeBots` only), `timeseries` (clicks and running total per bucket over every link, same parameters as the per-link one), `top-links` (top N links by clicks in period with slug, owner id, clicks, rank) — same mechanisms, cached under tag `global`. The global reports carry no distinct-visitor counts: computed over every link's rows, that count alone puts them over NFR-PERF-2.
 - **FR-ANL-5** Analytics queries are tested against real PostgreSQL with fixture clicks; every report has at least one test that asserts numbers, and the timeseries test covers gap filling and DST-free UTC bucketing (all timestamps stored and bucketed in UTC).
 
 ### 2.7 QR codes (QR)
@@ -312,7 +312,7 @@ Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encor
 ### 6.1 Performance
 
 - **NFR-PERF-1** Redirect: p95 ≤ 50 ms server time on the local Docker setup with a warm cache, measured with a documented `wrk`/`ab` command in the README; ≤ 1 SQL SELECT and ≤ 1 Redis command per request (FR-RED-2).
-- **NFR-PERF-2** Analytics: every report query uses the `(link_id, occurred_at)` indexes (verified with `EXPLAIN` in the analytics change and pasted into its design), and p95 ≤ 300 ms uncached on 1 M fixture clicks for a 30-day period.
+- **NFR-PERF-2** Analytics: every per-link report query is bounded by the link's indexes — the planner picks the `(link_id)` index or the composite `(link_id, occurred_at)` one depending on the window (verified with `EXPLAIN` in the analytics change and pasted into its design) — and every report, per-link and global, has p95 ≤ 300 ms uncached on 1 M fixture clicks for a 30-day period.
 - **NFR-PERF-3** The worker sustains ≥ 500 clicks/s on the local setup (batch of 10 000 messages drained in ≤ 20 s), demonstrating the redirect is decoupled from persistence.
 
 ### 6.2 Security
