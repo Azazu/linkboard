@@ -1,7 +1,7 @@
 # Handoff — add-qr-codes
 
 **Updated:** 2026-09-11 · claude
-**State:** proposing
+**State:** awaiting-gate-1
 **Branch:** change/add-qr-codes
 
 ## Done this session
@@ -10,8 +10,10 @@
 
 **Security-relevant parts for review:** the dependency addition (three packages, pinned by the lock, `composer audit` in task 1.1) and the authorization boundary of the new endpoint (provider 404 first, then `LINK_VIEW` — the same sequence as `GET /links/{id}`).
 
+- Gate 1 round 1 (`af515f7`, Reviewed-Commit `194022e`): changes-requested — blocker: a custom `controller` bypasses the provider/security/validation chain under the default `use_symfony_listeners: false`; minors: enum `from()` name clash, 404-before-auth versus the firewall's 401. Fixed in the following commit: rendering moves into `LinkQrProcessor` on a `write: true` GET operation served by `MainController` (verified in vendor), `fromQuery`, 401 for anonymous callers whatever the id. Statuses → fixed.
+
 ## Next step
-Gate 1 (high tier): `scripts/pregate-verify.sh gate1 add-qr-codes`, then `scripts/gate-run.sh add-qr-codes 1 full`; findings via `/workflow:fix-findings`. Then `/opsx:apply add-qr-codes`.
+`scripts/gate-run.sh add-qr-codes 1 confirm 1`; then `/opsx:apply add-qr-codes`.
 
 ## Blockers
 None.
