@@ -31,15 +31,15 @@ The `format` query parameter SHALL accept exactly `svg` and `png`. Any other val
 - **THEN** the response status is 406 `application/problem+json`
 
 ### Requirement: Authorization boundary of QR codes
-The QR code SHALL be served to the link's owner and to users with `ROLE_ADMIN`; any other authenticated user receives 403 `application/problem+json`, an anonymous caller 401, and an unknown or malformed `id` 404 (before any authorization check, so an unknown id looks the same to everyone). Inactive and expired links keep their QR code (the redirect decides what a scan does); a deleted link's QR code answers 404. There is no unauthenticated QR endpoint.
+The QR code SHALL be served to the link's owner and to users with `ROLE_ADMIN`; any other authenticated user receives 403 `application/problem+json`. An anonymous caller receives 401 for any `id`, known or not — the API's authentication boundary comes first. For an authenticated caller an unknown or malformed `id` answers 404 `application/problem+json` before any ownership check, so an unknown id looks the same to every authenticated user. Inactive and expired links keep their QR code (the redirect decides what a scan does); a deleted link's QR code answers 404. There is no unauthenticated QR endpoint.
 
 #### Scenario: Owner, admin, stranger, anonymous
 - **WHEN** user A owns a link and A, an admin, user B and an anonymous client each request its QR code
 - **THEN** A's and the admin's responses are 200 `image/svg+xml`, B's is 403 `application/problem+json` and the anonymous one is 401
 
 #### Scenario: Unknown link
-- **WHEN** an authenticated user requests `GET /api/v1/links/not-a-uuid/qr` and `GET /api/v1/links/{random uuid}/qr`
-- **THEN** each response status is 404 `application/problem+json`
+- **WHEN** an authenticated user requests `GET /api/v1/links/not-a-uuid/qr` and `GET /api/v1/links/{random uuid}/qr`, and an anonymous client requests the same two URLs
+- **THEN** the authenticated responses are 404 `application/problem+json` and the anonymous ones are 401
 
 #### Scenario: Inactive and expired links keep their code
 - **WHEN** the owner deactivates a link, and owns another link whose `expiresAt` has passed, and requests the QR code of each

@@ -11,7 +11,7 @@ A short link is meant to be printed and scanned as much as clicked, and the brie
 ## What Changes
 
 1. **`GET /api/v1/links/{id}/qr`** (FR-QR-1): the QR code of the link's `shortUrl` as SVG by default or PNG (512 × 512 px) with `?format=png`, served with the image content type, `Content-Disposition: inline; filename="<slug>.svg|png"` and `Cache-Control: private, max-age=86400` (no server-side cache — rendering takes milliseconds). `format` other than `svg`/`png` answers 422 problem details with one violation on `format`; an `Accept` header that admits neither image type answers 406 problem details.
-2. **Same boundary as the link itself**: the owner or an admin gets the image, any other authenticated user 403, anonymous 401, an unknown or malformed id 404 before any authorization check. Inactive or expired links still have a QR code (the redirect decides at scan time). There is no public QR endpoint.
+2. **Same boundary as the link itself**: anonymous callers get 401 from the firewall whatever the id; for an authenticated caller an unknown or malformed id is 404 before the voter runs, then the owner or an admin gets the image and any other user 403. Inactive or expired links still have a QR code (the redirect decides at scan time). There is no public QR endpoint.
 3. **New dependency `endroid/qr-code` ^6.1** (PHP ^8.4, `bacon/bacon-qr-code` ^3; PNG through the `gd` extension already in the image). Justification against the anti-overengineering rule: Symfony has no QR support; `bacon/bacon-qr-code` alone is a matrix encoder that needs its renderers wired by hand; `endroid/qr-code` is the brief's stack choice (§5), small, maintained, and gives both writers behind one builder.
 4. **Rendering in `src/Link/Qr/`**: a renderer that turns a URL into SVG or PNG bytes at a fixed size, with a snapshot test of the SVG (the brief's §7 exit criterion) and a dimension check of the PNG.
 5. **OpenAPI**: the operation is documented with its `format` parameter and both image content types — the first non-JSON response of the API, declared as an exception of the JSON-only rule.
@@ -38,6 +38,6 @@ A short link is meant to be printed and scanned as much as clicked, and the brie
 
 ## Impact
 
-- New: `src/Link/Qr/` (format enum, renderer, the operation's controller), the `qr` operation on `LinkResource`, `tests/Unit/Link/Qr/` (renderer, snapshot fixture under `tests/Fixture/qr/`), `tests/Api/Link/LinkQrTest.php`.
+- New: `src/Link/Qr/` (format enum, renderer, the operation's state processor), the `qr` operation on `LinkResource`, `tests/Unit/Link/Qr/` (renderer, snapshot fixture under `tests/Fixture/qr/`), `tests/Api/Link/LinkQrTest.php`.
 - Modified: `composer.json` / `composer.lock` (`endroid/qr-code` ^6.1 and its two transitive packages), `src/Link/Api/LinkResource.php` (one operation), `docs/how-to/local-development.md`, `docs/explanation/requirements.md` (FR-QR-1), `openspec/ROADMAP.md` (row 9 removed at archive time).
 - Unchanged: schema (no migration), firewall and `access_control`, `LinkVoter`, the redirect, analytics and click paths.
