@@ -15,6 +15,14 @@ enum Granularity: string
 
     public const int MAX_HOURLY_DAYS = 14;
 
+    /**
+     * @return list<string>
+     */
+    public static function values(): array
+    {
+        return array_map(static fn (self $g): string => $g->value, self::cases());
+    }
+
     /** The `date_trunc` unit. */
     public function unit(): string
     {

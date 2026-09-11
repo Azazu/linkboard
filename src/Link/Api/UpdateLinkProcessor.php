@@ -7,6 +7,7 @@ namespace App\Link\Api;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
+use App\Analytics\Cache\ReportCache;
 use App\Auth\Entity\User;
 use App\Link\LinkRepositoryInterface;
 use App\Link\Rules\RulesDocumentParser;
@@ -26,7 +27,8 @@ use Symfony\Component\Validator\ConstraintViolationList;
  * maxClicks, utm and rules may be cleared with null (a rules document
  * replaces the whole stored one); targetUrl and isActive may not be null;
  * slug is immutable. Admin actions on another user's link are audited
- * after the flush.
+ * after the flush, and the link's cached reports are invalidated after the
+ * flush (best effort — capability analytics).
  *
  * @implements ProcessorInterface<UpdateLinkInput, LinkResource>
  */
@@ -39,6 +41,7 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
         private LoggerInterface $auditLogger,
         private PublicUrl $publicUrl,
         private RulesDocumentParser $rulesParser,
+        private ReportCache $reportCache,
     ) {
     }
 
@@ -91,6 +94,7 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
             $data->isActive ? $link->activate($now) : $link->deactivate($now);
         }
         $this->em->flush();
+        $this->reportCache->forgetLink($link->getId());
 
         $actor = $this->security->getUser();
         if ($actor instanceof User && !$actor->getId()->equals($link->getOwner()->getId())) {
