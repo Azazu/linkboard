@@ -14,3 +14,16 @@
 | 3 | minor | specs/qr-codes/spec.md, Authorization boundary; proposal.md, What Changes 2; design.md, Applicability | The unconditional promise that an unknown or malformed id returns 404 before any authorization check, looking the same to everyone, conflicts with the retained firewall: `access_control` requires `ROLE_USER` before the item provider runs, so an anonymous request to an unknown id returns 401. The scenario currently tests unknown ids only for authenticated callers. Qualify the 404-before-voter guarantee as applying after authentication and explicitly cover anonymous requests to malformed/unknown ids, keeping the existing firewall boundary. | fixed |
 
 Validation: branch and HEAD match the requested identifiers; the working tree was clean before review. `scripts/pregate-verify.sh gate1 add-qr-codes` passed, including strict OpenSpec validation. Findings are based on the change artifacts, current application configuration and installed API Platform source; no implementation files were changed.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-11
+**Reviewed-Commit:** f99b7cb66ae67e1888300cc22bed80dc8b30bda2
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Design decisions 1 and 7 and task 2.1 replace the explicit controller with an autoconfigured `ProcessorInterface` implementation, selected through `processor: LinkQrProcessor::class` and `write: true`. The installed metadata factory selects `MainController` when no custom controller is declared; its provider chain executes before `WriteProcessor`, which invokes the selected processor for this explicitly writable GET. Processor autoconfiguration and the service locator resolve the private service, and `SerializeProcessor` / `RespondProcessor` preserve its `Response`. Task 2.2 retains owner/admin/stranger, invalid-format and unacceptable-media-type HTTP checks and the security mutation check, and adds a mutation check for removing `write: true`. The proposal's impact section agrees with the processor architecture. |
+
+Validation: reviewed only the diff from `194022e75971f4897b86848c5fb76c6bc3937b1f` to the Reviewed-Commit and collateral effects of finding 1, the source round's only blocker or major finding. Branch and HEAD match the request; the working tree was initially clean and every source finding was dispositioned. Checked the revised integration against installed API Platform source and current service configuration. `scripts/pregate-verify.sh gate1 add-qr-codes` passed, including strict OpenSpec validation. This confirms the Gate 1 design resolution; implementation and HTTP execution remain Gate 2 work. No unrelated findings introduced.
