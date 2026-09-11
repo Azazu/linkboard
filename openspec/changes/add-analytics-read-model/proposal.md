@@ -1,8 +1,8 @@
 # Proposal — add-analytics-read-model
 
-**Risk-Tier:** medium
+**Risk-Tier:** high
 
-Tier rationale (roadmap row 8; AGENTS.md project triggers: "analytics queries" → `medium`): no firewall, voter or API-key change — the report operations reuse the `LINK_VIEW` attribute of the existing `LinkVoter` and the `ROLE_ADMIN` net already on `/api/v1/admin/`; no migration; no new dependency; the only untrusted input is five query parameters from authenticated callers, validated by declarative constraints and bound as SQL parameters, never interpolated. The demo seed command creates accounts with generated passwords through the configured hasher — it is flagged as security-relevant in its commit body, not a change to authentication. Gate 2 only; the user may raise the tier.
+Tier rationale (raised from the roadmap's `medium` by the user at Gate 2 round 1, finding 1): AGENTS.md assigns deletion and any change touching an authorization boundary to `high` even when existing voters and hashers are reused — `app:demo:seed --reset` deletes accounts and, through the FK cascades, their links and clicks, creates accounts and promotes an administrator; the report provider establishes the authorization boundary of nine new read endpoints (owner/admin through `LINK_VIEW`, `ROLE_ADMIN` for the global ones); five query parameters from authenticated callers reach SQL as bound parameters after declarative and domain validation. No firewall, voter, API-key or migration change; no new dependency. Gate 1 (on the completed artifacts) + Gate 2, a demonstrated failing input for every new guard, `design.md` carries the applicability table, a green branch run before Gate 2 (auto review mode).
 
 ## Why
 

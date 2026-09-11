@@ -1,7 +1,7 @@
 # Handoff — add-analytics-read-model
 
 **Updated:** 2026-09-11 · claude
-**State:** fixing-g2
+**State:** awaiting-gate-1
 **Branch:** change/add-analytics-read-model
 
 ## Done this session
@@ -18,8 +18,10 @@
 
 - Gate 2 round 1 (`1bbc1b7`, Reviewed-Commit `ff0c483`): changes-requested, four majors. Fixed: #2 — an omitted `from` is now defined as 30 days before the effective `to` (spec, brief, how-to, design; HTTP test for both one-bound cases); #3 — the admin summary declares no period, ignores `from`/`to` and the provider no longer parses them (spec exception, test); #4 — the global reports dropped the distinct-visitor count the brief never asked of them and re-measured at 119 / 75 ms p95 on one million clicks (target 300); NFR-PERF-2's index clause reworded to what the plans do, the 300 ms target unchanged. `make check` green after the fixes.
 
+- Finding #1: the user raised the tier to `high` (2026-09-11). `proposal.md` carries the new tier and rationale, `design.md` the applicability table, `tasks.md` a Gate 1 task (0.1).
+
 ## Next step
-Finding #1 (tier) awaits the user's decision: raise to `high` (applicability table in `design.md`, `scripts/gate-run.sh add-analytics-read-model 1 full` on the existing artifacts, then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1`) or waive. Then the Gate 2 confirmation of round 1.
+`scripts/gate-run.sh add-analytics-read-model 1 full` (Gate 1 on the completed artifacts; the floor `scripts/pregate-verify.sh gate1 add-analytics-read-model` passes), then `scripts/gate-run.sh add-analytics-read-model 2 confirm 1`.
 
 ## Blockers
-Finding #1 needs the user (tier is the user's call; a `major` cannot be closed by the executor alone).
+None.

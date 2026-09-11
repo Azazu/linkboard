@@ -1,6 +1,10 @@
 # Tasks — add-analytics-read-model
 
-Medium tier: no Gate 1; Gate 2 on the code (AGENTS.md). Work on `change/add-analytics-read-model`; `scripts/workflow-verify.sh apply add-analytics-read-model` first.
+High tier (raised by the user at Gate 2 round 1): Gate 1 on the artifacts and Gate 2 on the code (AGENTS.md). Work on the change branch; `scripts/workflow-verify.sh apply add-analytics-read-model` first.
+
+## 0. Gate 1 (high tier)
+
+- [ ] 0.1 `scripts/pregate-verify.sh gate1 add-analytics-read-model` passes; `scripts/gate-run.sh add-analytics-read-model 1 full` on the completed artifacts (proposal with the raised tier, specs, design with the applicability table, tasks); findings via `/workflow:fix-findings`, confirmed with `scripts/gate-run.sh add-analytics-read-model 1 confirm <round>`. Verify: the last Gate 1 record in review.md reads `approved` or `confirmed`.
 
 ## 1. Read model
 
