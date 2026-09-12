@@ -59,10 +59,21 @@ final class ApiKeysTest extends LinkApiTestCase
         UserFactory::createOne(['email' => 'a@example.com']);
         $token = $this->token($client, 'a@example.com');
 
-        foreach ([['name' => ''], ['name' => '   '], ['name' => str_repeat('x', 65)], ['name' => 'ok', 'expiresAt' => '2020-01-01T00:00:00Z']] as $i => $body) {
+        foreach ([['name' => ''], ['name' => '   '], ['name' => str_repeat('x', 65)]] as $body) {
             $this->api($client, $token, 'POST', '/api/v1/api-keys', $body);
-            self::assertSame([3 === $i ? 'expiresAt' : 'name'], $this->violationPaths($client), json_encode($body, \JSON_THROW_ON_ERROR));
+            self::assertSame(['name'], $this->violationPaths($client), json_encode($body, \JSON_THROW_ON_ERROR));
         }
+        // expiresAt is validated on the string the client sent: RFC 3339 syntax, a real
+        // calendar date, and a moment in the future (Gate 2 round 1, finding 1)
+        foreach (['2020-01-01T00:00:00Z' => 'past', 'tomorrow' => 'relative text', '2026-12-01T10:00:00' => 'no time zone', '2026-02-30T00:00:00Z' => 'impossible calendar date', '2026-12-01' => 'date only'] as $value => $case) {
+            $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'ok', 'expiresAt' => $value]);
+            self::assertSame(['expiresAt'], $this->violationPaths($client), $case);
+        }
+        self::assertSame(0, (int) $this->connection()->fetchOne('SELECT count(*) FROM api_keys'), 'nothing was created');
+
+        $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'expiring', 'expiresAt' => '2030-01-01T00:00:00Z']);
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame('2030-01-01T00:00:00+00:00', $this->decode($client)['expiresAt'], 'a valid future timestamp is stored as given');
     }
 
     public function testEleventhActiveKeyIs409UntilOneIsRevoked(): void

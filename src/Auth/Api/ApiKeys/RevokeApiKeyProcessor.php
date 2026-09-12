@@ -9,7 +9,6 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Auth\ApiKeyRepositoryInterface;
 use App\Auth\Entity\User;
 use App\Auth\Security\ApiKeyVoter;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -18,9 +17,11 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * DELETE /api/v1/api-keys/{id} — revocation (spec api-keys): revoked_at is
- * set once, the row stays, the key stops authenticating on the next request.
- * The provider already scoped the key to the caller; the voter is asked as
- * well (defence in depth, the same rule the web UI will call).
+ * set once by a conditional UPDATE (… WHERE revoked_at IS NULL), so repeated
+ * or concurrent revocations keep the first timestamp; the row stays, the key
+ * stops authenticating on the next request. The provider already scoped the
+ * key to the caller; the voter is asked as well (defence in depth, the same
+ * rule the web UI will call).
  *
  * @implements ProcessorInterface<ApiKeyOutput, null>
  */
@@ -28,7 +29,6 @@ final readonly class RevokeApiKeyProcessor implements ProcessorInterface
 {
     public function __construct(
         private ApiKeyRepositoryInterface $keys,
-        private EntityManagerInterface $em,
         private Security $security,
         private ClockInterface $clock,
     ) {
@@ -49,8 +49,7 @@ final readonly class RevokeApiKeyProcessor implements ProcessorInterface
         if (!$this->security->isGranted(ApiKeyVoter::REVOKE, $key)) {
             throw new AccessDeniedException();
         }
-        $key->revoke($this->clock->now());
-        $this->em->flush();
+        $this->keys->revoke($key->getId(), $this->clock->now());
 
         return null;
     }

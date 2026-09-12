@@ -38,6 +38,12 @@ interface ApiKeyRepositoryInterface
     public function lockOwner(User $owner): void;
 
     /**
+     * Revokes the key in one conditional statement — revoked_at is written only
+     * while it is null, so concurrent revocations keep the first timestamp.
+     */
+    public function revoke(Uuid $id, \DateTimeImmutable $now): void;
+
+    /**
      * Sets last_used_at to $now when it is null or older than $threshold — one
      * conditional statement, so a key used many times a minute is written once.
      */

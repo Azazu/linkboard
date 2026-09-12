@@ -120,7 +120,11 @@ class ApiKey
         return $this->createdAt;
     }
 
-    /** Idempotent: the first revocation's timestamp stays. */
+    /**
+     * In-memory idempotency for a loaded entity (the first timestamp stays within
+     * one unit of work). The API revokes through the repository's conditional
+     * UPDATE, which gives the same guarantee across concurrent requests.
+     */
     public function revoke(\DateTimeImmutable $now): void
     {
         $this->revokedAt ??= $now;

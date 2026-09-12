@@ -68,6 +68,22 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
         $em->clear();
     }
 
+    public function testRevokeIsAConditionalUpdateThatKeepsTheFirstTimestamp(): void
+    {
+        $key = ApiKeyFactory::createOne();
+        $repository = $this->repository();
+        $connection = self::getContainer()->get('doctrine.dbal.default_connection');
+        self::assertInstanceOf(Connection::class, $connection);
+        $t0 = new \DateTimeImmutable('2026-09-12T12:00:00Z');
+
+        $repository->revoke($key->getId(), $t0);
+        $repository->revoke($key->getId(), $t0->modify('+5 minutes'));
+
+        $stored = $connection->fetchOne('SELECT revoked_at FROM api_keys WHERE id = :id', ['id' => $key->getId()->toRfc4122()]);
+        self::assertEquals($t0, new \DateTimeImmutable((string) $stored), 'the second revocation does not move the timestamp');
+        self::assertNull($repository->findActiveByHash($key->getKeyHash(), $t0), 'a revoked key no longer authenticates');
+    }
+
     public function testCountActiveByOwnerExcludesRevokedAndExpired(): void
     {
         $owner = UserFactory::createOne();

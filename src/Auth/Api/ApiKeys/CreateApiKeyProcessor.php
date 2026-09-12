@@ -6,6 +6,7 @@ namespace App\Auth\Api\ApiKeys;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use ApiPlatform\Validator\Exception\ValidationException;
 use App\Auth\ApiKey\ApiKeyGenerator;
 use App\Auth\ApiKeyRepositoryInterface;
 use App\Auth\Entity\ApiKey;
@@ -15,6 +16,8 @@ use Psr\Clock\ClockInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Validator\ConstraintViolation;
+use Symfony\Component\Validator\ConstraintViolationList;
 
 /**
  * POST /api/v1/api-keys (design decision 5). One database transaction: lock
@@ -55,16 +58,17 @@ final readonly class CreateApiKeyProcessor implements ProcessorInterface
     public function create(User $owner, CreateApiKeyInput $input): CreatedApiKeyOutput
     {
         $now = $this->clock->now();
+        $expiresAt = $this->expiry($input, $now);
         $generated = $this->generator->generate();
 
         // DBAL's transactional() rolls back without closing the EntityManager on
         // the conflict path (EntityManager::wrapInTransaction would close it).
-        $key = $this->em->getConnection()->transactional(function () use ($owner, $input, $generated, $now): ApiKey {
+        $key = $this->em->getConnection()->transactional(function () use ($owner, $input, $expiresAt, $generated, $now): ApiKey {
             $this->keys->lockOwner($owner);
             if ($this->keys->countActiveByOwner($owner, $now) >= ApiKey::MAX_ACTIVE_PER_USER) {
                 throw new ConflictHttpException(\sprintf('At most %d active API keys per user.', ApiKey::MAX_ACTIVE_PER_USER));
             }
-            $key = new ApiKey($owner, $input->name, $generated->hash, $generated->prefix, $input->expiresAt, $now);
+            $key = new ApiKey($owner, $input->name, $generated->hash, $generated->prefix, $expiresAt, $now);
             $this->keys->add($key);
             $this->em->flush();
 
@@ -72,5 +76,26 @@ final readonly class CreateApiKeyProcessor implements ProcessorInterface
         });
 
         return CreatedApiKeyOutput::fromKey($key, $generated->plaintext);
+    }
+
+    /**
+     * The validator has already checked the RFC 3339 syntax and calendar
+     * validity of the string; "in the future" needs the clock, so it is
+     * checked here and rendered as the same 422 violation on `expiresAt`.
+     */
+    private function expiry(CreateApiKeyInput $input, \DateTimeImmutable $now): ?\DateTimeImmutable
+    {
+        if (null === $input->expiresAt) {
+            return null;
+        }
+        $expiresAt = \DateTimeImmutable::createFromFormat(CreateApiKeyInput::EXPIRES_AT_FORMAT, $input->expiresAt);
+        if (false === $expiresAt) {
+            throw new \LogicException('expiresAt was validated as RFC 3339 before processing.');
+        }
+        if ($expiresAt <= $now) {
+            throw new ValidationException(new ConstraintViolationList([new ConstraintViolation('expiresAt must be in the future.', null, [], $input, 'expiresAt', $input->expiresAt)]));
+        }
+
+        return $expiresAt;
     }
 }

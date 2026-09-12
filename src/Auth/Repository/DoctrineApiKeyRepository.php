@@ -75,6 +75,15 @@ final readonly class DoctrineApiKeyRepository implements ApiKeyRepositoryInterfa
         $this->em->getConnection()->executeStatement('SELECT id FROM users WHERE id = :id FOR UPDATE', ['id' => $owner->getId()->toRfc4122()]);
     }
 
+    public function revoke(Uuid $id, \DateTimeImmutable $now): void
+    {
+        $this->em->getConnection()->executeStatement(
+            'UPDATE api_keys SET revoked_at = :now WHERE id = :id AND revoked_at IS NULL',
+            ['id' => $id->toRfc4122(), 'now' => $now],
+            ['now' => Types::DATETIMETZ_IMMUTABLE],
+        );
+    }
+
     public function touchLastUsed(Uuid $id, \DateTimeImmutable $now, \DateTimeImmutable $threshold): void
     {
         $this->em->getConnection()->executeStatement(
