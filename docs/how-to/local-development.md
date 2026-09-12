@@ -86,6 +86,23 @@ A PATCH changes only the fields present in the body; `expiresAt`,
 Without `slug` a 7-character one is generated. In a shell, quote URLs with
 `[` `]` or pass `-g` to curl (`order[createdAt]=asc`).
 
+The QR code of a link's short URL, for the owner or an admin (FR-QR-1):
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8082/api/v1/links/$ID/qr" -o spring-sale.svg
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8082/api/v1/links/$ID/qr?format=png" -o spring-sale.png
+```
+
+`format` is `svg` (default) or `png` (512 × 512 px); anything else is a 422
+with a violation on `format`, and a client that accepts neither image type
+(`Accept: application/json`) gets 406 — the parameter selects the image, the
+`Accept` header only gates. The response is `Content-Disposition: inline;
+filename="<slug>.svg|png"` with `Cache-Control: private, max-age=86400`, so a
+browser keeps it for a day and nothing is cached server-side; inactive and
+expired links still have a code (the redirect decides at scan time). PNG
+rendering needs the `gd` extension, which the php image ships; SVG needs
+nothing.
+
 **Security notes on targets.** A target must be an absolute `http`/`https`
 URL to a public host: `localhost`, loopback, link-local and private
 addresses (v4 and v6, including IPv4-mapped v6) are rejected on write, so a
