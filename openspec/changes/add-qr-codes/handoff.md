@@ -19,8 +19,10 @@
 
 - Branch run 34678937819 on `6e80ea9`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34678937819). Task tokens that are not paths lost their backticks (pregate); 4.2 and 4.3 ticked (4.3 at the gate request).
 
+- Gate 2 round 1 (`4867b1d`, Reviewed-Commit `46e60c3`): **approved**, one minor — the HTTP tests did not assert that the code encodes exactly `shortUrl` although design decision 5 claimed it. Fixed: `testTheCodeEncodesExactlyTheShortUrl` (endpoint SVG = renderer output for the `shortUrl` from `GET /links/{id}`; ≠ target URL, ≠ bare slug), design decision 5 aligned, status → fixed; failing input: rendering `targetUrl` fails it. Test-only change; `make cs`/`make stan` clean, `LinkQrTest` 7 tests / 68 assertions.
+
 ## Next step
-`scripts/gate-run.sh add-qr-codes 2 full`; findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-qr-codes 2 confirm <round>`. Then `/git:merge add-qr-codes` (a green run on the final head first if code changes).
+`scripts/gate-run.sh add-qr-codes 2 confirm 1` (the fix touches `tests/` — the Gate 2 freshness rule needs the confirmation). Then the user pushes the branch, the executor confirms a green run on the exact head, then `/git:merge add-qr-codes`.
 
 ## Blockers
 None.

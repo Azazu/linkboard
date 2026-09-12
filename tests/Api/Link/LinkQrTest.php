@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Api\Link;
 
 use App\Link\Qr\LinkQrProcessor;
+use App\Link\Qr\QrCodeRenderer;
+use App\Link\Qr\QrFormat;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -62,6 +64,26 @@ final class LinkQrTest extends LinkApiTestCase
 
         self::assertSame($first, $second);
         self::assertNotSame($first, $other);
+    }
+
+    public function testTheCodeEncodesExactlyTheShortUrl(): void
+    {
+        $client = self::createClient();
+        $a = UserFactory::createOne(['email' => 'a@example.com']);
+        $link = LinkFactory::createOne(['owner' => $a, 'slug' => 'encoded', 'targetUrl' => 'https://example.com/somewhere/else']);
+        $token = $this->token($client, 'a@example.com');
+
+        $this->api($client, $token, 'GET', '/api/v1/links/'.$link->getId());
+        $shortUrl = $this->decode($client)['shortUrl'];
+        self::assertIsString($shortUrl);
+        self::assertStringEndsWith('/encoded', $shortUrl);
+
+        $renderer = new QrCodeRenderer();
+        $body = $this->qr($client, $token, (string) $link->getId());
+
+        self::assertSame($renderer->render($shortUrl, QrFormat::Svg), $body, 'the image is the renderer\'s output for the link\'s shortUrl');
+        self::assertNotSame($renderer->render('https://example.com/somewhere/else', QrFormat::Svg), $body, 'not the target URL');
+        self::assertNotSame($renderer->render('encoded', QrFormat::Svg), $body, 'not the bare slug');
     }
 
     public function testUnknownFormatIs422AndJsonOnlyAcceptIs406(): void
