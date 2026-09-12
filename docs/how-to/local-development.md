@@ -29,10 +29,48 @@ HOST_UID=$(id -u) HOST_GID=$(id -g) make up
 `.env.local` (gitignored) — never edit secrets into `.env`.
 
 Health: http://localhost:8082/health (`?deep=1` also probes PostgreSQL and
-Redis) · API docs (Swagger UI): http://localhost:8082/api/docs · OpenAPI
-JSON: http://localhost:8082/api/docs.json · API base path:
+Redis; open in dev, see "Monitoring the deep probe" for prod) · API docs
+(Swagger UI): http://localhost:8082/api/docs · OpenAPI JSON:
+http://localhost:8082/api/docs.json · API base path:
 http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
 `127.0.0.1:6382`.
+
+## Monitoring the deep probe
+
+`GET /health` (liveness) stays open everywhere. In `prod` the dependency
+probe runs only for a monitor that presents an API key of an unblocked
+admin:
+
+```bash
+curl -sS -i -H "Authorization: Bearer $MONITOR_API_KEY" \
+  https://<host>/health?deep=1
+```
+
+Create that key like any other (`POST /api/v1/api-keys` as the admin) and
+keep it in the monitor's secret store — never in a repository or a
+dashboard URL. In dev the same request works without the header.
+
+- **Alert on any non-200.** 200 means every dependency answered; 503 is
+  the probe's own report with a `checks` object naming the failing one;
+  404 means the request was not authorized.
+- **A 404 with a key you believe is valid** means the key could not be
+  verified: the database was unreachable, stalled or lost the answer, and
+  no verification of that key from the last 5 minutes was remembered. The
+  refusal is deliberately identical to the one for a wrong key — the
+  reason is in the application log, at `warning`, naming the failure class
+  and never the key.
+- **A monitor that polled successfully before the outage sees the probe's
+  own report instead**, so `database: fail` reaches you rather than a 404.
+  That is the point of the 5-minute memory; it also means a key revoked
+  while the database is already down keeps access until it expires.
+- **Give the monitor a 10-second timeout.** The application bounds its own
+  work at 5 seconds; the remainder is the network and name resolution.
+- **Use IP literals (or a local caching resolver) in `DATABASE_URL` and
+  `REDIS_URL`** where the platform resolver can stall: name resolution
+  happens before every timeout the application controls.
+- **`proc_open` must be allowed** in the deployment's PHP configuration:
+  the key lookup runs in a child process, which is what lets the
+  application kill a client stuck on a dependency that never answers.
 
 ## Daily
 
@@ -453,6 +491,11 @@ it yourself.
   (no `_test` suffix; it checks the configured dependency, like in prod),
   so that database must exist wherever the tests run. CI creates `app`
   as the service database and `make test-db` derives `app_test` from it.
+- **`HealthDeepProdTest` fails on a missing `api_keys` table** — the same
+  database, now needing the schema: those tests authorize the prod probe
+  with keys they write into `DATABASE_URL`'s own database. `make migrate`
+  covers it locally, and CI runs it (`APP_ENV=dev make migrate EXEC=`)
+  before `make test-db EXEC=`.
 - **`make check` fails in the token tests with a key error**, or the dev
   stack answers `POST /api/v1/auth/token` with a 500 "private key/passphrase" —
   the keypairs are missing or were generated with another passphrase; run

@@ -273,7 +273,7 @@ No materialized views in the core stages; a `click_daily` aggregate is listed as
 | `GET /api/v1/admin/links` | admin | all links |
 | `GET /api/v1/admin/stats/summary` · `/timeseries` · `/top-links` | admin | FR-ANL-4 |
 | `GET /{slug}` | none | redirect, outside `/api` (2.4) |
-| `GET /health` | none | liveness: `{"status":"ok"}`; `?deep=1` also checks DB and Redis, admin-only in prod |
+| `GET /health` | none | liveness: `{"status":"ok"}`; `?deep=1` also checks DB and Redis — in prod only for `Authorization: Bearer <admin API key>`, every other request 404 |
 
 Stability rules: field names are camelCase in JSON; `id`s are UUID strings; timestamps are RFC 3339 UTC; the schema of any `/api/v1` response changes only additively — a breaking change means `/api/v2` (non-goal).
 
@@ -330,7 +330,7 @@ Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encor
 - **NFR-REL-1** Redirect availability does not depend on the worker, on the Redis transport or on the cache: each failure is caught and degrades (FR-RED-4), covered by tests that stub each dependency as failing. The one deliberate dependency is the click-limit counter: links with `max_clicks` answer 503 while Redis is down rather than exceed their limit (FR-RED-3); unlimited links are unaffected.
 - **NFR-REL-2** Click persistence is at-least-once with idempotent handling (FR-CLK-4, FR-CLK-5); nothing is lost while Redis retains the stream; the failed transport is the last resort and is monitored by `messenger:failed:show` in the README runbook.
 - **NFR-REL-3** All migrations have a working `down()`, tested by `doctrine:migrations:migrate prev` in CI on the test database.
-- **NFR-REL-4** `/health` exists from the first stage and is used by Docker healthchecks and CI smoke tests.
+- **NFR-REL-4** `/health` exists from the first stage and is used by Docker healthchecks and CI smoke tests. In `prod` the deep probe (`?deep=1`) runs only for a valid API key of an unblocked admin; the verification is bounded by deadlines the application enforces (a lookup in a child process it kills, per-command Redis timeouts) so a refusal leaves within 5 seconds however the dependencies misbehave, and every refusal is the same 404. A verification is remembered for 5 minutes, which is what lets the probe report a database outage to a monitor that polled before it.
 
 ### 6.4 Observability
 
@@ -395,7 +395,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | 8 | `add-analytics-read-model` | query services and DTOs for the six reports, `EXPLAIN`-verified indexes, Redis tag cache with invalidation, admin global stats, `app:demo:seed` | medium | report tests against PostgreSQL; cache invalidation test |
 | 9 | `add-qr-codes` | `endroid/qr-code`, `GET /api/v1/links/{id}/qr` SVG/PNG | low | snapshot test of SVG; voter test |
 | 10 | `add-api-keys-and-rate-limiting` | `api_keys`, hashed lookup authenticator, per-key/per-user API limit, rate-limit headers (trusted-proxy handling already tested by the two IP-keyed limiters) | high | plaintext-once test; expired/revoked 401; 429 tests; concurrent creations at the cap |
-| 10a | `authorize-deep-probe-by-api-key` | the prod deep health probe authorized by a valid admin API key: bounded key lookup with an enforceable total deadline, fail-closed 404, refused/delayed/stalled lookups tested end to end (split out of row 10 after review, 2026-09-12) | high | prod probe with an admin key; 404 within the budget while the database is down |
+| 10a | `authorize-deep-probe-by-api-key` | the prod deep health probe authorized by a valid admin API key: the lookup in a child process killed at its deadline, a reserved Redis allowance, a memory of the last verification (5 min) so the probe can report a database outage, fail-closed 404, refused/delayed/stalled/response-less cases tested end to end (split out of row 10 after review, 2026-09-12) | high | prod probe with an admin key; 404 within the budget while the database is down |
 
 ### Stage 4 — web UI, API polish, quality
 
