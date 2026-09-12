@@ -15,7 +15,6 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 9 | `add-qr-codes` | `endroid/qr-code`, owner-only `GET /api/v1/links/{id}/qr` as SVG/PNG | low |
 | 10 | `add-api-keys-and-rate-limiting` | hashed API keys (plaintext once), access-token authenticator, per-key/per-user API limit with rate-limit headers, trusted-proxy handling; the prod deep health probe becomes available to a valid admin API key | high |
 
 ## Stage 4 — web UI, API polish, quality

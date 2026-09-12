@@ -1,7 +1,7 @@
 # Handoff — add-qr-codes
 
 **Updated:** 2026-09-12 · claude
-**State:** ready-to-merge
+**State:** archived
 **Branch:** change/add-qr-codes
 
 ## Done this session
@@ -23,8 +23,12 @@
 
 - Gate 2 passed: Confirmation 1 (`e2de9f2`, Reviewed-Commit `0e9ff08`) — the shortUrl regression test confirmed. Branch run 34679251252 on `0e9ff08`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34679251252); since then only review.md and this file changed.
 
+- Merged into `main` as `9daaa31` (2026-09-12, `--no-ff`, verifier passed).
+
+- `main` run 34679725337 on `9daaa31`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34679725337). Archived 2026-09-12: spec `qr-codes` created (3 requirements), `api-docs` "JSON-only content negotiation" synced, ROADMAP row 9 removed.
+
 ## Next step
-`/git:merge add-qr-codes` (verifier passes). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive add-qr-codes` (specs `qr-codes` new, `api-docs` one modified requirement; ROADMAP row 9).
+None — archived. Next change per `openspec/ROADMAP.md`: row 10 `add-api-keys-and-rate-limiting`. After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive add-qr-codes` (specs `qr-codes` new, `api-docs` one modified requirement; ROADMAP row 9).
 
 ## Blockers
 None.
