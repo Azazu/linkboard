@@ -79,3 +79,23 @@
 - `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. This is a planning confirmation, not an implementation review.
 - Finding 1 remains unresolved after the user-authorized third confirmation. Stop and return to user arbitration as specified in the handoff; do not automatically continue the confirmation loop.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 4 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** d0528f88be7554b09fd49181ee6652e40d3fe354
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decisions 2–3 retain the bounded child-process lookup and the complete four-operation Redis budget, with a separate post-lookup share and an explicit resolver exclusion. Decisions 7/9 and tasks 2.1/3.1 now delay RESP command 3, assert successful AUTH and token GET through the command log, and identify the timed-out consultation through MemoryUnavailable.operation. The successful 0.2-second-per-command sequence exercises accumulated read time; the full-backlog listener separately exercises connect timeout with phase and duration assertions. Removing the Redis timeout has an explicit failing witness. These changes resolve the outstanding fixture mechanics as well as the source finding's deadline and verification-plan objections. |
+| 2 | confirmed — The pre-lookup random denial token and atomic replacement-plus-delete EVAL retain the ordering fix without expiring-counter reuse. Tasks cover the real lookup/revocation/denial/stale-write interleaving and token expiry/recreation. Consultation checks verified_at independently of the storage TTL and checks key expiry; a failed denial write and its bounded stale-access consequence remain explicitly admitted. The reviewed changes do not regress the previously confirmed resolution. |
+| 3 | confirmed — The fixed Redis sequence reserves the consultation command independently of the 2.5-second lookup allowance. The specification and tasks retain fallback after lookup timeout and the remembered-monitor table-lock case; the probe reports its own dependency observations, without equating every authorization lookup failure to database: fail. The reviewed changes preserve this resolution. |
+
+### Evidence and validation
+- Reviewed only `8b8fbd55206bd1242f4e6b9846edc91f9f6169db..d0528f88be7554b09fd49181ee6652e40d3fe354` and collateral reachable from findings 1–3. Confirmed the requested branch and HEAD and an initially clean worktree. All source findings were marked `fixed`; no unrelated findings were introduced. The proposal records user arbitration authorizing this fourth confirmation, also explicitly requested in this invocation.
+- Checked the revised fixture's feasibility against Linux source: the accept queue is full when its length exceeds the configured backlog ([sk_acceptq_is_full](https://raw.githubusercontent.com/torvalds/linux/v6.12/include/net/sock.h)), and a new connection request is dropped when that queue is full ([tcp_conn_request](https://raw.githubusercontent.com/torvalds/linux/v6.12/net/ipv4/tcp_input.c)). This supports the planned listen(0) plus one parked connection mechanism; runtime behavior still requires the planned phase assertions in the implementation environment.
+- Rechecked the installed `vendor/symfony/process/Process.php` timeout/stop path and the related proposal, design, tasks and delta-spec claims.
+- `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. This confirms the planning resolutions at Gate 1; implementation tests and guard-removal demonstrations remain Gate 2 work.
+- Only `review.md` was modified; no git write commands were run.
