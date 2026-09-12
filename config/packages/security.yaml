@@ -32,6 +32,15 @@ security:
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
             jwt: ~
+            # API keys on the same header (spec api-keys, FR-AUTH-3): the header
+            # extractor accepts only `Bearer lb_<40 base62>`; Lexik's chain
+            # extractor is decorated to decline those (JwtExtractorIgnoringApiKeys),
+            # so each credential reaches exactly one authenticator. The failure
+            # handler renders 401/403 problem details like the JWT subscriber.
+            access_token:
+                token_handler: App\Auth\ApiKey\ApiKeyTokenHandler
+                token_extractors: App\Auth\ApiKey\ApiKeyHeaderExtractor
+                failure_handler: App\Auth\ApiKey\ApiKeyAuthenticationFailureHandler
             entry_point: jwt
 
         # Web: session form login (FR-AUTH-2), CSRF on, no remember-me.
