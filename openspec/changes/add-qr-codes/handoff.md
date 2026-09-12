@@ -1,7 +1,7 @@
 # Handoff — add-qr-codes
 
 **Updated:** 2026-09-12 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/add-qr-codes
 
 ## Done this session
@@ -21,8 +21,10 @@
 
 - Gate 2 round 1 (`4867b1d`, Reviewed-Commit `46e60c3`): **approved**, one minor — the HTTP tests did not assert that the code encodes exactly `shortUrl` although design decision 5 claimed it. Fixed: `testTheCodeEncodesExactlyTheShortUrl` (endpoint SVG = renderer output for the `shortUrl` from `GET /links/{id}`; ≠ target URL, ≠ bare slug), design decision 5 aligned, status → fixed; failing input: rendering `targetUrl` fails it. Test-only change; `make cs`/`make stan` clean, `LinkQrTest` 7 tests / 68 assertions.
 
+- Gate 2 passed: Confirmation 1 (`e2de9f2`, Reviewed-Commit `0e9ff08`) — the shortUrl regression test confirmed. Branch run 34679251252 on `0e9ff08`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34679251252); since then only review.md and this file changed.
+
 ## Next step
-`scripts/gate-run.sh add-qr-codes 2 confirm 1` (the fix touches `tests/` — the Gate 2 freshness rule needs the confirmation). Then the user pushes the branch, the executor confirms a green run on the exact head, then `/git:merge add-qr-codes`.
+`/git:merge add-qr-codes` (verifier passes). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive add-qr-codes` (specs `qr-codes` new, `api-docs` one modified requirement; ROADMAP row 9).
 
 ## Blockers
 None.
