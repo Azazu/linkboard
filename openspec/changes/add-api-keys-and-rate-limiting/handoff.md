@@ -1,7 +1,7 @@
 # Handoff — add-api-keys-and-rate-limiting
 
 **Updated:** 2026-09-12 · claude
-**State:** proposing
+**State:** awaiting-gate-1
 **Branch:** change/add-api-keys-and-rate-limiting
 
 ## Done this session
@@ -12,8 +12,10 @@
 
 **Security-relevant parts for review:** a second authenticator on the API firewall and the decorator that keeps the JWT authenticator off API keys; the hashed credential store; the owner-only key resource; the rate-limit subscriber's identity key; the production probe's admin-key branch.
 
+- Gate 1 round 1 (`4f29d74`, Reviewed-Commit `b7678a0`): changes-requested — three majors: the unlocked count-and-insert of the 10-key cap, the limiter hooked after access control, the unbounded probe key lookup. Fixed in the following commit: owner-row lock in one transaction + concurrency test; limiter on `LoginSuccessEvent` (verified: authenticator listener before the access listener) + role-denied tests; bounded fail-closed `ProbeKeyResolver` on the probe's own PDO factory + CI migrating `app` (decision 10, task 5.2). Statuses → fixed.
+
 ## Next step
-Gate 1 (high tier): `scripts/gate-run.sh add-api-keys-and-rate-limiting 1 full`; findings via `/workflow:fix-findings`. Then `/opsx:apply add-api-keys-and-rate-limiting`.
+`scripts/gate-run.sh add-api-keys-and-rate-limiting 1 confirm 1`; then `/opsx:apply add-api-keys-and-rate-limiting`.
 
 ## Blockers
 None.
