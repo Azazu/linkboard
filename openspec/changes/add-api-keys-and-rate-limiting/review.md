@@ -48,3 +48,20 @@ Evidence for finding 3: the existing `src/Shared/Health/HealthProbe.php::databas
 Validation: reviewed only `b7678a00949273e46900c568b0f2644abf3b9ddb..b2b8d9142caa8284626636e930de3483252e6688` and collateral relevant to findings 1–3. All source findings were dispositioned as fixed; branch and HEAD match the request, and the working tree was initially clean. Checked the affected planning artifacts, repository guidance, installed Symfony authentication/firewall ordering, current health controller and connection factory, and the driver's documented connection-timeout semantics. `openspec validate add-api-keys-and-rate-limiting --strict` passed. This is a Gate 1 artifact confirmation; implementation tests remain Gate 2 work.
 
 Finding 3 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before proceeding.
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** 0b29a42ae4a6708c2e952267aab04fc00186bc26
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 5 keeps the owner-row lock, active-key count and insert in one transaction, with a fresh READ COMMITTED snapshot after locking. The proposal and API-key requirement retain the strict ten-key cap under concurrency. Task 3.1 plans twelve concurrent creations from nine committed active keys, requiring one success, eleven conflicts and exactly ten active keys, plus a demonstrated failure without the lock. |
+| 2 | confirmed — Decisions 4 and 6 carry the key identity in UserBadge attributes and consume on LoginSuccessEvent before access control. The installed AuthenticatorManager dispatches that event and returns its response before the access listener executes. Task 4.1 covers both key and JWT role-denied requests, decreasing limit headers on 403 responses, eventual 429, and a failing input restoring priority 7. Main-request filtering and the response header writer remain specified. |
+| 3 | confirmed — Resolved by reducing scope after the two failed confirmations, not by accepting the defective timeout design. The proposal's User decisions, decision 7, health-check delta and roadmap row 10a defer production probe authorization to authorize-deep-probe-by-api-key. The current change retains unconditional production 404 without credential lookup; resolver implementation, bounded-connection wiring and production authorization tests are removed from its tasks. Task 5.1 explicitly reconciles the brief's roadmap during implementation. The existing HealthController returns the production refusal before running dependency checks. The follow-up retains the obligation to design an enforceable total deadline and verify refused, delayed and stalled lookups end to end; this confirmation does not approve that future design. |
+
+Collateral note for finding 3: proposal Impact still lists `tests/Api/Health*`, and decision 8 retains the obsolete `isAdmin()` probe failing-input example. These are non-blocking editorial remnants: the explicit non-goals, decision 7, normative health delta and implementation tasks consistently exclude probe authorization.
+
+Validation: reviewed only `b7678a00949273e46900c568b0f2644abf3b9ddb..0b29a42ae4a6708c2e952267aab04fc00186bc26` and collateral relevant to findings 1–3. All source findings are dispositioned; branch and HEAD match the request, and the working tree was initially clean. Checked repository guidance, affected planning artifacts, related repository references, installed Symfony authentication event/firewall ordering and the existing health controller. `openspec validate add-api-keys-and-rate-limiting --strict` passed. This is a Gate 1 artifact confirmation; implementation tests and demonstrated failing inputs remain Gate 2 work.
