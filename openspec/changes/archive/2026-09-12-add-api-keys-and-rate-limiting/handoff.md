@@ -1,7 +1,7 @@
 # Handoff — add-api-keys-and-rate-limiting
 
 **Updated:** 2026-09-12 · claude
-**State:** ready-to-merge
+**State:** archived
 **Branch:** change/add-api-keys-and-rate-limiting
 
 ## Done this session
@@ -34,8 +34,12 @@
 
 - Branch run 34700349986 on `2a5700c`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34700349986) — the merge head; since then only this file changes. `make check` on the head: 603 tests green.
 
+- Merged into `main` as `0f69c3b` (2026-09-12, `--no-ff`, verifier passed).
+
+- `main` run 34708264883 on `0f69c3b`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34708264883). Archived 2026-09-12: spec `api-keys` created (4 requirements), `authentication` "JWT for the API", `user-accounts` "Blocked accounts are refused everywhere" and `health-check` "Deep dependency probe" synced, ROADMAP row 10 removed (row 10a `authorize-deep-probe-by-api-key` stays).
+
 ## Next step
-`/git:merge add-api-keys-and-rate-limiting` (verifier passes). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive add-api-keys-and-rate-limiting` (specs `api-keys` new; `authentication`, `user-accounts`, `health-check` modified; ROADMAP row 10 removed, row 10a stays).
+None — archived. Next change per `openspec/ROADMAP.md`: row 10a `authorize-deep-probe-by-api-key` (the split-out probe authorization) or row 11 `add-web-ui`. After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive add-api-keys-and-rate-limiting` (specs `api-keys` new; `authentication`, `user-accounts`, `health-check` modified; ROADMAP row 10 removed, row 10a stays).
 
 ## Blockers
 None.
