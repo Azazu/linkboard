@@ -103,6 +103,38 @@ expired links still have a code (the redirect decides at scan time). PNG
 rendering needs the `gd` extension, which the php image ships; SVG needs
 nothing.
 
+**API keys** (FR-KEY-1…4) are the credential for integrators and monitors —
+long-lived, revocable, hashed at rest. Create one with your JWT, then use it
+on the same `Authorization: Bearer` header instead of the token:
+
+```bash
+curl -s -X POST http://localhost:8082/api/v1/api-keys -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"name":"ci deploy"}'
+# → 201 {"id":"…","name":"ci deploy","prefix":"lb_xxxxx","key":"lb_…40 characters…", …}
+curl -s -D - -o /dev/null -H "Authorization: Bearer $API_KEY" http://localhost:8082/api/v1/me
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/v1/api-keys
+curl -s -X DELETE http://localhost:8082/api/v1/api-keys/$KEY_ID -H "Authorization: Bearer $TOKEN"
+```
+
+The plaintext `key` (`lb_` + 40 characters) is shown exactly once, in the 201
+response — the database keeps only its SHA-256 and the 8-character `prefix`
+you see in the list, so a lost key is revoked and re-created, never recovered.
+A key authenticates until it is revoked (`DELETE`, 204, idempotent; the row
+stays with `revokedAt` for audit) or its optional `expiresAt` passes; a
+revoked, expired or unknown key is a 401 like a bad JWT, a blocked account's
+key a 403 `blocked`. Keys are the caller's own: an admin manages only their
+own keys, and another user's key id is a 404. At most 10 active keys per
+user — the 11th `POST` is a 409, also when creations race.
+
+Every authenticated API request (key or JWT) consumes one token of a
+per-identity sliding window — `RATE_LIMIT_API_PER_KEY` requests per minute
+(default 600) per key, or per user for a JWT — counted at authentication, so a
+403 counts like a 200. Each such response carries `X-RateLimit-Limit` and
+`X-RateLimit-Remaining`; over the limit the answer is 429 problem details with
+`Retry-After`. The counters live in Redis (`cache.rate_limiter`, shared lock);
+while Redis is down the limit is not enforced and a `warning` is logged — the
+API stays available. `/api/v1/auth/*` keeps its per-IP limit (10/min) instead.
+
 **Security notes on targets.** A target must be an absolute `http`/`https`
 URL to a public host: `localhost`, loopback, link-local and private
 addresses (v4 and v6, including IPv4-mapped v6) are rejected on write, so a
