@@ -5,9 +5,9 @@ The system SHALL answer `GET /health?deep=1` with a JSON body that reports each 
 
 In the `prod` environment the deep probe SHALL run only for a request whose `Authorization: Bearer <API key>` header carries a key (capability `api-keys`) that the system verifies — by the hash of the presented value — as neither revoked nor expired and owned by an unblocked user with `ROLE_ADMIN`. Every other request — no header, a JWT, a session, an unknown, revoked or expired key, a non-admin's or a blocked admin's key, a key the system cannot verify — SHALL be refused with 404 (RFC 9457 problem details, `Cache-Control: no-store`), the same body for every reason, so the endpoint reveals nothing about keys or about why it refused. Sessions and JWTs never authorize the deep probe, because monitoring systems hold keys, not browser or user tokens. Outside `prod` the probe stays open as before.
 
-The verification SHALL complete or give up within a total budget of 4 seconds measured from the start of the request — connecting to the database within 2 seconds, the single lookup statement within what remains, and the Redis memory (below) within what remains after that — so a refusal for a verification that could not complete leaves within 5 seconds of the request whatever combination of refused, delayed or stalled dependencies caused it; such a refusal MUST be logged at `warning` naming the failure class and never the key.
+The verification SHALL be bounded by the client on every wait — connecting, awaiting the lookup's response, and each Redis command — so that a dependency that accepts a connection and then never answers, or a transport that loses the response, cannot hold the request: the database phase is allowed 2.5 seconds (connect within 1 second, the lookup within the rest) and the Redis memory (below) a further 1 second that it always receives whatever the database phase consumed; a refusal for a verification that could not complete therefore leaves within 5 seconds of the request in every combination of refused, delayed, stalled or response-less dependencies. Host-name resolution of the two DSNs happens before either allowance and is bounded only by the platform resolver, as for the probe's own checks. Such a refusal MUST be logged at `warning` naming the failure class and never the key.
 
-A verification that succeeded against the database SHALL be remembered — the key's hash, in Redis, for at most 300 seconds — and a verification that failed *because the database could not be reached or answer* (not one the database answered with "no such active admin key") SHALL accept a remembered key, so a monitor that was verified within the last 300 seconds still receives the probe's report of the outage (`database: fail`). A verification the database answered negatively SHALL forget the key's hash immediately, so revocation, expiry, blocking and demotion take effect on the next request whenever the database is up. When neither the database nor Redis can answer, the request is refused. The deep-probe verification MUST NOT update the key's `last_used_at` and MUST NOT log the key, its hash or its prefix.
+The system SHALL remember each verified admin key (by a hash of its hash, in Redis, for 300 seconds counted from the database's own time of the answer) and each denied one (a marker with the same anchor), always keeping the answer with the *later* database time — so a verification that raced a revocation can never overwrite the revocation's marker. When the database phase could not be reached or answer (not when it answered "no such active admin key"), a remembered verification less than 300 seconds old SHALL authorize the probe, which then runs and reports its own checks (a refused database as `database: fail`; a database that still answers its check as `ok`). A denied answer observed while Redis was reachable therefore takes effect on the next request and cannot be undone by a later outage. When Redis was unreachable at the moment of a denied answer, the marker is not written: an earlier verification may then authorize the probe during a database outage for at most the remainder of its 300 seconds — this bound is the accepted staleness, and the failed write is logged at `warning`. When neither the database nor Redis can answer, the request is refused. The deep-probe verification MUST NOT update the key's `last_used_at` and MUST NOT log the key, its hash or its prefix.
 
 #### Scenario: All dependencies reachable
 - **WHEN** PostgreSQL and Redis accept connections and a client requests `GET /health?deep=1` outside `prod`
@@ -37,14 +37,30 @@ A verification that succeeded against the database SHALL be remembered — the k
 - **WHEN** in `prod` the database refuses connections, no verification of the presented admin key is remembered, and the monitor requests the deep probe
 - **THEN** the response is the identical 404 within 5 seconds of the request, the probe's dependency checks did not run, and a `warning` names the failure class
 
+#### Scenario: Connection accepted but never completed, and a lost response
+- **WHEN** in `prod` the database endpoint accepts the TCP connection and never completes the handshake, or completes it and then never delivers the response to the lookup, and the monitor requests the deep probe with a key that is not remembered
+- **THEN** each response is the identical 404 within 5 seconds of the request and the probe's dependency checks did not run
+
 #### Scenario: Delayed connection and stalled lookup
 - **WHEN** in `prod` the database accepts the connection only after a delay and then does not answer the lookup statement, and the monitor requests the deep probe with an admin key that is not remembered
 - **THEN** the response is the identical 404 within 5 seconds of the request and the probe's dependency checks did not run
 
+#### Scenario: Redis that accepts and never answers during verification
+- **WHEN** in `prod` the database is unreachable and Redis accepts the connection but never answers, and the monitor requests the deep probe
+- **THEN** the response is the identical 404 within 5 seconds of the request and a `warning` names the failure class
+
 #### Scenario: Database outage reported to a remembered monitor
-- **WHEN** in `prod` a monitor's admin key was verified within the last 300 seconds, the database then becomes unreachable, and the monitor requests the deep probe again
-- **THEN** the response status is 503 with `checks.database` `"fail"` — the probe ran on the strength of the remembered verification
+- **WHEN** in `prod` a monitor's admin key was verified within the last 300 seconds, the database then refuses connections, and the monitor requests the deep probe again
+- **THEN** the probe runs on the strength of the remembered verification and answers 503 with `checks.database` `"fail"`; had the lookup stalled on a database that still answers its check, the probe would have run and reported `database` as `"ok"`
 
 #### Scenario: Revocation is forgotten immediately while the database is up
 - **WHEN** in `prod` a monitor's admin key was verified and remembered, the key is revoked, and the monitor requests the deep probe
 - **THEN** the response is the identical 404 and a subsequent database outage does not restore the monitor's access
+
+#### Scenario: A verification that raced a revocation cannot undo it
+- **WHEN** a request read the key as valid, the key is then revoked, a second request reads it as revoked and records the denial, and only then the first request's verification reaches the memory
+- **THEN** the memory keeps the denial (its database time is later), and a following database outage refuses the monitor
+
+#### Scenario: Redis unreachable when a denial is observed
+- **WHEN** in `prod` a remembered monitor's key is revoked, the request that observes the revocation cannot reach Redis, and the database then becomes unreachable within 300 seconds of the last verification
+- **THEN** the revocation itself answered 404, a `warning` named the memory failure, and the probe still runs for that monitor until the remembered verification is 300 seconds old — the accepted staleness
