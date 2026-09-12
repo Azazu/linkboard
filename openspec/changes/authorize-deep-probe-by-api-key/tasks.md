@@ -4,7 +4,7 @@ High tier (an authorization boundary on a production endpoint outside the firewa
 
 ## 0. Gate 1 (high tier)
 
-- [ ] 0.1 `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passes and `scripts/gate-run.sh authorize-deep-probe-by-api-key 1 full` is run on the completed artifacts (proposal with tier and Non-goals, the health-check delta, design with the applicability table, tasks); findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh authorize-deep-probe-by-api-key 1 confirm <round>`. Verify: review.md carries a Gate 1 round bound to the requested commit; the merge verifier checks that the last Gate 1 decision reads approved/confirmed.
+- [x] 0.1 `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passes and `scripts/gate-run.sh authorize-deep-probe-by-api-key 1 full` is run on the completed artifacts (proposal with tier and Non-goals, the health-check delta, design with the applicability table, tasks); findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh authorize-deep-probe-by-api-key 1 confirm <round>`. Verify: review.md carries a Gate 1 round bound to the requested commit; the merge verifier checks that the last Gate 1 decision reads approved/confirmed.
 
 ## 1. The lookup process and the Redis client
 

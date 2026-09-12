@@ -1,7 +1,7 @@
 # Handoff — authorize-deep-probe-by-api-key
 
 **Updated:** 2026-09-12 · claude
-**State:** awaiting-gate-1
+**State:** implementing
 **Branch:** change/authorize-deep-probe-by-api-key
 
 ## Done this session
@@ -20,8 +20,10 @@
 
 - Gate 1 Confirmation 3 (`e1c9472`, Reviewed-Commit `8896305`): findings 2–3 confirmed; finding 1 changes-requested on fixture mechanics only — `--slow-from-command=4` never reached the consultation (three RESP commands per request; connect is not one), `--accept-delay` stalls `AUTH` rather than connect (an established connection waits in the accept queue), and no assertion pinned the operation that timed out. The user arbitrated again: fix and run a fourth confirmation. Fixed in the following commit: command index 3; `full-backlog-listener.php` (`listen(0)` with one parked connection, so the next SYN is dropped) for a stalled connect; `MemoryUnavailable` names its operation and the fake Redis writes a command log, and every fixture test asserts the operation and the completed commands; the whole-sequence success and the guard-removal witness (per-command timeout removed) retained. Statuses remain fixed.
 
+- Gate 1 Confirmation 4 (`5e4ae57`, Reviewed-Commit `d0528f8`): findings 1–3 confirmed — **Gate 1 passed**. Task 0.1 ticked.
+
 ## Next step
-`scripts/gate-run.sh authorize-deep-probe-by-api-key 1 confirm 1` — the **fourth** confirmation on finding 1, authorised by the user (proposal "User decisions"); if it fails again, stop and report — the user decides. Then `/opsx:apply authorize-deep-probe-by-api-key`.
+`/opsx:apply authorize-deep-probe-by-api-key` — tasks 1.1 onwards (bounded clients and fixtures, `ProbeAuthorizer`, prod end-to-end tests, CI migrating `app`, docs); `make check`; the user pushes; a green Actions run on the exact head; then Gate 2 (`scripts/gate-run.sh authorize-deep-probe-by-api-key 2 full`).
 
 ## Blockers
 None.
