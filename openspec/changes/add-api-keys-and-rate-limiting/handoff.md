@@ -1,7 +1,7 @@
 # Handoff — add-api-keys-and-rate-limiting
 
 **Updated:** 2026-09-12 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/add-api-keys-and-rate-limiting
 
 ## Done this session
@@ -24,8 +24,10 @@
 
 **Security-relevant parts for review:** the second authenticator on the `api` firewall and the decorator that keeps the JWT authenticator off `lb_` tokens (`2ed88f7`); the hash-only credential store and the constant 401 (`5816881`, `2ed88f7`); the owner-only key resource with the serialised cap (`eb8f3b1`); the limiter's identity key and its position before access control (`b12d088`). Observed while implementing: `doctrine:schema:validate` reports two pre-existing differences unrelated to `api_keys` (the partial index predicate spelling on `clicks`, the messenger index name); the test kernel needs `cache:clear --env=test` after resource-metadata or security changes.
 
+- Branch run 34698485045 on `9bb1ba0`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34698485045). Task tokens that are not paths lost their backticks (pregate); 6.2 and 6.3 ticked (6.3 at the gate request).
+
 ## Next step
-Task 6.2: the user pushes `change/add-api-keys-and-rate-limiting`; the executor confirms a completed, successful Actions run whose `head_sha` equals `git rev-parse HEAD` and records it here. Then task 6.3: `scripts/pregate-verify.sh gate2 add-api-keys-and-rate-limiting`, `scripts/gate-run.sh add-api-keys-and-rate-limiting 2 full`.
+`scripts/gate-run.sh add-api-keys-and-rate-limiting 2 full`; findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-api-keys-and-rate-limiting 2 confirm <round>`. Then `/git:merge add-api-keys-and-rate-limiting` (a green run on the final head first if code changes).
 
 ## Blockers
 None.
