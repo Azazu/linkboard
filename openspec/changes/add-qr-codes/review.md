@@ -42,3 +42,16 @@ Validation: reviewed only the diff from `194022e75971f4897b86848c5fb76c6bc3937b1
 Validation: branch and HEAD match the requested identifiers and the working tree was initially clean. Reviewed `git diff main...change/add-qr-codes`, the change artifacts, `openspec/config.yaml`, the dependency lock diff, existing provider/voter/firewall integration, and installed API Platform and QR-library source. No blocker or major finding identified. The recorded mutation demonstrations in the implementation commit bodies cover authorization, processor execution, format validation, cache headers, image dimensions and the snapshot.
 
 `scripts/pregate-verify.sh gate2 add-qr-codes` passed whitespace, strict OpenSpec validation, tier, task and reference checks, but could not complete `make check`: the sandbox denies access to `/var/run/docker.sock` at the first style-check command. No host PHP executable is available. Consequently, this review did not independently rerun PHP checks or HTTP tests; the green 569-test / 7409-assertion suite and branch CI result are executor-recorded evidence in tasks/handoff, not executions by this reviewer. The recorded CI commit `6e80ea9` differs from the reviewed HEAD only in `tasks.md` and `handoff.md`. This source-review approval does not replace the runner's required successful mechanical floor. Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** 0e9ff08976b7494c3f121c05b28c7bf755a55b44
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The source round contains no blocker or major findings; this is its sole minor finding. `testTheCodeEncodesExactlyTheShortUrl` obtains `shortUrl` independently through the link item HTTP endpoint, compares the QR endpoint's SVG byte-for-byte with `QrCodeRenderer::render($shortUrl, QrFormat::Svg)`, and asserts that rendering the distinct target URL or bare slug produces different bytes. This closes the named regression-coverage gap. Design decision 5 now describes the actual assertion, and tasks/handoff agree. |
+
+Validation: reviewed only the diff from `46e60c345d5c7d00b332bc8150e2313a9db5ad3c` to the Reviewed-Commit and the named finding's reachable test helpers, processor and renderer. Branch and HEAD match the request; the working tree was initially clean and the source finding was dispositioned as fixed. The range passes `git diff --check`. `make cs` could not execute PHP-CS-Fixer because the sandbox denies access to `/var/run/docker.sock`; PHP checks, HTTP tests and the recorded target-URL mutation were not independently rerun. The reported 7 tests / 68 assertions and mutation result remain executor-recorded evidence. This source-review confirmation does not replace the runner's required successful mechanical floor. No unrelated findings introduced; only `review.md` modified and no git write commands run.
