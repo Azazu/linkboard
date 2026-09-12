@@ -1,7 +1,7 @@
 # Handoff — add-qr-codes
 
 **Updated:** 2026-09-12 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/add-qr-codes
 
 ## Done this session
@@ -17,8 +17,10 @@
 
 **Security-relevant parts for review:** the dependency change (`e05a709`: three packages, lock-pinned, audit clean, no runtime I/O) and the authorization boundary of the new endpoint (`b7c4837`: firewall 401 first, then `LinkItemProvider` 404, then `LinkVoter::VIEW` — the same sequence as `GET /links/{id}`; the `format` query parameter reaches the enum only after declared validation).
 
+- Branch run 34678937819 on `6e80ea9`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34678937819). Task tokens that are not paths lost their backticks (pregate); 4.2 and 4.3 ticked (4.3 at the gate request).
+
 ## Next step
-Task 4.2: the user pushes `change/add-qr-codes`; the executor confirms a completed, successful Actions run whose `head_sha` equals `git rev-parse HEAD` and records it here. Then task 4.3: `scripts/pregate-verify.sh gate2 add-qr-codes`, `scripts/gate-run.sh add-qr-codes 2 full`.
+`scripts/gate-run.sh add-qr-codes 2 full`; findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-qr-codes 2 confirm <round>`. Then `/git:merge add-qr-codes` (a green run on the final head first if code changes).
 
 ## Blockers
 None.
