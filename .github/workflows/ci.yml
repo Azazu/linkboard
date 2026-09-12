@@ -85,5 +85,11 @@ jobs:
           MESSENGER_TRANSPORT_DSN: in-memory://
         run: |
           make jwt-keys EXEC=
+          # The `app` database itself, not only `app_test`: the prod-kernel
+          # health tests read DATABASE_URL as is and need api_keys there
+          # (authorize-deep-probe-by-api-key, design decision 8). APP_ENV=dev
+          # for this one command — the step's APP_ENV=test would migrate the
+          # test database twice and leave `app` empty.
+          APP_ENV=dev make migrate EXEC=
           make test-db EXEC=
           make check EXEC=
