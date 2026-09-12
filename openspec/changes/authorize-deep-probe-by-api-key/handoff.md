@@ -1,7 +1,7 @@
 # Handoff — authorize-deep-probe-by-api-key
 
 **Updated:** 2026-09-12 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/authorize-deep-probe-by-api-key
 
 ## Done this session
@@ -31,7 +31,7 @@
 **Artifact sync during implementation** (descriptions of the implementation, no change of scope, requirements or architecture — Gate 1 not reopened): the prod cases run the kernel in a child process so its stderr carries the warnings; the fake Redis gained `--get-value`; the interleaving tests drive the real authorizer with a wrapped lookup; the `health` log channel and the extractor's static `keyFromHeader()` are named in the design and the proposal's Impact.
 
 ## Next step
-The user pushes `change/authorize-deep-probe-by-api-key`; then task 5.2 (the Actions run on the exact head must be `completed`/`success`, URL and SHA recorded here) and task 5.3 — `scripts/pregate-verify.sh gate2 …` and `scripts/gate-run.sh authorize-deep-probe-by-api-key 2 full`.
+`scripts/gate-run.sh authorize-deep-probe-by-api-key 2 full` on the branch head; findings via `/workflow:fix-findings`, then `/git:merge`. Green Actions run on the reviewed code: `9e3b98ced1d067ddf402c6734c64c1ef2f4d0047` — https://github.com/Azazu/linkboard/actions/runs/34713711107 (completed/success). Only `tasks.md` and `handoff.md` changed after it, which the Gate 2 freshness rule allows.
 
 ## Blockers
 None.
