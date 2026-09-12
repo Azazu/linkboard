@@ -1,7 +1,7 @@
 # Handoff — add-api-keys-and-rate-limiting
 
 **Updated:** 2026-09-12 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/add-api-keys-and-rate-limiting
 
 ## Done this session
@@ -32,8 +32,10 @@
 
 - Gate 2 passed: Confirmation 2 (`da272dc`, Reviewed-Commit `a8b70a5`) — both findings confirmed (raw-string `expiresAt` validation with the empty-string guard, conditional revocation).
 
+- Branch run 34700349986 on `2a5700c`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34700349986) — the merge head; since then only this file changes. `make check` on the head: 603 tests green.
+
 ## Next step
-The code head moved since the green run on `9bb1ba0` (`e8ad617`, `1bc0b38`): the user pushes `change/add-api-keys-and-rate-limiting`; the executor confirms a completed, successful Actions run whose `head_sha` equals `git rev-parse HEAD` and records it here; then `/git:merge add-api-keys-and-rate-limiting` (the verifier checks Gate 2 freshness: only review.md/handoff.md/tasks.md differ from `a8b70a5`). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive`.
+`/git:merge add-api-keys-and-rate-limiting` (verifier passes). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive add-api-keys-and-rate-limiting` (specs `api-keys` new; `authentication`, `user-accounts`, `health-check` modified; ROADMAP row 10 removed, row 10a stays).
 
 ## Blockers
 None.
