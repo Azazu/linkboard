@@ -18,3 +18,23 @@
 - `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation.
 - Reviewed proposal, design, tasks, delta specification, repository review rules/configuration, and the existing raw-client health probe and API-key extractor/hash implementation. These are planning findings; implementation has not been reviewed.
 - Timeout semantics checked against PostgreSQL 16 documentation: [connection control](https://www.postgresql.org/docs/16/libpq-connect.html) and [statement timeout](https://www.postgresql.org/docs/16/runtime-config-client.html#GUC-STATEMENT-TIMEOUT). The transport-stall counterexample in finding 1 follows from the distinction between server execution cancellation and receiving a response at the client.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** c1b35dd8d97a4beb4d883c3a5d43d7eecaa370f3
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The async receive loop, resolver exclusion and revised connect-deadline witness address parts of the finding, but design decision 3 and task 1.2 still do not bound the complete operation. The prescribed timeout cleanup calls `pg_cancel_query()` (incorrectly described as non-blocking), then `pg_close()`. PHP 8.4's cancellation wrapper calls `PQcancel` and drains `PQgetResult`; closing also drains `PQgetResult` before `PQfinish`. A proxy that swallows the original connection's responses can therefore hold cleanup after the deadline, even if the cancellation reaches the server. Specify and verify a bounded abort/cleanup path, including destruction, before claiming the 5-second refusal. The planned Redis black hole also stops at AUTH for a password-protected connection: add the requested successful-but-delayed AUTH followed by delayed GET/EVAL test to exercise cumulative operation timeouts. |
+| 2 | changes-requested — The failed-invalidation case is now explicitly admitted and verification age is checked independently of SET time, but the new CAS does not guarantee the promised revocation ordering. In design decisions 3–4, `clock_timestamp()` timestamps expression evaluation, not the SELECT's snapshot. Counterexample: A starts with a pre-revocation snapshot and pauses before evaluating its timestamp; revocation commits; B reads the revoked row and stores `d@t2`; A resumes, still reads the valid version from its old snapshot, and emits `v@t3` with t3 > t2. The CAS accepts A and an outage restores access despite B's successful denial write. The synthetic memory test supplies t1 < t2 and assumes precisely the property the SQL does not provide. Define ordering tied to authoritative authorization state, or explicitly relax the race guarantee consistently in proposal/spec/design; add a deterministic database-level interleaving test that establishes the ordering rather than supplying it. |
+| 3 | confirmed — Design decisions 2 and 5 reserve a separate Redis allowance after an exhausted database phase and distinguish lookup failure from the probe's own dependency observations. The delta spec and tasks 2.1/3.1 cover consultation after budget exhaustion and a remembered key during an api_keys table lock, with the probe reporting its own SELECT 1 result. This resolves the planning issue in finding 3; the full deadline remains subject to finding 1. |
+
+### Evidence and validation
+- Reviewed only the requested commit interval and collateral relevant to findings 1–3. All three source findings were marked `fixed`; no unrelated findings were added.
+- The cleanup counterexample follows from [PHP 8.4 ext-pgsql source](https://raw.githubusercontent.com/php/php-src/PHP-8.4/ext/pgsql/pgsql.c), specifically `php_pgsql_do_async`, `pg_close`, and `pgsql_link_free`, and the documented blocking behavior of `PQgetResult` in [libpq asynchronous processing](https://www.postgresql.org/docs/16/libpq-async.html). Merely making the connection non-blocking does not make result retrieval safe while a response is pending.
+- The ordering counterexample follows from PostgreSQL's [Read Committed snapshot semantics](https://www.postgresql.org/docs/16/transaction-iso.html#XACT-READ-COMMITTED) and [clock_timestamp semantics](https://www.postgresql.org/docs/16/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT): current wall time can advance during one statement while its visible row version stays fixed.
+- `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. These are artifact-level conclusions; no implementation or runtime failure demonstration is claimed.
+- Only `review.md` was modified; no git write commands were run.
