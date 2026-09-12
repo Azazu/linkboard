@@ -88,9 +88,11 @@ final readonly class CreateApiKeyProcessor implements ProcessorInterface
         if (null === $input->expiresAt) {
             return null;
         }
+        // the validator has rejected empty and malformed values; a parse failure here would be a
+        // configuration drift between the two — rendered as the same 422, never a 500
         $expiresAt = \DateTimeImmutable::createFromFormat(CreateApiKeyInput::EXPIRES_AT_FORMAT, $input->expiresAt);
         if (false === $expiresAt) {
-            throw new \LogicException('expiresAt was validated as RFC 3339 before processing.');
+            throw new ValidationException(new ConstraintViolationList([new ConstraintViolation('expiresAt must be an RFC 3339 timestamp.', null, [], $input, 'expiresAt', $input->expiresAt)]));
         }
         if ($expiresAt <= $now) {
             throw new ValidationException(new ConstraintViolationList([new ConstraintViolation('expiresAt must be in the future.', null, [], $input, 'expiresAt', $input->expiresAt)]));

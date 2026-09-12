@@ -16,8 +16,8 @@ Long-lived credentials for integrators and monitors: named API keys a user creat
 - **THEN** no column of the stored row contains the plaintext, and the row's `key_hash` equals the hex SHA-256 of the plaintext
 
 #### Scenario: Invalid input
-- **WHEN** a user posts `{"name":""}`, `{"name":"<65 characters>"}`, and `{"name":"ok","expiresAt":…}` with `2020-01-01T00:00:00Z` (past), `tomorrow` (not a timestamp), `2026-12-01T10:00:00` (no time zone) and `2026-02-30T00:00:00Z` (no such date)
-- **THEN** each response status is 422 `application/problem+json` with exactly one violation whose `propertyPath` is `name`, `name` and `expiresAt` respectively, and nothing is created; `2030-01-01T00:00:00Z` is accepted and echoed as `expiresAt`
+- **WHEN** a user posts `{"name":""}`, `{"name":"<65 characters>"}`, and `{"name":"ok","expiresAt":…}` with `2020-01-01T00:00:00Z` (past), `tomorrow` (not a timestamp), `2026-12-01T10:00:00` (no time zone) `2026-02-30T00:00:00Z` (no such date) and `""` (empty)
+- **THEN** each response status is 422 `application/problem+json` with exactly one violation whose `propertyPath` is `name`, `name` and `expiresAt` respectively, and nothing is created; `2030-01-01T00:00:00Z` is accepted and echoed as `expiresAt`, and an omitted or `null` `expiresAt` creates a key that never expires
 
 #### Scenario: Eleventh active key
 - **WHEN** a user holds 10 active keys and posts another

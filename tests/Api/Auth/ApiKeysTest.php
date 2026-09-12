@@ -65,7 +65,7 @@ final class ApiKeysTest extends LinkApiTestCase
         }
         // expiresAt is validated on the string the client sent: RFC 3339 syntax, a real
         // calendar date, and a moment in the future (Gate 2 round 1, finding 1)
-        foreach (['2020-01-01T00:00:00Z' => 'past', 'tomorrow' => 'relative text', '2026-12-01T10:00:00' => 'no time zone', '2026-02-30T00:00:00Z' => 'impossible calendar date', '2026-12-01' => 'date only'] as $value => $case) {
+        foreach (['2020-01-01T00:00:00Z' => 'past', 'tomorrow' => 'relative text', '2026-12-01T10:00:00' => 'no time zone', '2026-02-30T00:00:00Z' => 'impossible calendar date', '2026-12-01' => 'date only', '' => 'empty string'] as $value => $case) {
             $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'ok', 'expiresAt' => $value]);
             self::assertSame(['expiresAt'], $this->violationPaths($client), $case);
         }
@@ -74,6 +74,9 @@ final class ApiKeysTest extends LinkApiTestCase
         $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'expiring', 'expiresAt' => '2030-01-01T00:00:00Z']);
         self::assertResponseStatusCodeSame(201);
         self::assertSame('2030-01-01T00:00:00+00:00', $this->decode($client)['expiresAt'], 'a valid future timestamp is stored as given');
+        $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'never', 'expiresAt' => null]);
+        self::assertResponseStatusCodeSame(201, 'an explicit null means never expires');
+        self::assertNull($this->decode($client)['expiresAt']);
     }
 
     public function testEleventhActiveKeyIs409UntilOneIsRevoked(): void
