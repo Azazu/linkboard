@@ -38,3 +38,24 @@
 - The ordering counterexample follows from PostgreSQL's [Read Committed snapshot semantics](https://www.postgresql.org/docs/16/transaction-iso.html#XACT-READ-COMMITTED) and [clock_timestamp semantics](https://www.postgresql.org/docs/16/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT): current wall time can advance during one statement while its visible row version stays fixed.
 - `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. These are artifact-level conclusions; no implementation or runtime failure demonstration is claimed.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** fb42073450832338a0dd0db3f41c14beab1d5ac3
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The child-process deadline addresses the PostgreSQL cleanup objection and replaces the invalid connect-floor mutation witness. However, design decision 2 budgets only connect, AUTH and one command at 1/3 second each, while decision 4 and task 2.1 require a generation GET before the lookup and another command afterwards; denial additionally requires INCR, TTL refresh and DEL. Even a reused connection therefore has more operations than the budget accounts for. For example, connect, AUTH, generation GET and consultation GET each completing in 0.30 seconds already consume 1.20 seconds, exceeding the normative reserved 1-second Redis allowance. Specify a complete operation budget, including pre-lookup access and denial writes, that preserves the post-lookup consultation allowance. Test the whole sequence with successful delayed operations, including connect; the current 0.5-second response-delay fixture times out at AUTH under the prescribed 1/3-second timeout and cannot exercise the claimed later-command timeout. Align design, spec and tasks. |
+| 2 | changes-requested — Reading a generation before the statement fixes the snapshot-timestamp race only while generations cannot be reused. Decision 4 expires the counter after 300 seconds, breaking its monotonicity argument within an otherwise short request: an earlier denial left generation 1 near expiry; the key is currently valid (for example, its owner was unblocked); A reads generation 1 and a valid row; the counter expires; the key is revoked; B observes that revocation, INCR recreates generation 1 and DEL succeeds; A's CAS now accepts generation 1 and restores the memory. An outage restores access despite B's successful denial. Use a generation identity that cannot recur across expiry, or otherwise reject writes spanning counter expiry, and test this interleaving deterministically. Also retain the source finding's verification-age bound: the new value contains only gen and key expiry, and starts a fresh 300-second TTL at the delayed write, so it no longer enforces 300 seconds from verification. Define an absolute verification-age limit or explicitly revise that contract consistently. |
+| 3 | confirmed — Decision 5 and the delta spec continue to distinguish authorization lookup failure from the probe's own dependency observations. Tasks 2.1 and 3.1 retain consultation after a timed-out lookup and the remembered-monitor table-lock case with the probe reporting its own SELECT 1 result. The separate post-lookup consultation allowance remains the intended contract; its incomplete Redis accounting is tracked under finding 1 rather than duplicated here. |
+
+### Evidence and validation
+- Reviewed the requested interval `8b8fbd55206bd1242f4e6b9846edc91f9f6169db..fb42073450832338a0dd0db3f41c14beab1d5ac3` and collateral reachable from findings 1–3. Confirmed the branch and HEAD and an initially clean worktree. All source findings were marked `fixed`; no unrelated findings were introduced.
+- Read the revised proposal, design, tasks and health-check delta, and checked related claims in repository documentation. The Redis counterexample follows directly from the specified expiring counter, INCR recreation and equality-only CAS; it does not require a request lasting 300 seconds or a failed denial write.
+- Inspected the installed `vendor/symfony/process/Process.php` timeout and stop paths. The process boundary provides a concrete way to avoid running blocked PostgreSQL cleanup in the request process; runtime verification remains an implementation task.
+- `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. This is a planning review; no implementation or runtime failure demonstration is claimed.
+- Findings 1 and 2 have now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before proceeding.
+- Only `review.md` was modified; no git write commands were run.
