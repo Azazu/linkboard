@@ -17,9 +17,10 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * write also refuses (absent ≠ read) — a harmless false negative. consult()
  * bounds the verification's age from verified_at, not from the write.
  *
- * Every operation is one Redis command with its own read timeout; the whole
- * request sends exactly three (AUTH/PING, GET, then EVAL or GET) on one
- * connection. The URL's database index is not selected — the memory lives in
+ * Every operation is one Redis command under an absolute deadline of its own
+ * (BoundedRedisConnection: a reply arriving in pieces cannot outlast it); the
+ * whole request sends exactly three — AUTH/PING, GET, then EVAL or GET — on
+ * one connection. The URL's database index is not selected — the memory lives in
  * database 0 (REDIS_URL carries none in this project; a SELECT would be a
  * fourth command outside the budget).
  */
@@ -42,7 +43,7 @@ final class ProbeMemory implements ProbeMemoryInterface
         return 1
         LUA;
 
-    private ?\Redis $redis = null;
+    private ?BoundedRedisConnection $connection = null;
 
     public function __construct(
         #[Autowire(env: 'REDIS_URL')]
@@ -54,32 +55,25 @@ final class ProbeMemory implements ProbeMemoryInterface
     public function connect(): void
     {
         $this->close();
-        try {
-            $redis = BoundedRedisCommands::open($this->redisUrl, $this->operationTimeout);
-        } catch (RedisOperationFailed $e) {
-            throw new MemoryUnavailable($e->operation, $e->getPrevious() ?? $e);
+        $connection = $this->guard('connect', fn (): BoundedRedisConnection => BoundedRedisConnection::connect($this->redisUrl, $this->operationTimeout));
+
+        $password = BoundedRedisConnection::password($this->redisUrl);
+        // with no password a PING takes AUTH's slot, so every request costs the same three commands
+        $answer = $this->guard('auth', static fn (): string|int|null => null === $password
+            ? $connection->command('auth', 'PING')
+            : $connection->command('auth', 'AUTH', $password));
+        if ('OK' !== $answer && 'PONG' !== $answer) {
+            $connection->close();
+            throw new MemoryUnavailable('auth', new \RuntimeException('the server did not accept the connection'));
         }
-        if (!BoundedRedisCommands::hasPassword($this->redisUrl)) {
-            // no AUTH to send: a PING takes its slot so every request costs the same three commands
-            try {
-                $pong = $redis->ping();
-            } catch (\RedisException $e) {
-                throw new MemoryUnavailable('auth', $e);
-            }
-            if (true !== $pong) {
-                throw new MemoryUnavailable('auth', new \RedisException('PING not answered'));
-            }
-        }
-        $this->redis = $redis;
+
+        $this->connection = $connection;
     }
 
     public function token(#[\SensitiveParameter] string $hash): string
     {
-        try {
-            $token = $this->connection('token')->get(self::tokenKey($hash));
-        } catch (\RedisException $e) {
-            throw new MemoryUnavailable('token', $e);
-        }
+        $connection = $this->connection('token');
+        $token = $this->guard('token', static fn (): string|int|null => $connection->command('token', 'GET', self::tokenKey($hash)));
 
         return \is_string($token) ? $token : '';
     }
@@ -91,31 +85,26 @@ final class ProbeMemory implements ProbeMemoryInterface
             'exp' => $expiresAt?->format(\DATE_ATOM),
             'verified_at' => $verifiedAt->format(\DATE_ATOM),
         ], \JSON_THROW_ON_ERROR);
-        try {
-            $stored = $this->connection('remember')->eval(self::REMEMBER, [self::tokenKey($hash), self::valueKey($hash), $token, $value, (string) (self::TTL_SECONDS * 1000)], 2);
-        } catch (\RedisException $e) {
-            throw new MemoryUnavailable('remember', $e);
-        }
+        $connection = $this->connection('remember');
+        $stored = $this->guard('remember', static fn (): string|int|null => $connection->command(
+            'remember', 'EVAL', self::REMEMBER, '2', self::tokenKey($hash), self::valueKey($hash), $token, $value, (string) (self::TTL_SECONDS * 1000),
+        ));
 
         return 1 === $stored;
     }
 
     public function deny(#[\SensitiveParameter] string $hash): void
     {
-        try {
-            $this->connection('deny')->eval(self::DENY, [self::tokenKey($hash), self::valueKey($hash), bin2hex(random_bytes(16)), (string) (self::TTL_SECONDS * 1000)], 2);
-        } catch (\RedisException $e) {
-            throw new MemoryUnavailable('deny', $e);
-        }
+        $connection = $this->connection('deny');
+        $this->guard('deny', static fn (): string|int|null => $connection->command(
+            'deny', 'EVAL', self::DENY, '2', self::tokenKey($hash), self::valueKey($hash), bin2hex(random_bytes(16)), (string) (self::TTL_SECONDS * 1000),
+        ));
     }
 
     public function consult(#[\SensitiveParameter] string $hash, \DateTimeImmutable $now): bool
     {
-        try {
-            $raw = $this->connection('consult')->get(self::valueKey($hash));
-        } catch (\RedisException $e) {
-            throw new MemoryUnavailable('consult', $e);
-        }
+        $connection = $this->connection('consult');
+        $raw = $this->guard('consult', static fn (): string|int|null => $connection->command('consult', 'GET', self::valueKey($hash)));
         if (!\is_string($raw)) {
             return false;
         }
@@ -139,19 +128,29 @@ final class ProbeMemory implements ProbeMemoryInterface
 
     public function close(): void
     {
-        if (null !== $this->redis) {
-            try {
-                $this->redis->close();
-            } catch (\RedisException) {
-                // the connection is gone either way
-            }
-            $this->redis = null;
-        }
+        $this->connection?->close();
+        $this->connection = null;
     }
 
-    private function connection(string $operation): \Redis
+    private function connection(string $operation): BoundedRedisConnection
     {
-        return $this->redis ?? throw new MemoryUnavailable($operation, new \LogicException('not connected'));
+        return $this->connection ?? throw new MemoryUnavailable($operation, new \LogicException('not connected'));
+    }
+
+    /**
+     * @template T
+     *
+     * @param callable(): T $operation
+     *
+     * @return T
+     */
+    private function guard(string $name, callable $operation): mixed
+    {
+        try {
+            return $operation();
+        } catch (RedisOperationFailed $e) {
+            throw new MemoryUnavailable($name, $e->getPrevious() ?? $e);
+        }
     }
 
     private static function tokenKey(#[\SensitiveParameter] string $hash): string

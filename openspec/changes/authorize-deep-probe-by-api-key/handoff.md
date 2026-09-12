@@ -1,7 +1,7 @@
 # Handoff — authorize-deep-probe-by-api-key
 
 **Updated:** 2026-09-12 · claude
-**State:** awaiting-gate-2
+**State:** fixing-g2
 **Branch:** change/authorize-deep-probe-by-api-key
 
 ## Done this session
@@ -28,10 +28,12 @@
 
 **Demonstrated failing inputs** (each mutation applied in turn and its witness test run — all fail; recorded in the commit bodies of `c8b7331` and `1d26fde`): the child's deadline raised; the hash on the command line; the `roles` or `is_blocked` check removed; the token read moved after the lookup; the CAS replaced by a plain `SET`; a counter instead of a random token; `DEL` dropped from the deny script; the `exp` or the `verified_at` check removed at consult; the per-command Redis timeout loosened; the reserved allowance made conditional; `remember()` dropped; the 404 body varied by reason.
 
+- Gate 2 round 1 (`b5e49cb`, Reviewed-Commit `5163c14`): changes-requested — two majors, both real and both fixed. (1) `symfony/process` sat in `require-dev` (a linter's dependency), so `composer install --no-dev` left production raising a class-not-found error: promoted to `require`, and `ProductionDependenciesTest` now reads `composer.lock` and refuses any `require-dev` namespace in `src/`, `bin/` or `public/` — the check the suite itself cannot make. Verified on a clean `--no-dev` tree: admin key → the probe report, unknown key → the identical 404; with the package removed again, the same tree answers 500. (2) The 0.25-second Redis timeout was a per-read timeout, not a deadline: a server dribbling its reply made progress forever. `BoundedRedisConnection` (a small RESP client over a non-blocking socket) now gives every operation one absolute deadline, the memory and the probe's own Redis check share it, the fake Redis can fragment replies, and three witnesses cover the pre-lookup read, the post-lookup consultation and the prod request.
+
 **Artifact sync during implementation** (descriptions of the implementation, no change of scope, requirements or architecture — Gate 1 not reopened): the prod cases run the kernel in a child process so its stderr carries the warnings; the fake Redis gained `--get-value`; the interleaving tests drive the real authorizer with a wrapped lookup; the `health` log channel and the extractor's static `keyFromHeader()` are named in the design and the proposal's Impact.
 
 ## Next step
-`scripts/gate-run.sh authorize-deep-probe-by-api-key 2 full` on the branch head; findings via `/workflow:fix-findings`, then `/git:merge`. Green Actions run on the reviewed code: `9e3b98ced1d067ddf402c6734c64c1ef2f4d0047` — https://github.com/Azazu/linkboard/actions/runs/34713711107 (completed/success). Only `tasks.md` and `handoff.md` changed after it, which the Gate 2 freshness rule allows.
+`scripts/gate-run.sh authorize-deep-probe-by-api-key 2 confirm 1` — the confirmation on findings 1–2, both `fixed`. Then the user pushes, the Actions run on the new head must be green, and `/git:merge`.
 
 ## Blockers
 None.

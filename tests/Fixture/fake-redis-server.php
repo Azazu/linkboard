@@ -18,6 +18,12 @@ declare(strict_types=1);
 //   --get-value=<string>         answer GET with this bulk string instead of a
 //                                null bulk: a memory that HAS a remembered
 //                                verification, served as slowly as the rest
+//   --fragment-bytes=<n>         send the reply in n-byte pieces
+//   --fragment-delay=<seconds>   sleep between those pieces — a server that
+//                                keeps making progress and never finishes:
+//                                a per-read timeout never fires on it, an
+//                                operation deadline does. Fragmenting obeys
+//                                --slow-from-command like the delay does.
 // Binds 127.0.0.1:0, prints the port on the first stdout line, serves one
 // connection at a time; stopped by the test in `finally`.
 
@@ -25,6 +31,8 @@ $delay = 0.0;
 $slowFrom = 1;
 $log = null;
 $getValue = null;
+$fragmentBytes = null;
+$fragmentDelay = 0.0;
 foreach (array_slice($argv, 1) as $arg) {
     if (1 === preg_match('/^--response-delay=([\d.]+)$/', $arg, $m)) {
         $delay = (float) $m[1];
@@ -34,6 +42,10 @@ foreach (array_slice($argv, 1) as $arg) {
         $log = $m[1];
     } elseif (1 === preg_match('/^--get-value=(.*)$/s', $arg, $m)) {
         $getValue = $m[1];
+    } elseif (1 === preg_match('/^--fragment-bytes=(\d+)$/', $arg, $m)) {
+        $fragmentBytes = max(1, (int) $m[1]);
+    } elseif (1 === preg_match('/^--fragment-delay=([\d.]+)$/', $arg, $m)) {
+        $fragmentDelay = (float) $m[1];
     } else {
         fwrite(\STDERR, "unknown argument $arg\n");
         exit(64);
@@ -121,7 +133,16 @@ while (true) {
                 'EVAL' => ":1\r\n",
                 default => "-ERR unknown command\r\n",
             };
-            @fwrite($client, $reply);
+            if (null === $fragmentBytes || $index < $slowFrom) {
+                @fwrite($client, $reply);
+            } else {
+                foreach (str_split($reply, $fragmentBytes) as $piece) {
+                    @fwrite($client, $piece);
+                    if ($fragmentDelay > 0) {
+                        usleep((int) ($fragmentDelay * 1_000_000));
+                    }
+                }
+            }
             logLine($log, 'answered', $command);
         }
     }

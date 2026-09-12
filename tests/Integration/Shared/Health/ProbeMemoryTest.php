@@ -227,6 +227,64 @@ final class ProbeMemoryTest extends TestCase
         unlink($log);
     }
 
+    public function testAReplyArrivingInPiecesEndsAtTheOperationDeadlineAllTheSame(): void
+    {
+        // A server that keeps making progress and never finishes: one byte
+        // every 100 ms arrives well inside any per-read timeout, so that kind
+        // of timeout never fires — a deadline taken when the operation started
+        // does (Gate 2 round 1, finding 2). This 39-byte reply would take about
+        // four seconds; the operation's share of the allowance is a quarter of one.
+        $token = bin2hex(random_bytes(16));
+        $fake = FixtureProcess::start('fake-redis-server.php', ['--slow-from-command=2', '--fragment-bytes=1', '--fragment-delay=0.1', '--get-value='.$token]);
+        try {
+            $memory = new ProbeMemory(\sprintf('redis://:secret@127.0.0.1:%d', $fake->port));
+            $memory->connect();
+            $started = microtime(true);
+            try {
+                $memory->token($this->hash);
+                self::fail('a dribbled reply must end at the operation deadline');
+            } catch (MemoryUnavailable $e) {
+                $elapsed = microtime(true) - $started;
+                self::assertSame('token', $e->operation);
+            }
+            self::assertTrue($fake->isRunning(), 'the server was still happily sending when the deadline ended it');
+            $memory->close();
+        } finally {
+            $fake->stop();
+        }
+
+        self::assertGreaterThanOrEqual(ProbeMemory::OPERATION_TIMEOUT, $elapsed);
+        self::assertLessThan(3 * ProbeMemory::OPERATION_TIMEOUT, $elapsed, 'the whole Redis phase stays inside its allowance');
+    }
+
+    public function testADribbledConsultationEndsAtItsShareAfterTheEarlierCommandsPassed(): void
+    {
+        $remembered = json_encode([
+            'gen' => '',
+            'exp' => null,
+            'verified_at' => (new \DateTimeImmutable())->format(\DATE_ATOM),
+        ], \JSON_THROW_ON_ERROR);
+        $fake = FixtureProcess::start('fake-redis-server.php', ['--slow-from-command=3', '--fragment-bytes=1', '--fragment-delay=0.1', '--get-value='.$remembered]);
+        try {
+            $memory = new ProbeMemory(\sprintf('redis://:secret@127.0.0.1:%d', $fake->port));
+            $started = microtime(true);
+            $memory->connect();
+            self::assertNotSame('', $memory->token($this->hash), 'the pre-lookup read completed');
+            try {
+                $memory->consult($this->hash, new \DateTimeImmutable());
+                self::fail('a dribbled consultation must end at its share');
+            } catch (MemoryUnavailable $e) {
+                $elapsed = microtime(true) - $started;
+                self::assertSame('consult', $e->operation);
+            }
+            $memory->close();
+        } finally {
+            $fake->stop();
+        }
+
+        self::assertLessThan(ProbeAuthorizer::REDIS_ALLOWANCE, $elapsed, 'connect, AUTH, the token read and the consultation together stay inside the allowance');
+    }
+
     public function testAConnectThatNeverCompletesTimesOutAtItsShare(): void
     {
         $listener = FixtureProcess::start('full-backlog-listener.php');

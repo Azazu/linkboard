@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Shared\Health;
 
-use App\Shared\Health\BoundedRedisCommands;
+use App\Shared\Health\BoundedRedisConnection;
 use App\Shared\Health\KeyLookupProcess;
 use App\Shared\Health\ProbeAuthorizer;
 use App\Shared\Health\RedisOperationFailed;
@@ -22,7 +22,7 @@ use Symfony\Component\Process\Process;
  * by killing it — the lost-response case no in-process client can pass.
  */
 #[CoversClass(KeyLookupProcess::class)]
-#[CoversClass(BoundedRedisCommands::class)]
+#[CoversClass(BoundedRedisConnection::class)]
 final class KeyLookupProcessTest extends TestCase
 {
     private const float ALLOWANCE = ProbeAuthorizer::DATABASE_ALLOWANCE;
@@ -210,20 +210,16 @@ final class KeyLookupProcessTest extends TestCase
     {
         $blackHole = FixtureProcess::start('black-hole-socket.php');
         try {
+            $connection = BoundedRedisConnection::connect(\sprintf('redis://127.0.0.1:%d', $blackHole->port), 0.25);
             $started = microtime(true);
             try {
-                $redis = BoundedRedisCommands::open(\sprintf('redis://127.0.0.1:%d', $blackHole->port), 0.25);
-                $redis->ping();
+                $connection->command('ping', 'PING');
                 self::fail('a PING no server answers must time out');
-            } catch (\RedisException) {
-                self::assertEqualsWithDelta(0.25, microtime(true) - $started, 0.2, 'the read timeout is the per-operation timeout');
-            }
-
-            try {
-                BoundedRedisCommands::open(\sprintf('redis://:secret@127.0.0.1:%d', $blackHole->port), 0.25);
-                self::fail('an AUTH no server answers must time out');
             } catch (RedisOperationFailed $e) {
-                self::assertSame('auth', $e->operation);
+                self::assertSame('ping', $e->operation);
+                self::assertEqualsWithDelta(0.25, microtime(true) - $started, 0.2, 'the deadline is the per-operation timeout');
+            } finally {
+                $connection->close();
             }
         } finally {
             $blackHole->stop();

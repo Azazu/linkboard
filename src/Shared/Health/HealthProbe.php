@@ -82,12 +82,19 @@ final readonly class HealthProbe
 
     private function checkRedis(): bool
     {
+        $connection = null;
         try {
-            $redis = BoundedRedisCommands::open($this->redisUrl, (float) self::TIMEOUT_SECONDS);
+            $connection = BoundedRedisConnection::connect($this->redisUrl, (float) self::TIMEOUT_SECONDS);
+            $password = BoundedRedisConnection::password($this->redisUrl);
+            if (null !== $password && 'OK' !== $connection->command('auth', 'AUTH', $password)) {
+                return false;
+            }
 
-            return true === $redis->ping();
-        } catch (RedisOperationFailed|\RedisException) {
+            return 'PONG' === $connection->command('ping', 'PING');
+        } catch (RedisOperationFailed) {
             return false;
+        } finally {
+            $connection?->close();
         }
     }
 }

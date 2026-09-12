@@ -256,6 +256,32 @@ final class HealthDeepProdTest extends TestCase
         unlink($log);
     }
 
+    public function testAConsultationDribbledOutByteByByteStillAnswersWithinTheBound(): void
+    {
+        // Without a deadline over the whole operation this reply — one byte
+        // every 100 ms, each arriving inside any per-read timeout — would hold
+        // the request for some ten seconds.
+        $plaintext = $this->key();
+        $remembered = json_encode([
+            'gen' => '',
+            'exp' => null,
+            'verified_at' => (new \DateTimeImmutable())->format(\DATE_ATOM),
+        ], \JSON_THROW_ON_ERROR);
+        $fake = FixtureProcess::start('fake-redis-server.php', ['--slow-from-command=3', '--fragment-bytes=1', '--fragment-delay=0.1', '--get-value='.$remembered]);
+        try {
+            $response = ProdHealthRequest::send('Bearer '.$plaintext, [
+                'DATABASE_URL' => ProbeTestEnvironment::closedDatabaseUrl(),
+                'REDIS_URL' => \sprintf('redis://:secret@127.0.0.1:%d', $fake->port),
+            ]);
+        } finally {
+            $fake->stop();
+        }
+
+        self::assertSame(404, $response->status);
+        self::assertLessThan(5.0, $response->elapsed);
+        self::assertSame('consult', $response->withMessage('deep probe authorization: memory unavailable')[0]['context']['operation']);
+    }
+
     public function testARedisWhoseConnectNeverCompletesStillLetsTheDatabaseAnswer(): void
     {
         $plaintext = $this->key();
