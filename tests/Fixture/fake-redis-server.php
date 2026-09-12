@@ -15,12 +15,16 @@ declare(strict_types=1);
 //   --command-log=<file>         append "received <CMD> <unix time>" and
 //                                "answered <CMD> <unix time>" lines so a test
 //                                asserts which commands completed
+//   --get-value=<string>         answer GET with this bulk string instead of a
+//                                null bulk: a memory that HAS a remembered
+//                                verification, served as slowly as the rest
 // Binds 127.0.0.1:0, prints the port on the first stdout line, serves one
 // connection at a time; stopped by the test in `finally`.
 
 $delay = 0.0;
 $slowFrom = 1;
 $log = null;
+$getValue = null;
 foreach (array_slice($argv, 1) as $arg) {
     if (1 === preg_match('/^--response-delay=([\d.]+)$/', $arg, $m)) {
         $delay = (float) $m[1];
@@ -28,6 +32,8 @@ foreach (array_slice($argv, 1) as $arg) {
         $slowFrom = (int) $m[1];
     } elseif (1 === preg_match('/^--command-log=(.+)$/', $arg, $m)) {
         $log = $m[1];
+    } elseif (1 === preg_match('/^--get-value=(.*)$/s', $arg, $m)) {
+        $getValue = $m[1];
     } else {
         fwrite(\STDERR, "unknown argument $arg\n");
         exit(64);
@@ -111,7 +117,7 @@ while (true) {
             $reply = match ($command) {
                 'AUTH', 'SELECT' => "+OK\r\n",
                 'PING' => "+PONG\r\n",
-                'GET' => "$-1\r\n",
+                'GET' => null === $getValue ? "$-1\r\n" : sprintf("$%d\r\n%s\r\n", strlen($getValue), $getValue),
                 'EVAL' => ":1\r\n",
                 default => "-ERR unknown command\r\n",
             };
