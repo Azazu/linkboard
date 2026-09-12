@@ -15,7 +15,8 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 10 | `add-api-keys-and-rate-limiting` | hashed API keys (plaintext once), access-token authenticator, per-key/per-user API limit with rate-limit headers, trusted-proxy handling; the prod deep health probe becomes available to a valid admin API key | high |
+| 10 | `add-api-keys-and-rate-limiting` | hashed API keys (plaintext once), access-token authenticator, per-key/per-user API limit with rate-limit headers, trusted-proxy handling | high |
+| 10a | `authorize-deep-probe-by-api-key` | the prod deep health probe becomes available to a valid admin API key: a bounded key lookup with an enforceable total deadline, fail-closed 404, refused/delayed/stalled cases tested end to end (split out of row 10 by user arbitration, 2026-09-12) | high |
 
 ## Stage 4 — web UI, API polish, quality
 
