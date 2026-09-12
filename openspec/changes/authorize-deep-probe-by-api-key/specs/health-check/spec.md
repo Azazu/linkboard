@@ -1,0 +1,50 @@
+## MODIFIED Requirements
+
+### Requirement: Deep dependency probe
+The system SHALL answer `GET /health?deep=1` with a JSON body that reports each dependency (`database`, `redis`) as `"ok"` or `"fail"`, with HTTP 200 when all are `"ok"` and HTTP 503 when any is `"fail"`. Connecting to and querying each dependency MUST time out within 2 seconds so a hung dependency (reachable host, unresponsive service) cannot hang the probe; host name resolution happens before that timeout and is bounded by the platform resolver.
+
+In the `prod` environment the deep probe SHALL run only for a request whose `Authorization: Bearer <API key>` header carries a key (capability `api-keys`) that the system verifies — by the hash of the presented value — as neither revoked nor expired and owned by an unblocked user with `ROLE_ADMIN`. Every other request — no header, a JWT, a session, an unknown, revoked or expired key, a non-admin's or a blocked admin's key, a key the system cannot verify — SHALL be refused with 404 (RFC 9457 problem details, `Cache-Control: no-store`), the same body for every reason, so the endpoint reveals nothing about keys or about why it refused. Sessions and JWTs never authorize the deep probe, because monitoring systems hold keys, not browser or user tokens. Outside `prod` the probe stays open as before.
+
+The verification SHALL complete or give up within a total budget of 4 seconds measured from the start of the request — connecting to the database within 2 seconds, the single lookup statement within what remains, and the Redis memory (below) within what remains after that — so a refusal for a verification that could not complete leaves within 5 seconds of the request whatever combination of refused, delayed or stalled dependencies caused it; such a refusal MUST be logged at `warning` naming the failure class and never the key.
+
+A verification that succeeded against the database SHALL be remembered — the key's hash, in Redis, for at most 300 seconds — and a verification that failed *because the database could not be reached or answer* (not one the database answered with "no such active admin key") SHALL accept a remembered key, so a monitor that was verified within the last 300 seconds still receives the probe's report of the outage (`database: fail`). A verification the database answered negatively SHALL forget the key's hash immediately, so revocation, expiry, blocking and demotion take effect on the next request whenever the database is up. When neither the database nor Redis can answer, the request is refused. The deep-probe verification MUST NOT update the key's `last_used_at` and MUST NOT log the key, its hash or its prefix.
+
+#### Scenario: All dependencies reachable
+- **WHEN** PostgreSQL and Redis accept connections and a client requests `GET /health?deep=1` outside `prod`
+- **THEN** the response status is 200 and the body is `{"status":"ok","checks":{"database":"ok","redis":"ok"}}`
+
+#### Scenario: One dependency unreachable
+- **WHEN** Redis refuses connections and a client requests `GET /health?deep=1` outside `prod`
+- **THEN** the response status is 503 and the body is `{"status":"fail","checks":{"database":"ok","redis":"fail"}}`
+
+#### Scenario: One dependency hangs
+- **WHEN** the Redis host is reachable but the service does not answer (process paused) and a client requests `GET /health?deep=1` outside `prod`
+- **THEN** the response arrives within 3 seconds with status 503 and `redis` reported as `fail`
+
+#### Scenario: Database accepts connections but does not answer
+- **WHEN** the database accepts the connection but a query on the probe's connection does not complete within 2 seconds
+- **THEN** the query is cancelled by a server-side statement timeout and the `database` check reports `fail` within 3 seconds
+
+#### Scenario: Deep probe in production without authorization
+- **WHEN** the application runs with `APP_ENV=prod` and a client requests `GET /health?deep=1` with no header, with an admin's JWT, with a valid key of a non-admin user, with a revoked admin key, with an expired admin key, and with the key of a blocked admin
+- **THEN** each response status is 404, the content type is `application/problem+json`, the body is identical for every case and carries `type`, `title`, `status: 404` and `detail`, the response has `Cache-Control: no-store`, and no key's `last_used_at` changed
+
+#### Scenario: Deep probe in production with an admin key
+- **WHEN** the application runs with `APP_ENV=prod` and a monitor requests `GET /health?deep=1` with `Authorization: Bearer <valid key of an unblocked admin>`
+- **THEN** the response is the probe's own answer (200 or 503 with the `checks` body) with `Cache-Control: no-store`, and the key's `last_used_at` is unchanged
+
+#### Scenario: Database refuses connections during verification
+- **WHEN** in `prod` the database refuses connections, no verification of the presented admin key is remembered, and the monitor requests the deep probe
+- **THEN** the response is the identical 404 within 5 seconds of the request, the probe's dependency checks did not run, and a `warning` names the failure class
+
+#### Scenario: Delayed connection and stalled lookup
+- **WHEN** in `prod` the database accepts the connection only after a delay and then does not answer the lookup statement, and the monitor requests the deep probe with an admin key that is not remembered
+- **THEN** the response is the identical 404 within 5 seconds of the request and the probe's dependency checks did not run
+
+#### Scenario: Database outage reported to a remembered monitor
+- **WHEN** in `prod` a monitor's admin key was verified within the last 300 seconds, the database then becomes unreachable, and the monitor requests the deep probe again
+- **THEN** the response status is 503 with `checks.database` `"fail"` — the probe ran on the strength of the remembered verification
+
+#### Scenario: Revocation is forgotten immediately while the database is up
+- **WHEN** in `prod` a monitor's admin key was verified and remembered, the key is revoked, and the monitor requests the deep probe
+- **THEN** the response is the identical 404 and a subsequent database outage does not restore the monitor's access
