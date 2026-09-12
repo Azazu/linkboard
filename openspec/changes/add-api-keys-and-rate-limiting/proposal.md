@@ -41,7 +41,7 @@ Integrators and monitoring systems hold keys, not browser sessions or one-hour J
 
 ## Impact
 
-- New: `src/Auth/Entity/ApiKey.php`, `src/Auth/ApiKeyRepositoryInterface.php`, `src/Auth/Repository/DoctrineApiKeyRepository.php`, `src/Auth/ApiKey/` (key generator/hasher, the token handler, extractor, failure handler, JWT-extractor decorator, `ApiKeyVoter`), `src/Auth/Api/ApiKeys/` (resource, input, providers, processors), `src/Auth/RateLimit/` (the API limit subscriber and the header writer), a migration, tests under `tests/Unit/Auth/`, `tests/Integration/Auth/`, `tests/Api/Auth/ApiKeys/`, `tests/Api/Health*`.
+- New: `src/Auth/Entity/ApiKey.php`, `src/Auth/ApiKeyRepositoryInterface.php`, `src/Auth/Repository/DoctrineApiKeyRepository.php`, `src/Auth/ApiKey/` (key generator/hasher, the token handler, extractor, failure handler, JWT-extractor decorator, `ApiKeyVoter`), `src/Auth/Api/ApiKeys/` (resource, input, providers, processors), `src/Auth/RateLimit/` (the API limit subscriber and the header writer), a migration, tests under `tests/Unit/Auth/`, `tests/Integration/Auth/`, `tests/Api/Auth/ApiKeys/`.
 - Modified: `config/packages/security.yaml` (`access_token` on the `api` firewall), `config/packages/framework.yaml` (`api_identity` limiter), `.env` (`RATE_LIMIT_API_PER_KEY=600`), `openspec/ROADMAP.md` (the follow-up row added; row 10 removed at archive time), `docs/how-to/local-development.md`, `docs/explanation/requirements.md` (FR-KEY-1…4, §7 rows), `docs/reference/commands.md` if a console helper is added (none planned).
 - Unchanged: the JWT flow and its tests, `LinkVoter`, the redirect and click paths, the auth and redirect limiters, the web firewall, `/health` and the CI workflow.
 

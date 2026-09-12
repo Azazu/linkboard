@@ -4,7 +4,7 @@ High tier (authentication, API keys, firewall, rate limits, a migration — AGEN
 
 ## 0. Gate 1 (high tier)
 
-- [ ] 0.1 `scripts/pregate-verify.sh gate1 add-api-keys-and-rate-limiting` passes and `scripts/gate-run.sh add-api-keys-and-rate-limiting 1 full` is run on the completed artifacts (proposal with tier and Non-goals, specs `api-keys` + three modified capabilities, design with the applicability table, tasks); findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-api-keys-and-rate-limiting 1 confirm <round>`. Verify: review.md carries a Gate 1 round bound to the requested commit; the merge verifier checks that the last Gate 1 decision reads approved/confirmed.
+- [x] 0.1 `scripts/pregate-verify.sh gate1 add-api-keys-and-rate-limiting` passes and `scripts/gate-run.sh add-api-keys-and-rate-limiting 1 full` is run on the completed artifacts (proposal with tier and Non-goals, specs `api-keys` + three modified capabilities, design with the applicability table, tasks); findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-api-keys-and-rate-limiting 1 confirm <round>`. Verify: review.md carries a Gate 1 round bound to the requested commit; the merge verifier checks that the last Gate 1 decision reads approved/confirmed. Done: round 1 `4f29d74` (three majors), confirmations `ff5e172` and `97cafc9` (finding 3 twice more), user arbitration → the probe split into `authorize-deep-probe-by-api-key`, Confirmation 3 `03cbd2e` confirmed (Reviewed-Commit `0b29a42`).
 
 ## 1. Schema and domain
 

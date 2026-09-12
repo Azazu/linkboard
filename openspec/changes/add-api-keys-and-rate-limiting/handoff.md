@@ -1,7 +1,7 @@
 # Handoff — add-api-keys-and-rate-limiting
 
 **Updated:** 2026-09-12 · claude
-**State:** awaiting-gate-1
+**State:** implementing
 **Branch:** change/add-api-keys-and-rate-limiting
 
 ## Done this session
@@ -18,8 +18,10 @@
 
 - Gate 1 Confirmation 2 (`97cafc9`, Reviewed-Commit `b2b8d91`): finding 3 changes-requested again — libpq's minimum `connect_timeout` is 2 s, the 1-second bound was unenforceable, the combined delay untested. Two failed confirmations → user arbitration (2026-09-12): the probe authorization is split into the follow-up change `authorize-deep-probe-by-api-key` (ROADMAP row 10a); this change's scope is keys, key authentication and the per-identity limit. Finding 3 → `wont-fix` with the reason; the health-check delta only repoints the forward reference. The user authorised a third confirmation on the reduced change.
 
+- Gate 1 passed: Confirmation 3 (`03cbd2e`, Reviewed-Commit `0b29a42`) — findings 1–2 confirmed, finding 3 confirmed as resolved by the scope split. Two editorial remnants Codex noted (`tests/Api/Health*` in Impact, the `isAdmin()` failing input in decision 8) removed. Task 0.1 ticked.
+
 ## Next step
-`scripts/gate-run.sh add-api-keys-and-rate-limiting 1 confirm 1` (third confirmation, authorised by the user after arbitration); then `/opsx:apply add-api-keys-and-rate-limiting`.
+`/opsx:apply add-api-keys-and-rate-limiting` — tasks 1.1 (entity, repository, migration), 1.2 (generator), 2.1/2.2 (authentication), 3.1 (key API + concurrency test), 4.1 (limiter), 5.1 (docs), 6.x (check, push + green run, Gate 2).
 
 ## Blockers
 None.
