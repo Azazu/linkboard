@@ -22,8 +22,16 @@
 
 - Gate 1 Confirmation 4 (`5e4ae57`, Reviewed-Commit `d0528f8`): findings 1–3 confirmed — **Gate 1 passed**. Task 0.1 ticked.
 
+- Implementation (tasks 1.1–5.1), `make check` green (664 tests, 8827 assertions): `bin/probe-key-lookup` + `KeyLookupProcess` (the lookup in a child process killed at 2.5 s, the hash on stdin), `BoundedRedisCommands`, `ProbeMemory` (random denial token, CAS on the token read before the lookup, `verified_at` with an absolute 300-second bound, three RESP commands plus the connect at 0.25 s each), `ProbeAuthorizer`, the prod `HealthController` branch, a `health` Monolog channel with an always-on `warning` stream in `prod`, the four network fixtures, the prod-kernel request fixture, CI migrating the `app` database, and the how-to's monitoring section.
+
+**Security-relevant parts for Gate 2:** `ProbeAuthorizer` and `bin/probe-key-lookup` (the whole authorization decision: the regex before any I/O, the three-valued database step, the consult-only-on-unavailable rule, the identical 404, no `last_used_at`, no key in any log), `ProbeMemory`'s two Lua scripts and its CAS argument, and the child process's argument list (the hash travels on stdin).
+
+**Demonstrated failing inputs** (each mutation applied in turn and its witness test run — all fail; recorded in the commit bodies of `c8b7331` and `1d26fde`): the child's deadline raised; the hash on the command line; the `roles` or `is_blocked` check removed; the token read moved after the lookup; the CAS replaced by a plain `SET`; a counter instead of a random token; `DEL` dropped from the deny script; the `exp` or the `verified_at` check removed at consult; the per-command Redis timeout loosened; the reserved allowance made conditional; `remember()` dropped; the 404 body varied by reason.
+
+**Artifact sync during implementation** (descriptions of the implementation, no change of scope, requirements or architecture — Gate 1 not reopened): the prod cases run the kernel in a child process so its stderr carries the warnings; the fake Redis gained `--get-value`; the interleaving tests drive the real authorizer with a wrapped lookup; the `health` log channel and the extractor's static `keyFromHeader()` are named in the design and the proposal's Impact.
+
 ## Next step
-`/opsx:apply authorize-deep-probe-by-api-key` — tasks 1.1 onwards (bounded clients and fixtures, `ProbeAuthorizer`, prod end-to-end tests, CI migrating `app`, docs); `make check`; the user pushes; a green Actions run on the exact head; then Gate 2 (`scripts/gate-run.sh authorize-deep-probe-by-api-key 2 full`).
+The user pushes `change/authorize-deep-probe-by-api-key`; then task 5.2 (the Actions run on the exact head must be `completed`/`success`, URL and SHA recorded here) and task 5.3 — `scripts/pregate-verify.sh gate2 …` and `scripts/gate-run.sh authorize-deep-probe-by-api-key 2 full`.
 
 ## Blockers
 None.
