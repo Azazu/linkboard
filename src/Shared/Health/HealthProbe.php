@@ -82,32 +82,11 @@ final readonly class HealthProbe
 
     private function checkRedis(): bool
     {
-        $parts = parse_url($this->redisUrl);
-        if (false === $parts || !isset($parts['host'])) {
-            return false;
-        }
-
         try {
-            $redis = new \Redis();
-            // connect timeout and read timeout (for PING) are both bounded;
-            // name resolution happens before either and is the resolver's.
-            $connected = $redis->connect(
-                $parts['host'],
-                $parts['port'] ?? 6379,
-                (float) self::TIMEOUT_SECONDS,
-                null,
-                0,
-                (float) self::TIMEOUT_SECONDS,
-            );
-            if (!$connected) {
-                return false;
-            }
-            if (isset($parts['pass']) && !$redis->auth($parts['pass'])) {
-                return false;
-            }
+            $redis = BoundedRedisCommands::open($this->redisUrl, (float) self::TIMEOUT_SECONDS);
 
             return true === $redis->ping();
-        } catch (\RedisException) {
+        } catch (RedisOperationFailed|\RedisException) {
             return false;
         }
     }

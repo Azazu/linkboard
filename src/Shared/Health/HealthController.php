@@ -14,13 +14,15 @@ use Symfony\Component\Routing\Attribute\Route;
  * GET /health?deep=1   dependency probe (database, redis); 503 when any fails.
  *
  * Outside the API contour on purpose: not in the OpenAPI document, no
- * authentication, never cached. The deep probe is refused in prod until an
- * authorization boundary exists (users-and-security change).
+ * firewall, never cached. In prod the deep probe runs only for a request the
+ * ProbeAuthorizer verifies (a valid admin API key, spec health-check); every
+ * other request gets one and the same 404 problem body.
  */
 final class HealthController
 {
     public function __construct(
         private readonly HealthProbe $probe,
+        private readonly ProbeAuthorizer $authorizer,
         #[Autowire('%kernel.environment%')]
         private readonly string $environment,
     ) {
@@ -33,9 +35,10 @@ final class HealthController
             return $this->json(['status' => 'ok'], 200);
         }
 
-        if ('prod' === $this->environment) {
-            // Explicit RFC 9457 body: /health is outside the API contour, so no
-            // framework error renderer is guaranteed to produce problem+json here.
+        if ('prod' === $this->environment && !$this->authorizer->authorize($request->headers->get('Authorization'))) {
+            // Explicit RFC 9457 body, identical for every refusal (design decision 6):
+            // /health is outside the API contour, so no framework error renderer is
+            // guaranteed to produce problem+json here.
             $response = $this->json([
                 'type' => '/errors/404',
                 'title' => 'Not Found',
