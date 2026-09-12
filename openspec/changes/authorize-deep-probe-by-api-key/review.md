@@ -99,3 +99,23 @@
 - Rechecked the installed `vendor/symfony/process/Process.php` timeout/stop path and the related proposal, design, tasks and delta-spec claims.
 - `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. This confirms the planning resolutions at Gate 1; implementation tests and guard-removal demonstrations remain Gate 2 work.
 - Only `review.md` was modified; no git write commands were run.
+
+
+## Round 1 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** 5163c14e75ae81c161ddc93c95e3dae3c3348639
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | major | src/Shared/Health/KeyLookupProcess.php:33–34; composer.json require; composer.lock packages-dev | Declare `symfony/process` as a production dependency. It is currently present only in `packages-dev`, pulled in by PHP-CS-Fixer; no production package requires it. After a clean `composer install --no-dev`, a correctly shaped API-key header reaches `new PhpExecutableFinder()` and raises a class-not-found Error before the lookup's try/catch. Thus production returns 500 for both valid and unknown keys instead of the probe report or the identical 404, and remembered-monitor fallback cannot run. The prod-kernel tests retain dev dependencies and miss this deployment failure. Update the manifest and lockfile, reconcile the artifacts' claim that the existing installed package needs no dependency change, and demonstrate the prod authorization path with a clean dependency installation excluding dev packages. | open |
+| 2 | major | src/Shared/Health/BoundedRedisCommands.php:29; src/Shared/Health/ProbeMemory.php token/consult; tests/Fixture/fake-redis-server.php | The 0.25-second Redis read timeout is not a wall-clock command deadline. A proxy can deliver a bulk reply header immediately and its 32-byte denial token one byte every 0.2 seconds: each read makes progress, yet the pre-lookup GET alone takes over 6 seconds. There is no outer deadline to interrupt it, so the promised 1-second Redis allowance and 5-second refusal bound fail even with a refused database. The fixture delays once and writes the whole reply, missing fragmented responses. Enforce a deadline over the complete operation and add a fragmented-response witness, including a post-lookup consultation, while preserving its reserved allowance. | open |
+
+### Evidence and validation
+- Confirmed the requested branch and HEAD and an initially clean worktree. Reviewed `git diff main...change/authorize-deep-probe-by-api-key`, the change artifacts and Gate 1 records, `openspec/config.yaml`, implementation, test fixtures, dependency metadata, CI and changed documentation.
+- Parsed `composer.lock`: `symfony/process` v8.1.6 is exclusively in `packages-dev`; its only actual `require` edge is from `friendsofphp/php-cs-fixer`. References in production packages are development requirements, not runtime dependencies. This establishes finding 1 without changing the installed vendor tree.
+- Finding 2 is a source-based counterexample, not a locally executed reproduction: [PhpRedis bulk-read loop and timeout setup](https://raw.githubusercontent.com/phpredis/phpredis/6.2.0/library.c) repeatedly read until the payload is complete; [PHP 8.4 socket reads](https://raw.githubusercontent.com/php/php-src/PHP-8.4/main/streams/xp_socket.c) reuse the configured timeout on successive waits. Neither supplies an absolute RESP-command deadline.
+- `scripts/pregate-verify.sh gate2 authorize-deep-probe-by-api-key` passed whitespace, strict OpenSpec validation, tier, task and link checks, but could not run `make check`: this review sandbox denies access to `/var/run/docker.sock`, and no host PHP executable is available. The executor's green suite and mutation evidence are recorded in the handoff and commit bodies; they were inspected but not independently rerun here. The sandbox limitation is not classified as a code defect.
+- Only `review.md` was modified; no git write commands were run.
