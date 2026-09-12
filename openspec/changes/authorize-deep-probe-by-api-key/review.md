@@ -59,3 +59,23 @@
 - `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. This is a planning review; no implementation or runtime failure demonstration is claimed.
 - Findings 1 and 2 have now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before proceeding.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** 88963059488ce49e3ca87bf799efeadca87b99ff
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — Decision 2 now accounts for the pre-lookup access and consolidates denial writes into one EVAL, giving four operations with a reserved post-lookup share. The process boundary retains the PostgreSQL cleanup fix. However, the required Redis failure demonstrations in design decisions 7/9 and tasks 2.1/3.1 still do not exercise their claimed conditions. On a password-protected connection the RESP sequence is AUTH (command 1), generation GET (2), consultation GET or EVAL (3); TCP connect is not a RESP command. Therefore `--slow-from-command=4` never delays the consultation, and an ordinary missing-value 404 can falsely pass the end-to-end timing assertion. Also, delaying accept on a listening TCP socket does not delay the client's handshake: the connection can complete into the kernel's accept queue, so `--accept-delay=0.5` stalls AUTH, not connect. A per-response 0.2-second delay likewise does not exercise a slow connect. Correct the command index, assert that the intended post-lookup operation actually timed out after successful delayed AUTH and generation GET, and specify a feasible connect-delay/timeout fixture with phase assertions. Retain a complete successful delayed sequence and a guard-removal witness for the Redis bound. These are outstanding verification requirements of this finding, not unrelated test refinements. |
+| 2 | confirmed — Decision 4 and task 2.1 replace the expiring integer counter with a fresh random denial token and an atomic token-replacement-plus-delete EVAL. The pre-lookup token comparison rejects the named stale-snapshot and counter-recreation interleavings; the deterministic database/Redis tests cover both. The value again includes verified_at, independently checked against the 300-second age bound at consultation, with a delayed-write/old-value test. The failed-invalidation case remains explicitly admitted in proposal, design and delta specification. This resolves the named planning issues; implementation verification remains for Gate 2. |
+| 3 | confirmed — The fixed Redis sequence reserves the post-lookup command's allowance independently of the database timeout. Decision 5, the delta specification and tasks 2.1/3.1 retain consultation after an exhausted lookup phase and the remembered-monitor table-lock case, with the probe reporting its own SELECT 1 observation rather than treating every lookup failure as database: fail. The remaining failure-fixture issue is tracked under finding 1. |
+
+### Evidence and validation
+- Reviewed only `8b8fbd55206bd1242f4e6b9846edc91f9f6169db..88963059488ce49e3ca87bf799efeadca87b99ff` and collateral reachable from findings 1–3. Confirmed the requested branch and HEAD and an initially clean worktree. All source findings were marked `fixed`. The proposal records user arbitration authorizing this third confirmation; the current request explicitly requests it.
+- The command-count counterexample follows directly from the fixture's specified RESP command sequence. Linux documents that the listen backlog contains completely established connections waiting for accept, supporting the accept-delay counterexample: [listen(2)](https://www.man7.org/linux/man-pages/man2/listen.2.html). An attempted local socket demonstration was blocked by the sandbox at socket creation (`PermissionError`); no successful runtime demonstration is claimed.
+- `scripts/pregate-verify.sh gate1 authorize-deep-probe-by-api-key` passed, including strict OpenSpec validation. This is a planning confirmation, not an implementation review.
+- Finding 1 remains unresolved after the user-authorized third confirmation. Stop and return to user arbitration as specified in the handoff; do not automatically continue the confirmation loop.
+- Only `review.md` was modified; no git write commands were run.
