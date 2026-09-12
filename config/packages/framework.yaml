@@ -43,6 +43,23 @@ framework:
             interval: '1 minute'
             cache_pool: cache.rate_limiter
             lock_factory: lock.factory
+        # FR-KEY-4: authenticated API requests per identity — an API key, or the
+        # user for a JWT — consumed at authentication, before access control
+        # (App\Auth\RateLimit\ApiRateLimitListener); fail-open when Redis is down
+        api_identity:
+            policy: sliding_window
+            limit: '%env(int:RATE_LIMIT_API_PER_KEY)%'
+            interval: '1 minute'
+            cache_pool: cache.rate_limiter
+            lock_factory: lock.factory
+        # identical policy on the Redis pool in every environment; consumed by
+        # tests only, to prove the storage api_identity uses in dev/prod
+        api_identity_redis:
+            policy: sliding_window
+            limit: '%env(int:RATE_LIMIT_API_PER_KEY)%'
+            interval: '1 minute'
+            cache_pool: cache.rate_limiter
+            lock_factory: lock.factory
 
     # Note that the session will be started ONLY if you read or write from it.
     session: true
@@ -57,6 +74,8 @@ when@test:
             auth_ip:
                 # in-process storage that survives the per-request services reset
                 # (an ArrayAdapter pool is cleared between requests by kernel.reset)
+                storage_service: app.rate_limiter.test_storage
+            api_identity:
                 storage_service: app.rate_limiter.test_storage
             redirect_ip:
                 storage_service: app.rate_limiter.test_storage
