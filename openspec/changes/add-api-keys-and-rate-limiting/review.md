@@ -1,0 +1,109 @@
+# Review — add-api-keys-and-rate-limiting
+
+## Round 1 · Gate 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** b7678a00949273e46900c568b0f2644abf3b9ddb
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | major | design.md:20,31,40; specs/api-keys/spec.md — Create an API key and see it once; tasks.md — 3.1 | The deliberately unlocked count-and-insert permits two concurrent requests at nine active keys to create eleven, contradicting both FR-KEY-1 and the delta requirement that the request creating an eleventh key returns 409 and creates nothing. Calling this accepted housekeeping and using “MAY hold at most” does not specify an exception to that requirement. Serialize creation per owner across the count and insert in one transaction, and add a concurrent-creation verification that leaves exactly ten active keys with one success and one 409. Alternatively, obtain explicit acceptance of a relaxed requirement and reconcile all affected artifacts before implementation. | fixed |
+| 2 | major | design.md:21; tasks.md — 4.1; specs/api-keys/spec.md — Per-identity API rate limit | A kernel.request subscriber at priority 7 runs after the entire firewall, including access_control enforcement, not just authentication. The installed Firewall runs at priority 8 and its AccessListener throws on denied roles. Thus a valid ordinary user's key or JWT repeatedly requesting an existing /api/v1/admin/ operation receives 403 before the limiter executes: no tokens consumed, no limit headers, and no eventual 429. This contradicts the promised coverage of every authenticated non-auth API request. Specify a hook after successful authentication but before access-control denial, retaining once-per-main-request consumption and response headers; add HTTP tests for repeated role-denied requests with both credential types, including exhaustion. | fixed |
+| 3 | major | design.md:22; tasks.md — 5.1; specs/health-check/spec.md — Deep dependency probe | Production authorization now calls findActiveByHash through the application repository before HealthProbe can run. The application Doctrine connection has no bounded connect/query timeout in config/packages/doctrine.yaml; the existing probe deliberately uses separate timeout-bounded connections. A correctly shaped key against an unresponsive database can therefore hang in authorization before reaching the probe's two-second checks. Saying the resolver “throws nothing” neither bounds a hung call nor defines how database failure differs from an invalid credential; task 5.1 tests neither failure nor hang. Define bounded credential lookup and a fail-closed response when authorization cannot be established, reconcile the production database-failure behavior with the health spec, and add production tests for refused connections and a stalled lookup that assert the response budget and no unauthorized probe execution. | wont-fix (scope removed — the probe authorization moves to change `authorize-deep-probe-by-api-key`; user arbitration 2026-09-12 after two failed confirmations) |
+
+Validation: branch and HEAD match the requested identifiers; the working tree was clean before review. Read the proposal, design, tasks, all four delta specs, handoff, AGENTS.md and openspec/config.yaml; checked the relevant installed Symfony firewall/authenticator code and current security, Doctrine and health-probe implementation. `openspec validate add-api-keys-and-rate-limiting --strict` passed. This is an artifact review; implementation checks belong to Gate 2.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** f576c8ba9953201f80079aebaeb29d117f530d13
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Design decision 5 now serializes creation on the owner's row inside the count-and-insert transaction, with a fresh READ COMMITTED snapshot for the count after acquiring the lock. The proposal and API-key requirement retain the strict ten-key cap under concurrency; task 3.1 verifies twelve concurrent creations from nine committed active keys yield one success, eleven conflicts and exactly ten active keys, and requires demonstrating the failure without the lock. |
+| 2 | confirmed — Design decisions 4 and 6 move identity consumption to LoginSuccessEvent, carrying the key identity in UserBadge attributes and returning an exhaustion response before access control. The installed AuthenticatorManager dispatches this event and returns its response before the firewall's access listener runs. Task 4.1 explicitly covers both key and JWT role-denied requests, decreasing headers on 403 responses, eventual 429, and a failing input that moves consumption back to priority 7. Main-request filtering and the response header writer are retained. |
+| 3 | changes-requested — The separate bounded connection and fail-closed 404 policy resolve the unbounded application-repository lookup and define database-failure behavior, but the response budget and its required verification remain incomplete. Design decision 7 permits about 2 seconds connecting plus 2 seconds querying; the new production database-down scenario in specs/health-check/spec.md requires a response within 3 seconds of lookup start. A connection completing near its timeout followed by a statement timeout can exceed that scenario's budget. Reconcile the total deadline across design, spec and tests. Also, task 5.1 only tests an unreachable URL returning false and a standalone pg_sleep query on the resolver's connection; its production HTTP test matrix contains neither refused connections nor a stalled credential lookup. Add planned production HTTP tests for both failures through resolveAdmin, asserting the agreed elapsed-time budget, identical 404 problem details with no-store, the warning, and that dependency checks never execute. A standalone connection timeout test does not verify those controller and resolver guarantees requested in round 1. |
+
+Validation: reviewed only `b7678a00949273e46900c568b0f2644abf3b9ddb..f576c8ba9953201f80079aebaeb29d117f530d13` and collateral relevant to findings 1–3. All source findings were dispositioned as fixed; branch and HEAD match the request, and the working tree was initially clean. Checked the affected artifacts, repository guidance, installed Symfony authentication event and firewall ordering, and the existing health connection factory and tests. `openspec validate add-api-keys-and-rate-limiting --strict` passed. This confirmation assesses the Gate 1 plan; implementation and demonstrated failing inputs remain Gate 2 work.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** b2b8d9142caa8284626636e930de3483252e6688
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 5 serializes creation on the owner's row inside the count-and-insert transaction, with a fresh READ COMMITTED snapshot after locking. The proposal, API-key requirement and task 3.1 agree on the strict cap; the planned concurrent test starts at nine committed keys and requires one success, eleven conflicts and ten active keys, with a demonstrated failure without the lock. |
+| 2 | confirmed — Decisions 4 and 6 use LoginSuccessEvent and the passport's key identity before access control; the installed AuthenticatorManager returns the event's response before the access listener. Task 4.1 covers both key and JWT role-denied requests, decreasing headers on 403 and eventual 429, and a failing input restoring priority 7. Main-request filtering and response headers remain specified. |
+| 3 | changes-requested — Decisions 7–8, task 5.1 and the health delta now include production HTTP refusal and locked-table cases, but the revised deadline still relies on an unsupported assumption: PDO ATTR_TIMEOUT=1 maps to libpq connect_timeout, whose minimum is 2 seconds (1 is interpreted as 2; see the PostgreSQL documentation below). Thus the stated connect <= 1 s and total lookup <= 2 s do not follow from this mechanism; a slow successful connection followed by a 1-second statement timeout also removes the claimed margin under the 3-second HTTP budget. A closed port returns immediately and the locked-table case establishes its connection normally, so neither tests that combined delay. Reconcile the budget with the driver's actual minimum, or specify an enforceable total deadline, and plan a delayed-connection plus stalled-lookup case. Also correct the claimed failing input: raising only statement_timeout to 2 s on a normally connected locked-table test need not exceed its 3-second assertion; removing the timeout or asserting the actual statement bound would demonstrate the guard. |
+
+Evidence for finding 3: the existing `src/Shared/Health/HealthProbe.php::databaseConnection()` documents the PDO-to-libpq mapping; [PostgreSQL 16 connection parameters](https://www.postgresql.org/docs/16/libpq-connect.html#LIBPQ-CONNECT-CONNECT-TIMEOUT) specify the two-second minimum and a separate timeout per host/address.
+
+Validation: reviewed only `b7678a00949273e46900c568b0f2644abf3b9ddb..b2b8d9142caa8284626636e930de3483252e6688` and collateral relevant to findings 1–3. All source findings were dispositioned as fixed; branch and HEAD match the request, and the working tree was initially clean. Checked the affected planning artifacts, repository guidance, installed Symfony authentication/firewall ordering, current health controller and connection factory, and the driver's documented connection-timeout semantics. `openspec validate add-api-keys-and-rate-limiting --strict` passed. This is a Gate 1 artifact confirmation; implementation tests remain Gate 2 work.
+
+Finding 3 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before proceeding.
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** 0b29a42ae4a6708c2e952267aab04fc00186bc26
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 5 keeps the owner-row lock, active-key count and insert in one transaction, with a fresh READ COMMITTED snapshot after locking. The proposal and API-key requirement retain the strict ten-key cap under concurrency. Task 3.1 plans twelve concurrent creations from nine committed active keys, requiring one success, eleven conflicts and exactly ten active keys, plus a demonstrated failure without the lock. |
+| 2 | confirmed — Decisions 4 and 6 carry the key identity in UserBadge attributes and consume on LoginSuccessEvent before access control. The installed AuthenticatorManager dispatches that event and returns its response before the access listener executes. Task 4.1 covers both key and JWT role-denied requests, decreasing limit headers on 403 responses, eventual 429, and a failing input restoring priority 7. Main-request filtering and the response header writer remain specified. |
+| 3 | confirmed — Resolved by reducing scope after the two failed confirmations, not by accepting the defective timeout design. The proposal's User decisions, decision 7, health-check delta and roadmap row 10a defer production probe authorization to authorize-deep-probe-by-api-key. The current change retains unconditional production 404 without credential lookup; resolver implementation, bounded-connection wiring and production authorization tests are removed from its tasks. Task 5.1 explicitly reconciles the brief's roadmap during implementation. The existing HealthController returns the production refusal before running dependency checks. The follow-up retains the obligation to design an enforceable total deadline and verify refused, delayed and stalled lookups end to end; this confirmation does not approve that future design. |
+
+Collateral note for finding 3: proposal Impact still lists `tests/Api/Health*`, and decision 8 retains the obsolete `isAdmin()` probe failing-input example. These are non-blocking editorial remnants: the explicit non-goals, decision 7, normative health delta and implementation tasks consistently exclude probe authorization.
+
+Validation: reviewed only `b7678a00949273e46900c568b0f2644abf3b9ddb..0b29a42ae4a6708c2e952267aab04fc00186bc26` and collateral relevant to findings 1–3. All source findings are dispositioned; branch and HEAD match the request, and the working tree was initially clean. Checked repository guidance, affected planning artifacts, related repository references, installed Symfony authentication event/firewall ordering and the existing health controller. `openspec validate add-api-keys-and-rate-limiting --strict` passed. This is a Gate 1 artifact confirmation; implementation tests and demonstrated failing inputs remain Gate 2 work.
+
+## Round 1 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** e9da6ce8804e7b03307d2b6f42599547001aec7b
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | major | src/Auth/Api/ApiKeys/CreateApiKeyInput.php:17–18; tests/Api/Auth/ApiKeysTest.php::testInvalidInputIs422PerField | The creation requirement mandates a future RFC 3339 timestamp and a 422 violation for invalid input, but the DTO validates only the already-denormalized DateTimeImmutable. No strict input format is configured: the installed Symfony DateTimeNormalizer falls back to `new DateTimeImmutable($data)` when its default format does not match. Consequently `{"name":"ci","expiresAt":"tomorrow"}` is accepted as a future expiry instead of rejected, and invalid calendar dates can be normalized into a different expiry. Validate the original value's RFC 3339 syntax and calendar validity before losing it through conversion, preserving the optional/null behavior and the specified 422 violation on expiresAt. Add HTTP cases for relative text, a date without a timezone, an impossible calendar date, and a valid future timestamp; demonstrate that removing the new guard fails the rejection cases. | fixed |
+| 2 | minor | src/Auth/Api/ApiKeys/RevokeApiKeyProcessor.php:48–53; src/Auth/Entity/ApiKey.php:123–126; design.md — Applicability / Concurrent writers | The design calls concurrent revocation equivalent to `SET revoked_at = coalesce(revoked_at, :now)`, but the entity's null-coalescing assignment operates on an earlier in-memory snapshot. Two requests can both load revokedAt=null, set different timestamps, and flush unconditional updates; the later writer replaces the first revocation timestamp. Authentication remains revoked, but the promised first timestamp is not preserved under concurrency. Use a conditional database update or serialization if that audit guarantee is intended, with a concurrent verification; otherwise narrow the design and code comment to the sequential idempotency actually provided. | fixed |
+
+Validation: branch and HEAD match the requested identifiers; the working tree was initially clean. Reviewed `git diff main...change/add-api-keys-and-rate-limiting`, the change artifacts and delta specs, repository guidance, implementation and tests, and the recorded failing-input evidence in the implementation commits. Checked the installed Symfony authentication/event ordering, serializer date parsing, and lazy Redis connection wiring. The owner-row creation lock and the pre-access-control limiter implement the retained Gate 1 resolutions. `openspec validate add-api-keys-and-rate-limiting --strict` and `git diff --check main...HEAD` passed. An independent `make check` attempt stopped at its first command because this sandbox cannot access `/var/run/docker.sock`; no application tests ran in this review. The executor records a green 602-test run in tasks.md/handoff.md; this review does not claim to have reproduced it. Findings above are based on source inspection, not an HTTP reproduction in this sandbox. Only review.md was modified; no git write commands were run.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** 004c843cb6e99174cf2300bb088a90f4dcda0c89
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The raw-string constraint now rejects the named relative-text, missing-zone and impossible-date examples, and the processor checks future expiry against the clock. However, the same validation path still violates the required 422 contract for `{"name":"ci","expiresAt":""}`: the installed `vendor/symfony/validator/Constraints/DateTimeValidator.php::validate()` explicitly returns without a violation for an empty string, while `CreateApiKeyProcessor::expiry()` handles only null as absent and throws `LogicException` when parsing the empty string fails (lines 88–93). This reaches the default 500 error mapping instead of a violation on expiresAt. Reject empty strings before processing while preserving omitted/null expiry, and add HTTP coverage asserting 422, the expiresAt violation and no created row, alongside omitted/null success cases. Demonstrate the rejection test failing when that guard is removed. This is collateral of the named input-validation fix, not a new unrelated finding. |
+| 2 | confirmed — The API processor retains its owner lookup and voter checks and now calls the repository's single `UPDATE api_keys SET revoked_at = :now WHERE id = :id AND revoked_at IS NULL`, eliminating the stale-entity flush that could replace the first timestamp. The entity comment is narrowed to in-memory idempotency and the design now describes the conditional database update. The repository test checks two different timestamps preserve the first and that authentication lookup excludes the revoked key; commit e8ad617 records the failing input with the predicate removed. The test is sequential, as the revised design explicitly states; concurrent preservation follows from the conditional row update, rather than an in-memory snapshot. |
+
+Validation: reviewed only `e9da6ce8804e7b03307d2b6f42599547001aec7b..004c843cb6e99174cf2300bb088a90f4dcda0c89` and collateral reachable from findings 1–2. Both source findings are dispositioned as fixed; branch and HEAD match the request, and the working tree was initially clean. Checked repository guidance, openspec/config.yaml, affected implementation, tests and artifact changes, the installed DateTime validator and API Platform error mapping, and the executor's recorded failing-input evidence. `openspec validate add-api-keys-and-rate-limiting --strict` and the scoped `git diff --check` passed. `make check` stopped at its first command because the sandbox cannot access `/var/run/docker.sock`; no application tests or HTTP reproduction ran in this review, and the remaining objection is based on source inspection. Only review.md was modified; no git write commands were run.
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-12
+**Reviewed-Commit:** a8b70a50d09d7cf75d9928b8f9493216bc576c39
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The DTO retains the original expiry string for DateTime validation, rejecting the named relative-text, missing-zone and impossible-calendar-date inputs before conversion. NotBlank(allowNull: true) now rejects the empty string identified in confirmation 1 while preserving omitted/null expiry. The processor checks future expiry against the clock before generating or inserting a key and now raises a ValidationException on parse failure, with an expiresAt violation and the installed API Platform's 422 mapping. HTTP coverage asserts 422 problem details on expiresAt for the rejection cases, no inserted rows, a valid future timestamp echoed back, explicit null success and omitted-field success. Commit 1bc0b38 records the two-layer failing-input demonstration: removing NotBlank alone retains the processor's 422 protection; removing both protections restores the 500 and fails the test. The design, delta scenario and task evidence reflect the correction. |
+| 2 | confirmed — The previously confirmed conditional repository update remains intact: UPDATE api_keys SET revoked_at = :now WHERE id = :id AND revoked_at IS NULL. The processor retains owner lookup and voter enforcement and does not flush a stale entity revocation. The repository test verifies that two different revocation times preserve the first and exclude the key from active authentication lookup; commit e8ad617 records failure when the predicate is removed. The design correctly distinguishes this atomic database guarantee from the entity's in-memory idempotency. |
+
+Validation: reviewed only `e9da6ce8804e7b03307d2b6f42599547001aec7b..a8b70a50d09d7cf75d9928b8f9493216bc576c39` and collateral reachable from findings 1–2, including the prior confirmation. Both source findings are dispositioned as fixed; branch and HEAD match the request, and the working tree was initially clean. Checked repository guidance, openspec/config.yaml, affected implementation, tests and artifact changes, the installed DateTime and NotBlank validators, API Platform's ValidationException mapping, and recorded failing-input evidence. `openspec validate add-api-keys-and-rate-limiting --strict` and the scoped `git diff --check` passed. `make check` stopped at its first command because the sandbox cannot access `/var/run/docker.sock`; no application tests or HTTP reproduction ran in this review. This confirmation relies on source inspection and the executor's recorded failing-input evidence. Only review.md was modified; no git write commands were run.

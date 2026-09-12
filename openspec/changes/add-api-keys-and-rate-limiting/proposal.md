@@ -1,0 +1,50 @@
+# Proposal — add-api-keys-and-rate-limiting
+
+**Risk-Tier:** high
+
+Tier rationale: AGENTS.md and NFR-SEC-7 put every change touching authentication, API keys, firewalls or rate limits at `high`; this change adds a second authenticator to the API firewall, a credential type stored hashed at rest, a per-identity rate limit on every API request, a new table with a reviewed migration, and touches the credential store every API request depends on. Gate 1 on the artifacts and Gate 2 on the code; a demonstrated failing input for every new guard; `design.md` carries the applicability table; a green branch run before Gate 2 (auto review mode). No new dependency: Symfony's `access_token` authenticator, RateLimiter and Lock are already installed and in use.
+
+## Why
+
+Integrators and monitoring systems hold keys, not browser sessions or one-hour JWTs (FR-AUTH-3, §2.8 of the brief). Until now the API is reachable only with a JWT minted from a password, nothing limits an authenticated client's request rate, and no credential fit for a monitor exists yet (the production deep health probe that will use one is the follow-up change `authorize-deep-probe-by-api-key`). The `api_keys` table is the last piece of §3 the schema lacks.
+
+## What Changes
+
+1. **API keys as a resource** (FR-KEY-1, FR-KEY-3): `POST /api/v1/api-keys` creates a named key (`name` ≤ 64 characters, optional `expiresAt`) for the caller — the response (201) carries the plaintext `key` exactly once, of the form `lb_` + 40 base62 characters; the database stores only `SHA-256(key)` and the first 8 characters as a display `prefix`. `GET /api/v1/api-keys` lists the caller's own keys (prefix, name, created, last used, expires, revoked) newest first; `DELETE /api/v1/api-keys/{id}` revokes (sets `revokedAt`, keeps the row for audit, 204; idempotent). At most 10 active keys per user, held under concurrency (creation serialises per owner in one database transaction) — the `POST` that would create the 11th answers 409 problem details (assumption: a state conflict, not a field validation). Owner-only through `ApiKeyVoter`: an admin manages their own keys like any user, never another user's (permission matrix "own / own"); a stranger's `DELETE` is 404 (keys of others are invisible, so an unknown id and a foreign id look alike).
+2. **API keys authenticate API requests** (FR-AUTH-3, FR-KEY-2): `Authorization: Bearer lb_…` on any `/api/v1` operation resolves to the key's user through an exact-match lookup by the hash (no plaintext is ever compared or stored); a revoked, expired or unknown key answers 401 problem details; a blocked user's key answers 403 `blocked` like a blocked user's JWT; `lastUsedAt` is updated at most once per minute per key. JWTs keep working unchanged; both credentials reach the same user entity, the same voters and the same `/api/v1/auth/*`-free public surface.
+3. **Per-identity rate limit on the API** (FR-KEY-4): every authenticated request under `/api/v1` (outside `/api/v1/auth/*`, which keeps its per-IP limit) consumes — at authentication, before any authorization decision, so refused requests count too — one token of a sliding window of `RATE_LIMIT_API_PER_KEY` (default 600) per minute, keyed by the API key for key-authenticated requests and by the user for JWT-authenticated ones; over the limit → 429 problem details with `Retry-After`; every limited response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`. Redis storage with the existing lock, fail-open like the redirect limiter (Redis down → the request proceeds, one `warning`, no headers).
+4. **Production deep health probe — deferred** (user arbitration, 2026-09-12, after Gate 1 confirmation 2): authorizing `GET /health?deep=1` in `prod` by an admin API key moves to the follow-up change `authorize-deep-probe-by-api-key` (roadmap, Stage 3) because its response budget under a down or stalled database needs its own bounded-connection design and tests. This change keeps the probe's `prod` behaviour exactly as it is (unconditional 404) and only repoints the health-check spec's forward reference to the new change.
+5. **Schema**: table `api_keys` per §3.2 of the brief (uuid PK, `user_id` FK → users `ON DELETE CASCADE`, `name`, `key_hash` char(64) unique, `prefix` char(8), `expires_at`, `revoked_at`, `last_used_at`, `created_at`) in a reviewed, reversible migration.
+6. **Docs**: how-to (create a key, call the API with it, revoke, the limit headers and 429, `RATE_LIMIT_API_PER_KEY`), `.env` default for the new limit, FR-KEY-1…4 refined where this proposal fixes what the brief left open (409 on the 11th key, `X-RateLimit-*` on which responses, fail-open), §7 rows 10 and the new follow-up row in the brief's plan.
+
+## Capabilities
+
+### New Capabilities
+
+- `api-keys`: creating, listing and revoking API keys; the key format, hashing at rest and plaintext-once; authenticating API requests with a key (lookup, 401/403 rules, `lastUsedAt`); the per-identity API rate limit and its headers.
+
+### Modified Capabilities
+
+- `authentication`: "JWT for the API" becomes "JWT or API key for the API" — the same bearer header carries either credential, distinguished by the `lb_` prefix; the failure rules are stated for both.
+- `user-accounts`: "Blocked accounts are refused everywhere" — the credentials list gains API keys (403 `blocked` on the next request, no waiting for expiry).
+- `health-check`: "Deep dependency probe" — wording only: the forward reference "until the API-keys change (`add-api-keys-and-rate-limiting`) authorizes it" now names the follow-up change `authorize-deep-probe-by-api-key`; the `prod` 404 stays unconditional.
+
+## Non-goals
+
+- The web UI's API-keys page (`add-web-ui`, row 11) — this change provides the API it will call; `ApiKeyVoter` is written so the web controllers reuse it.
+- Key rotation, scopes or per-key permissions, key-bound IP allow-lists, OAuth/OIDC, refresh tokens.
+- Rate limits keyed by IP for authenticated API traffic (identity is the better key once the caller is known); changing the auth (`10/min/IP`) or redirect (`60/min/IP`) limits — both stay as they are, with their existing trusted-proxy tests (FR-KEY-5 is already asserted for the two IP-keyed limiters and this change adds no IP-keyed one).
+- Admin management of other users' keys, listing all keys, an admin "revoke every key of a blocked user" action (blocking already stops every key on the next request).
+- A per-request `lastUsedAt` write (the once-per-minute rule of the brief is the contract) and a "last used IP" field.
+- Rate-limit headers on anonymous or `/api/v1/auth/*` responses, `X-RateLimit-Reset`, `RateLimit-Policy` (the brief names two headers).
+- Authorizing the production deep probe by an API key at all — the follow-up change `authorize-deep-probe-by-api-key` (its bounded key lookup, fail-closed 404 and time budget are its own design); `/health` is untouched here.
+
+## Impact
+
+- New: `src/Auth/Entity/ApiKey.php`, `src/Auth/ApiKeyRepositoryInterface.php`, `src/Auth/Repository/DoctrineApiKeyRepository.php`, `src/Auth/ApiKey/` (key generator/hasher, the token handler, extractor, failure handler, JWT-extractor decorator, `ApiKeyVoter`), `src/Auth/Api/ApiKeys/` (resource, input, providers, processors), `src/Auth/RateLimit/` (the API limit subscriber and the header writer), a migration, tests under `tests/Unit/Auth/`, `tests/Integration/Auth/`, `tests/Api/Auth/ApiKeys/`.
+- Modified: `config/packages/security.yaml` (`access_token` on the `api` firewall), `config/packages/framework.yaml` (`api_identity` limiter), `.env` (`RATE_LIMIT_API_PER_KEY=600`), `openspec/ROADMAP.md` (the follow-up row added; row 10 removed at archive time), `docs/how-to/local-development.md`, `docs/explanation/requirements.md` (FR-KEY-1…4, §7 rows), `docs/reference/commands.md` if a console helper is added (none planned).
+- Unchanged: the JWT flow and its tests, `LinkVoter`, the redirect and click paths, the auth and redirect limiters, the web firewall, `/health` and the CI workflow.
+
+## User decisions
+
+- **2026-09-12 — the production deep probe leaves this change** (Gate 1 round 1 finding 3, unresolved after two confirmations): the user chose to split rather than keep iterating on the lookup's time budget (libpq's minimum `connect_timeout` is 2 s, so the planned 1-second bound was not enforceable and a slow connect plus a stalled statement exceeded the 3-second budget). The probe authorization becomes the follow-up change `authorize-deep-probe-by-api-key`, whose design starts from the two confirmations' findings: a bounded connection with an enforceable total deadline, fail-closed 404, refused/delayed/stalled cases tested end to end. Finding 3 is dispositioned `wont-fix` with this reason.

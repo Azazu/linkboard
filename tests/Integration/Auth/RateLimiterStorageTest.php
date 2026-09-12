@@ -18,8 +18,20 @@ final class RateLimiterStorageTest extends KernelTestCase
 {
     public function testRedisBackedLimiterPersistsTheWindow(): void
     {
+        $this->assertRedisBacked('limiter.auth_ip_redis');
+    }
+
+    public function testRedisBackedApiIdentityLimiterPersistsTheWindow(): void
+    {
+        // the per-identity API limiter (FR-KEY-4) runs on the in-process storage in
+        // tests; its twin api_identity_redis proves the production pool
+        $this->assertRedisBacked('limiter.api_identity_redis');
+    }
+
+    private function assertRedisBacked(string $serviceId): void
+    {
         self::bootKernel();
-        $factory = self::getContainer()->get('limiter.auth_ip_redis');
+        $factory = self::getContainer()->get($serviceId);
         self::assertInstanceOf(RateLimiterFactoryInterface::class, $factory);
         $key = 'test-'.bin2hex(random_bytes(6));
 
@@ -33,7 +45,7 @@ final class RateLimiterStorageTest extends KernelTestCase
         // the state is in Redis, not in this process: a fresh kernel sees it too
         self::ensureKernelShutdown();
         self::bootKernel();
-        $again = self::getContainer()->get('limiter.auth_ip_redis');
+        $again = self::getContainer()->get($serviceId);
         self::assertInstanceOf(RateLimiterFactoryInterface::class, $again);
         $third = $again->create($key)->consume();
         self::assertSame($second->getRemainingTokens() - 1, $third->getRemainingTokens());
