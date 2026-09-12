@@ -26,8 +26,10 @@
 
 - Branch run 34698485045 on `9bb1ba0`: completed, success (https://github.com/Azazu/linkboard/actions/runs/34698485045). Task tokens that are not paths lost their backticks (pregate); 6.2 and 6.3 ticked (6.3 at the gate request).
 
+- Gate 2 round 1 (`4314c02`, Reviewed-Commit `e9da6ce`): changes-requested — major: `expiresAt` accepted relative text through the serializer's DateTime fallback; minor: revocation idempotency relied on an in-memory snapshot. Fixed in `e8ad617`: `expiresAt` validated on the raw string (`Assert\DateTime(format: RFC3339)`, future check in the processor against the clock; rejections for `tomorrow`, a timestamp without zone, an impossible date, date-only; a valid value echoed), revocation as one conditional `UPDATE … WHERE revoked_at IS NULL` with a repository test; both failing inputs demonstrated; design decision 5 / applicability, the spec scenario and task 3.1 updated; statuses → fixed. `make stan`/`make cs` clean, the affected suites green (16 tests).
+
 ## Next step
-`scripts/gate-run.sh add-api-keys-and-rate-limiting 2 full`; findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-api-keys-and-rate-limiting 2 confirm <round>`. Then `/git:merge add-api-keys-and-rate-limiting` (a green run on the final head first if code changes).
+`scripts/gate-run.sh add-api-keys-and-rate-limiting 2 confirm 1`. Then the user pushes the branch (code changed), the executor confirms a green run on the exact head, then `/git:merge add-api-keys-and-rate-limiting`.
 
 ## Blockers
 None.
