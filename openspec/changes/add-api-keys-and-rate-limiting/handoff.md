@@ -14,8 +14,10 @@
 
 - Gate 1 round 1 (`4f29d74`, Reviewed-Commit `b7678a0`): changes-requested — three majors: the unlocked count-and-insert of the 10-key cap, the limiter hooked after access control, the unbounded probe key lookup. Fixed in the following commit: owner-row lock in one transaction + concurrency test; limiter on `LoginSuccessEvent` (verified: authenticator listener before the access listener) + role-denied tests; bounded fail-closed `ProbeKeyResolver` on the probe's own PDO factory + CI migrating `app` (decision 10, task 5.2). Statuses → fixed.
 
+- Gate 1 Confirmation 1 (`ff5e172`, Reviewed-Commit `f576c8b`): findings 1–2 confirmed, finding 3 changes-requested — the lookup budget (2 s + 2 s) did not fit the spec's 3 seconds and the prod HTTP matrix lacked the refused/stalled cases. Fixed in the following commit: 1 s connect + 1 s statement for the resolver, prod-kernel HTTP tests for a closed port and a locked `api_keys` table with an elapsed-time assertion, the warning asserted at the resolver level.
+
 ## Next step
-`scripts/gate-run.sh add-api-keys-and-rate-limiting 1 confirm 1`; then `/opsx:apply add-api-keys-and-rate-limiting`.
+`scripts/gate-run.sh add-api-keys-and-rate-limiting 1 confirm 1` — the second confirmation on finding 3; if it fails again, stop and ask the user to arbitrate (AGENTS.md). Then `/opsx:apply add-api-keys-and-rate-limiting`.
 
 ## Blockers
 None.
