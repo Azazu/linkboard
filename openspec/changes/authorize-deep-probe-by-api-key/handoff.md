@@ -16,8 +16,10 @@
 
 - Gate 1 Confirmation 1 (`73d50cc`, Reviewed-Commit `c1b35dd`): finding 3 confirmed; findings 1–2 changes-requested — ext-pgsql's cleanup blocks on `PQgetResult` too, and `clock_timestamp()` does not order snapshots. Fixed in the following commit: the lookup in a killed child process (`bin/probe-key-lookup` + `KeyLookupProcess`, no new extension), a generation-ordered memory with the interleaving established by the real mechanism, a slow fake Redis for cumulative timeouts. Statuses remain fixed.
 
+- Gate 1 Confirmation 2 (`c0f3504`, Reviewed-Commit `fb42073`): finding 3 confirmed; findings 1–2 changes-requested — the Redis operation budget did not account for the pre-lookup read and the denial writes (a 0.5 s delay timed out at `AUTH`); an integer generation with a TTL can recur after expiry, and the verification-age bound was lost. Two failed confirmations → the user arbitrated: apply both fixes and run a third confirmation. Fixed in the following commit: a fixed sequence of four Redis operations at 0.25 s each (connect, `AUTH`/`PING`, the token read, one post-lookup command) with the post-lookup command always funded; a random 128-bit denial token replaced (never incremented) by one deny `EVAL`; `verified_at` stored and checked against an absolute 300-second age at consult; fake Redis gains `--slow-from-command` and `--accept-delay`; new tests: the reuse-after-expiry interleaving, the 301-second-old memory, the whole delayed sequence incl. connect. Statuses remain fixed.
+
 ## Next step
-`scripts/gate-run.sh authorize-deep-probe-by-api-key 1 confirm 1` — the second confirmation on findings 1–2; if either fails again, stop and ask the user to arbitrate (AGENTS.md). Then `/opsx:apply authorize-deep-probe-by-api-key`.
+`scripts/gate-run.sh authorize-deep-probe-by-api-key 1 confirm 1` — the **third** confirmation on findings 1–2, authorised by the user after arbitration (proposal "User decisions"); if either fails again, stop and report — the user decides. Then `/opsx:apply authorize-deep-probe-by-api-key`.
 
 ## Blockers
 None.
