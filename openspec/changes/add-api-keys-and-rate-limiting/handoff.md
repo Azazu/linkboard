@@ -28,8 +28,10 @@
 
 - Gate 2 round 1 (`4314c02`, Reviewed-Commit `e9da6ce`): changes-requested — major: `expiresAt` accepted relative text through the serializer's DateTime fallback; minor: revocation idempotency relied on an in-memory snapshot. Fixed in `e8ad617`: `expiresAt` validated on the raw string (`Assert\DateTime(format: RFC3339)`, future check in the processor against the clock; rejections for `tomorrow`, a timestamp without zone, an impossible date, date-only; a valid value echoed), revocation as one conditional `UPDATE … WHERE revoked_at IS NULL` with a repository test; both failing inputs demonstrated; design decision 5 / applicability, the spec scenario and task 3.1 updated; statuses → fixed. `make stan`/`make cs` clean, the affected suites green (16 tests).
 
+- Gate 2 Confirmation 1 (`83f64bb`, Reviewed-Commit `004c843`): finding 2 confirmed; finding 1 changes-requested on a collateral — `expiresAt: ""` skipped the DateTime validator and hit a LogicException (500). Fixed in the following commit: `NotBlank(allowNull: true)` (empty rejected, null/omitted = never expires), the processor renders a parse failure as a 422 violation; tests for `""` and `null`; two-layer failing-input demonstration recorded.
+
 ## Next step
-`scripts/gate-run.sh add-api-keys-and-rate-limiting 2 confirm 1`. Then the user pushes the branch (code changed), the executor confirms a green run on the exact head, then `/git:merge add-api-keys-and-rate-limiting`.
+`scripts/gate-run.sh add-api-keys-and-rate-limiting 2 confirm 1` — the second confirmation on finding 1; if it fails again, stop and ask the user to arbitrate (AGENTS.md). Then the user pushes the branch (code changed), the executor confirms a green run on the exact head, then `/git:merge add-api-keys-and-rate-limiting`.
 
 ## Blockers
 None.
