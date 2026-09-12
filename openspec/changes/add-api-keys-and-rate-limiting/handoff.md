@@ -30,8 +30,10 @@
 
 - Gate 2 Confirmation 1 (`83f64bb`, Reviewed-Commit `004c843`): finding 2 confirmed; finding 1 changes-requested on a collateral — `expiresAt: ""` skipped the DateTime validator and hit a LogicException (500). Fixed in the following commit: `NotBlank(allowNull: true)` (empty rejected, null/omitted = never expires), the processor renders a parse failure as a 422 violation; tests for `""` and `null`; two-layer failing-input demonstration recorded.
 
+- Gate 2 passed: Confirmation 2 (`da272dc`, Reviewed-Commit `a8b70a5`) — both findings confirmed (raw-string `expiresAt` validation with the empty-string guard, conditional revocation).
+
 ## Next step
-`scripts/gate-run.sh add-api-keys-and-rate-limiting 2 confirm 1` — the second confirmation on finding 1; if it fails again, stop and ask the user to arbitrate (AGENTS.md). Then the user pushes the branch (code changed), the executor confirms a green run on the exact head, then `/git:merge add-api-keys-and-rate-limiting`.
+The code head moved since the green run on `9bb1ba0` (`e8ad617`, `1bc0b38`): the user pushes `change/add-api-keys-and-rate-limiting`; the executor confirms a completed, successful Actions run whose `head_sha` equals `git rev-parse HEAD` and records it here; then `/git:merge add-api-keys-and-rate-limiting` (the verifier checks Gate 2 freshness: only review.md/handoff.md/tasks.md differ from `a8b70a5`). After the merge: the user pushes `main`, the executor checks the `main` run, then `/opsx:archive`.
 
 ## Blockers
 None.
