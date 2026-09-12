@@ -1,7 +1,7 @@
 # Handoff — authorize-deep-probe-by-api-key
 
 **Updated:** 2026-09-12 · claude
-**State:** awaiting-gate-1
+**State:** blocked
 **Branch:** change/authorize-deep-probe-by-api-key
 
 ## Done this session
@@ -19,7 +19,7 @@
 - Gate 1 Confirmation 2 (`c0f3504`, Reviewed-Commit `fb42073`): finding 3 confirmed; findings 1–2 changes-requested — the Redis operation budget did not account for the pre-lookup read and the denial writes (a 0.5 s delay timed out at `AUTH`); an integer generation with a TTL can recur after expiry, and the verification-age bound was lost. Two failed confirmations → the user arbitrated: apply both fixes and run a third confirmation. Fixed in the following commit: a fixed sequence of four Redis operations at 0.25 s each (connect, `AUTH`/`PING`, the token read, one post-lookup command) with the post-lookup command always funded; a random 128-bit denial token replaced (never incremented) by one deny `EVAL`; `verified_at` stored and checked against an absolute 300-second age at consult; fake Redis gains `--slow-from-command` and `--accept-delay`; new tests: the reuse-after-expiry interleaving, the 301-second-old memory, the whole delayed sequence incl. connect. Statuses remain fixed.
 
 ## Next step
-`scripts/gate-run.sh authorize-deep-probe-by-api-key 1 confirm 1` — the **third** confirmation on findings 1–2, authorised by the user after arbitration (proposal "User decisions"); if either fails again, stop and report — the user decides. Then `/opsx:apply authorize-deep-probe-by-api-key`.
+User arbitration on finding 1 (third confirmation failed on it). If the user chooses to fix: correct the fake-Redis command index (`AUTH`/`PING` = 1, token `GET` = 2, post-lookup command = 3 — TCP connect is not a RESP command), replace `--accept-delay` with a full-backlog listener (backlog 0, one connection parked by the fixture, so the next SYN is dropped and the client's connect times out), make `MemoryUnavailable` name the failed operation and the fixture record the commands it served so tests assert the intended phase, keep the whole-sequence success and the guard-removal witness; then a fourth confirmation. If the user waives finding 1: a `## Waiver · Gate 1` record, then `/opsx:apply`.
 
 ## Blockers
-None.
+Gate 1 Confirmation 3 (`e1c9472`, Reviewed-Commit `8896305`): findings 2–3 confirmed; finding 1 changes-requested on test-fixture mechanics only (the design's Redis budget itself is accepted): `--slow-from-command=4` never reaches the consultation (three RESP commands on the wire), `--accept-delay` stalls `AUTH` rather than connect (established connections wait in the accept queue), and no assertion pins which operation timed out. Awaiting the user's decision.
