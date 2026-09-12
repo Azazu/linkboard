@@ -147,7 +147,7 @@ Requirement ids (`FR-<AREA>-<n>`) are stable references for specs, tasks and tes
 
 ### 2.7 QR codes (QR)
 
-- **FR-QR-1** For every link the owner (or admin) SHALL obtain a QR code of `short_url` as SVG (default) or PNG (`?format=png`, 512 px), generated with `endroid/qr-code`, via `GET /api/v1/links/{id}/qr` and a download button in the web UI. Responses are cacheable for 1 day (`Cache-Control: private, max-age=86400`); no server-side cache is required. There is no public QR endpoint.
+- **FR-QR-1** For every link the owner (or admin) SHALL obtain a QR code of `short_url` as SVG (default) or PNG (`?format=png`, 512 × 512 px), generated with `endroid/qr-code`, via `GET /api/v1/links/{id}/qr` and a download button in the web UI (the button: FR-WEB-1, row 11). `format` accepts only `svg`/`png` — anything else is 422 with a violation on `format`; an `Accept` header admitting neither `image/svg+xml` nor `image/png` is 406; the parameter selects the image, the header only gates. Responses carry `Content-Disposition: inline; filename="<slug>.svg|png"` and are cacheable for 1 day (`Cache-Control: private, max-age=86400`); no server-side cache is required. The boundary is the link's own: anonymous 401, an unknown id 404 for an authenticated caller, a stranger 403; inactive and expired links keep their QR code (the redirect decides at scan time), a deleted link's answers 404. There is no public QR endpoint.
 
 ### 2.8 API keys and rate limiting (KEY)
 

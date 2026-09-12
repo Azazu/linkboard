@@ -11,9 +11,12 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
 use ApiPlatform\OpenApi\Model\Parameter;
 use App\Link\Entity\Link;
+use App\Link\Qr\LinkQrProcessor;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * The link as the API sees it (specification §2.2, §4). A DTO: the entity
@@ -66,6 +69,29 @@ use App\Link\Entity\Link;
             processor: DeleteLinkProcessor::class,
             security: 'is_granted("LINK_DELETE", object)',
             description: 'Hard delete; the slug becomes available again.',
+        ),
+        // The QR code of the short URL (spec qr-codes). The item provider and the
+        // voter run as for GET /links/{id}; `write: true` makes API Platform hand
+        // the resource to the processor on a GET (design decision 1) — nothing is
+        // written. `format` selects the image; `Accept` only gates (406 for a
+        // client that admits neither image type).
+        new Get(
+            uriTemplate: '/links/{id}/qr',
+            name: 'link_qr',
+            provider: LinkItemProvider::class,
+            processor: LinkQrProcessor::class,
+            write: true,
+            security: 'is_granted("LINK_VIEW", object)',
+            outputFormats: ['svg' => ['image/svg+xml'], 'png' => ['image/png']],
+            parameters: [
+                'format' => new QueryParameter(
+                    key: 'format',
+                    schema: ['type' => 'string', 'enum' => ['svg', 'png'], 'default' => 'svg'],
+                    description: 'Image format: `svg` (default) or `png` (512 × 512 px). Selects the image regardless of `Accept`.',
+                    constraints: [new Assert\Choice(choices: ['svg', 'png'], message: 'format must be svg or png.')],
+                ),
+            ],
+            description: 'The QR code of the link\'s short URL as SVG (default) or PNG (`?format=png`, 512 × 512 px); `Content-Disposition: inline; filename="<slug>.svg|png"`, `Cache-Control: private, max-age=86400`. Owner or admin.',
         ),
         new GetCollection(
             uriTemplate: '/admin/links',
