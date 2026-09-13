@@ -11,10 +11,12 @@
 
 **Design choices worth the reviewer's attention:** (1) the link write path moves out of the API Platform processors into `src/Link/UseCase/` because the processors read the raw JSON body and a form post has none — the alternative was a second copy of ownership, slug and cache logic; the existing `tests/Api/Link` suite is the net, and task 3.2 forbids editing it. (2) The dashboard query is deliberately uncached: a report cache keyed by owner would go stale for five minutes after any API write, and the invalidation would have to live in two layers. (3) The content security policy is not sent on `^/api` because API Platform's Swagger UI bootstraps inline; the gap is stated rather than papered over with `unsafe-inline`.
 
-**Security-relevant parts for review:** the ownership boundary repeated on every page (voter on the converted `LinkResource`, 404 on denial, SQL scoped by `owner_id`), CSRF on every state-changing form, the policy and its per-request nonce, and the session cookie flags.
+**Security-relevant parts for review:** the ownership boundary repeated on every page (voter on the converted `LinkResource`, 404 on the pages while the API keeps its 403, SQL scoped by `owner_id`), CSRF on every state-changing form, the policy and its per-request nonce, and the session cookie flags.
+
+- Gate 1 round 1 (`807c1fc`, Reviewed-Commit `600f852`): changes-requested — three majors and one minor, all real. (1) The access-control pattern `^/(dashboard|links|api-keys)` is an unanchored regular expression, so it also captured the valid short links `/dashboard-sale`, `/links-promo` and `/api-keys-promo` and would have sent public redirects to the login page. (2) Excluding `^/api` from the policy also excluded `/api-keys` — the one page that renders a secret. (3) Turbo Drive snapshots the DOM before navigating and restores it from cache without a server request, so a consumed server-side flash does not keep a new key's plaintext off the screen after a back navigation. (4) The artifacts claimed the API answers a stranger with 404; the `links` and `qr-codes` capabilities require 403. Fixed in the following commit: the segment boundary `(/|$)` on both patterns with a prefix-slug regression test; positive header assertions on `/api-keys` and on the page that shows a new key; `data-turbo-temporary` plus `<meta name="turbo-cache-control" content="no-cache">` plus `Cache-Control: no-store`, each asserted in markup, with the manual back-navigation check recorded in the how-to instead of claimed as a test; and the 404-versus-403 asymmetry stated as a rendering decision that leaves the API contract alone. Statuses → fixed.
 
 ## Next step
-`/opsx:propose add-web-ui` — proposal, the spec deltas, design and tasks; then Gate 1 if the declared tier is `high`, otherwise implementation and Gate 2.
+`scripts/gate-run.sh add-web-ui 1 confirm 1` — the confirmation on findings 1–4. Then `/opsx:apply add-web-ui`.
 
 ## Blockers
 None.

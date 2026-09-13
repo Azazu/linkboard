@@ -14,16 +14,24 @@ The system SHALL serve, to a signed-in user, `/dashboard` (their own totals, a c
 - **WHEN** a client with no session requests any of those paths
 - **THEN** the response redirects to `/login` and its body contains none of the page's content
 
+#### Scenario: A short link whose slug begins with a page's name is still a short link
+- **WHEN** a guest requests `/dashboard-sale`, `/links-promo` and `/api-keys-promo`, which are valid slugs of existing links
+- **THEN** each response is the redirect the `redirect` capability defines, no response sends the client to `/login`, and none starts a session
+
 #### Scenario: The dashboard shows the signed-in user's own figures
 - **WHEN** two users each own links with clicks, and one of them opens `/dashboard`
 - **THEN** the totals and the chart series count only that user's links, and the recent-links list holds only their links
 
 ### Requirement: A link page belongs to its owner
-The system SHALL refuse every link page for a link the signed-in user neither owns nor administers, with the same 404 the API gives, so that an existing link owned by somebody else is indistinguishable from an unknown identifier. An administrator SHALL reach another user's link pages, as they reach the link through the API. An identifier that is not a valid link identifier SHALL also be 404.
+The system SHALL refuse every link page for a link the signed-in user neither owns nor administers. The pages SHALL render that refusal as 404, identical to the response for an identifier no link has, so a signed-in stranger who guesses or is handed an identifier learns nothing from the page. This is the pages' rendering of the same authorization decision the API makes; the API's own answer for that caller stays what the `links` and `qr-codes` capabilities require (403 for a stranger, 404 for an unknown identifier) and is not changed by this capability. An administrator SHALL reach another user's link pages, as they reach the link through the API.
 
 #### Scenario: A stranger cannot tell an existing link from an unknown one
 - **WHEN** a signed-in user requests `/links/{id}`, `/links/{id}/edit` and the delete action for a link owned by somebody else, and then the same paths with an identifier no link has
 - **THEN** every response is 404 and the bodies are indistinguishable
+
+#### Scenario: The API's own answer is unchanged
+- **WHEN** that same user requests `GET /api/v1/links/{id}` for the link owned by somebody else
+- **THEN** the response is the 403 problem document the `links` capability requires — the pages' 404 is a rendering decision, not a change to the API
 
 #### Scenario: An administrator reaches another user's link
 - **WHEN** an administrator requests `/links/{id}` for another user's link
@@ -82,22 +90,30 @@ The system SHALL let an owner edit a link's routing rules both as a structured e
 - **THEN** the stored rules are that document in its canonical form and the link's page shows them
 
 ### Requirement: The API-keys page shows a new key once
-The system SHALL show a newly created API key's plaintext exactly once, on the page that follows its creation, and never again — later renderings of the page SHALL show only the prefix and the key's metadata, as the API does. The page SHALL list the user's own keys, revoked and expired ones included, and SHALL revoke a key on a confirmed, CSRF-protected submission. It SHALL show another user's key neither in the list nor through a revocation.
+The system SHALL show a newly created API key's plaintext exactly once, on the page that follows its creation, and never again — later renderings of the page SHALL show only the prefix and the key's metadata, as the API does. That page SHALL NOT be retained in any cache the browser or the navigation layer keeps, so returning to it through history shows a page without the plaintext rather than a restored copy of it. The page SHALL list the user's own keys, revoked and expired ones included, and SHALL revoke a key on a confirmed, CSRF-protected submission. It SHALL show another user's key neither in the list nor through a revocation.
 
 #### Scenario: The plaintext is shown once
 - **WHEN** a signed-in user creates an API key from `/api-keys` and then opens `/api-keys` again
 - **THEN** the first response shows the plaintext once and the second shows only the prefix and the metadata
+
+#### Scenario: A back navigation does not bring the plaintext back
+- **WHEN** the page that showed a new key is left and then reached again through the browser's history
+- **THEN** that response is fetched rather than restored from a cached copy, and it carries no plaintext
 
 #### Scenario: Another user's key cannot be revoked
 - **WHEN** a signed-in user submits a revocation for a key that belongs to somebody else
 - **THEN** the response is 404, and that key still authenticates
 
 ### Requirement: Every web response carries the hardening headers
-The system SHALL send, on every response the web pages produce, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, a `Referrer-Policy`, and a `Content-Security-Policy` that admits scripts, styles, images, fonts and connections only from the application's own origin — no external origin, no `unsafe-inline` for scripts — and that forbids framing and the injection of a base URI. Any inline script the asset pipeline requires SHALL be admitted by a nonce that is unpredictable and different on every response. Session cookies SHALL be `HttpOnly` and `SameSite=Lax`, and SHALL be `Secure` outside development.
+The system SHALL send, on every response the web pages produce — the API-keys page included — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, a `Referrer-Policy`, and a `Content-Security-Policy` that admits scripts, styles, images, fonts and connections only from the application's own origin — no external origin, no `unsafe-inline` for scripts — and that forbids framing and the injection of a base URI. Any inline script the asset pipeline requires SHALL be admitted by a nonce that is unpredictable and different on every response. Session cookies SHALL be `HttpOnly` and `SameSite=Lax`, and SHALL be `Secure` outside development.
 
 #### Scenario: A rendered page carries the headers and a fresh nonce
-- **WHEN** a signed-in user requests `/dashboard` twice
-- **THEN** each response carries the four headers, the policy names only the application's own origin, and the nonce in the second response differs from the first and matches the one on that response's inline script
+- **WHEN** a signed-in user requests `/dashboard` twice, and then `/api-keys` and the page that shows a newly created key
+- **THEN** each response carries the four headers, the policy names only the application's own origin, and the nonce in the second dashboard response differs from the first and matches the one on that response's inline script
+
+#### Scenario: Only the API documentation is outside the policy
+- **WHEN** the documentation page at `/api/docs` is requested
+- **THEN** it carries `X-Content-Type-Options`, `X-Frame-Options` and a `Referrer-Policy` but no content security policy, because its Swagger UI bootstraps with an inline script this capability does not control — and no other HTML page of the application is exempt
 
 #### Scenario: The policy admits no external origin
 - **WHEN** any web page is rendered
