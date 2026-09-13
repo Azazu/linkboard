@@ -18,7 +18,12 @@ final class ApiKeyHeaderExtractor implements AccessTokenExtractorInterface
 
     public function extractAccessToken(Request $request): ?string
     {
-        $header = $request->headers->get('Authorization');
+        return self::keyFromHeader($request->headers->get('Authorization'));
+    }
+
+    /** The key in an `Authorization` header value, or null when the value is not exactly `Bearer lb_…`. */
+    public static function keyFromHeader(#[\SensitiveParameter] ?string $header): ?string
+    {
         if (null === $header || 1 !== preg_match(self::HEADER, $header, $m)) {
             return null;
         }
