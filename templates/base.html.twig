@@ -3,10 +3,21 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        {# Turbo reads this when it creates its progress-bar <style>; without it
+           the policy refuses that element (found by the browser acceptance run). #}
+        <meta name="csp-nonce" content="{{ csp_nonce() }}">
         <title>{% block title %}Linkboard{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.1em%22 font-size=%22104%22>🔗</text></svg>">
         {% block head_meta %}{% endblock %}
-        {% block stylesheets %}{% endblock %}
+        {% block stylesheets %}
+            {# Linked, not imported from JavaScript: an `import 'x.css'` makes the
+               import map resolve the specifier to a `data:application/javascript,…`
+               module, which the content security policy refuses — and a refused
+               module takes the whole entry point down with it, Stimulus and Turbo
+               included (found by the browser acceptance run of add-web-ui). #}
+            <link rel="stylesheet" href="{{ asset('vendor/@picocss/pico/css/pico.min.css') }}">
+            <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
+        {% endblock %}
         {% block javascripts %}
             {% block importmap %}{{ importmap('app', { nonce: csp_nonce() }) }}{% endblock %}
         {% endblock %}

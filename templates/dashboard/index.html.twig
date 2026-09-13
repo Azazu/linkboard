@@ -14,7 +14,7 @@
 
     <h2>Clicks per day</h2>
     <p><small>{{ period.from|date('Y-m-d') }} to {{ period.to|date('Y-m-d') }}, UTC, bots excluded.</small></p>
-    <div style="height: 20rem">{{ render_chart(chart) }}</div>
+    <div class="lb-chart">{{ render_chart(chart) }}</div>
     {# the chart needs JavaScript; the numbers above and the table below do not #}
 
     <h2>Recent links</h2>

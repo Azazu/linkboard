@@ -30,3 +30,9 @@ body > footer {
 .lb-table-scroll {
     overflow-x: auto;
 }
+
+/* The chart's box. A height belongs in the stylesheet, not in a style
+   attribute: the content security policy refuses those. */
+.lb-chart {
+    height: 20rem;
+}

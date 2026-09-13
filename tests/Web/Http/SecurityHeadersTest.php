@@ -39,7 +39,7 @@ final class SecurityHeadersTest extends WebTestCase
         $client->request('GET', '/login');
         $policy = (string) $client->getResponse()->headers->get('Content-Security-Policy');
 
-        foreach (["default-src 'self'", "style-src 'self'", "img-src 'self' data:", "font-src 'self'", "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"] as $directive) {
+        foreach (["default-src 'self'", "style-src 'self' 'nonce-", "img-src 'self' data:", "font-src 'self'", "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"] as $directive) {
             self::assertStringContainsString($directive, $policy);
         }
         self::assertStringNotContainsString('unsafe-inline', $policy);

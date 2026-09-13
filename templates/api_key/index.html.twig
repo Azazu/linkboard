@@ -17,7 +17,7 @@
             <header><strong>Copy this key now</strong></header>
             <p>It is shown once. The server keeps only its hash and cannot show it again.</p>
             <p class="lb-monospace" data-secret-target="value" data-clipboard-target="source">{{ created.key }}</p>
-            <p><small>Prefix {{ created.prefix }} · created {{ created.createdAt|date('Y-m-d H:i') }} UTC</small></p>
+            <p><small>Key “{{ created.name }}”, prefix {{ created.prefix }}.</small></p>
         </article>
     {% endif %}
 

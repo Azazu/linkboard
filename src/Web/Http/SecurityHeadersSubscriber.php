@@ -22,7 +22,10 @@ use Symfony\Component\HttpKernel\KernelEvents;
  */
 final readonly class SecurityHeadersSubscriber
 {
-    private const string POLICY = "default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
+    // The nonce is on style-src as well: Turbo injects one <style> element for
+    // its progress bar and reads the nonce from the page's meta tag. An inline
+    // style *attribute* stays refused — the templates carry none.
+    private const string POLICY = "default-src 'self'; script-src 'self' 'nonce-%1\$s'; style-src 'self' 'nonce-%1\$s'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
     private const string API_PATH = '#^/api(/|$)#';
 
     public function __construct(private CspNonce $nonce)

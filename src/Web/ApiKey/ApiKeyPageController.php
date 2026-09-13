@@ -14,6 +14,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
@@ -53,19 +54,29 @@ final class ApiKeyPageController extends AbstractController
         $data = new ApiKeyFormData();
         $form = $this->createForm(ApiKeyType::class, $data);
         $form->handleRequest($request);
-        $created = null;
 
         if ($form->isSubmitted() && $form->isValid()) {
             $input = new CreateApiKeyInput();
             $input->name = $data->name;
             $input->expiresAt = $data->expiresAt?->format(CreateApiKeyInput::EXPIRES_AT_FORMAT);
             try {
-                $created = $this->createKey->create($user, $input);
-                $form = $this->createForm(ApiKeyType::class, new ApiKeyFormData());
+                $key = $this->createKey->create($user, $input);
+                // A 303 to this same page, not a rendered 200: Turbo replaces a
+                // page only on a redirect or a 422, and a redirect also means a
+                // reload cannot create a second key. The value rides one flash —
+                // server-side, read once, gone — rather than living in a URL or
+                // in a resubmittable POST body.
+                $this->addFlash('api_key_created', ['key' => $key->key, 'prefix' => $key->prefix, 'name' => $key->name]);
+
+                return $this->redirectToRoute('app_api_keys', [], Response::HTTP_SEE_OTHER);
             } catch (ConflictHttpException $e) {
                 $form->addError(new FormError($e->getMessage()));
             }
         }
+
+        $session = $request->getSession();
+        $flashed = $session instanceof FlashBagAwareSessionInterface ? $session->getFlashBag()->get('api_key_created') : [];
+        $created = \is_array($flashed[0] ?? null) ? $flashed[0] : null;
 
         $response = $this->render('api_key/index.html.twig', [
             'form' => $form,
@@ -73,7 +84,7 @@ final class ApiKeyPageController extends AbstractController
             'keys' => $this->keys->listByOwner($user, 0, self::PER_PAGE),
             'total' => $this->keys->countByOwner($user),
             'max_active' => ApiKey::MAX_ACTIVE_PER_USER,
-        ], new Response(status: $form->isSubmitted() && null === $created ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
+        ], new Response(status: $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
 
         if (null !== $created) {
             // the response that carries a secret is stored by nothing

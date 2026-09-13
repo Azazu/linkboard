@@ -21,7 +21,9 @@ final class ApiKeyPageTest extends WebPageTestCase
         $this->signIn($client, 'ann@example.com');
 
         $client->request('GET', '/api-keys');
-        $crawler = $client->submitForm('Create key', ['api_key[name]' => 'monitoring']);
+        $client->submitForm('Create key', ['api_key[name]' => 'monitoring']);
+        self::assertResponseStatusCodeSame(303, 'a write answers a redirect, so a reload cannot create a second key');
+        $crawler = $client->followRedirect();
 
         self::assertResponseIsSuccessful();
         $secret = $crawler->filter('[data-secret-target=value]')->text();
@@ -39,7 +41,8 @@ final class ApiKeyPageTest extends WebPageTestCase
         $this->signIn($client, 'ann@example.com');
 
         $client->request('GET', '/api-keys');
-        $crawler = $client->submitForm('Create key', ['api_key[name]' => 'monitoring']);
+        $client->submitForm('Create key', ['api_key[name]' => 'monitoring']);
+        $crawler = $client->followRedirect();
 
         // the three markings of design decision 9a, each of which a browser honours
         self::assertStringContainsString('no-store', (string) $client->getResponse()->headers->get('Cache-Control'));
@@ -65,6 +68,7 @@ final class ApiKeyPageTest extends WebPageTestCase
         self::assertNotNull($client->getResponse()->headers->get('Content-Security-Policy'));
 
         $client->submitForm('Create key', ['api_key[name]' => 'monitoring']);
+        $client->followRedirect();
         $policy = (string) $client->getResponse()->headers->get('Content-Security-Policy');
         self::assertStringContainsString("default-src 'self'", $policy);
         self::assertSame('DENY', $client->getResponse()->headers->get('X-Frame-Options'));
