@@ -119,3 +119,21 @@
 - Finding 2 is a source-based counterexample, not a locally executed reproduction: [PhpRedis bulk-read loop and timeout setup](https://raw.githubusercontent.com/phpredis/phpredis/6.2.0/library.c) repeatedly read until the payload is complete; [PHP 8.4 socket reads](https://raw.githubusercontent.com/php/php-src/PHP-8.4/main/streams/xp_socket.c) reuse the configured timeout on successive waits. Neither supplies an absolute RESP-command deadline.
 - `scripts/pregate-verify.sh gate2 authorize-deep-probe-by-api-key` passed whitespace, strict OpenSpec validation, tier, task and link checks, but could not run `make check`: this review sandbox denies access to `/var/run/docker.sock`, and no host PHP executable is available. The executor's green suite and mutation evidence are recorded in the handoff and commit bodies; they were inspected but not independently rerun here. The sandbox limitation is not classified as a code defect.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-13
+**Reviewed-Commit:** 1fb744f02bb3bdd48e3a272f65d3aaa1d80b0d9c
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — `composer.json` now requires `symfony/process` in production, and `composer.lock` moves the same v8.1.6 package from `packages-dev` to `packages`, supplying both Process and PhpExecutableFinder to a no-dev installation. Proposal, design and task 1.2 acknowledge the dependency change. ProductionDependenciesTest checks production lock membership and runtime references to development-only namespaces. Commit 129863c records a clean no-dev installation exercising an admin key (probe report) and an unknown key (identical 404), plus the package-removal witness returning 500. This resolves the deployment failure; the recorded runtime demonstration was inspected, not independently rerun in this sandbox. |
+| 2 | confirmed — BoundedRedisConnection replaces the per-read timeout with one deadline shared by the complete command write and response parsing. The socket is non-blocking and each readiness wait uses the remaining allowance, so incremental response progress cannot restart the timeout. ProbeMemory retains four operations at 0.25 seconds each and a separately funded post-lookup command; failure paths close the connection and preserve the authorizer's fail-closed fallback. The fragmented-response fixture and integration tests exercise both the token read and consultation after successful earlier commands, asserting the failed operation and elapsed bound; the prod test asserts consultation failure and a 404 within five seconds. Commit 129863c records failing witnesses when the deadline is replaced by a per-read timeout. The shared HealthProbe client and isolated prod-test cache introduce no unresolved regression reachable from this finding. |
+
+### Evidence and validation
+- Reviewed only `5163c14e75ae81c161ddc93c95e3dae3c3348639..1fb744f02bb3bdd48e3a272f65d3aaa1d80b0d9c` and collateral reachable from these two major findings. Verified the requested branch and HEAD and an initially clean worktree. Both source findings were marked `fixed`; no unrelated findings were introduced.
+- Inspected dependency metadata, the lookup caller, the new RESP transport, memory and authorizer control flow, the probe's Redis check, fragmented-response fixtures and assertions, production request support, and related artifact claims. Reviewed the executor's mutation/no-dev evidence in 129863c and the three green full-suite runs (669 tests) recorded in 1fb744f.
+- `git diff --check` for the requested interval passed. `scripts/pregate-verify.sh gate2 authorize-deep-probe-by-api-key` passed whitespace, strict OpenSpec validation, tier, task and link checks, but exited unsuccessfully because `make check` cannot access `/var/run/docker.sock` in this sandbox. No host PHP executable is available. Runtime tests and the clean no-dev demonstration were therefore not independently repeated; this environment limitation is not a code finding.
+- Only `review.md` was modified; no git write commands were run.
