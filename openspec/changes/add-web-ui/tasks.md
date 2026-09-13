@@ -41,8 +41,8 @@ High tier (a second authenticated surface, the ownership boundary on new pages, 
 ## 6. Wrap-up
 
 - [x] 6.1 `make check` green (cs, stan level 8, all suites); commits per block (`feat(web):`, `refactor(link):`, `feat(analytics):`, `test(web):`, `docs:`) with the agent trailer; every guard's commit body names its demonstrated failing input; the authorization and policy parts flagged in the commit bodies and in `handoff.md`. Verify: `git log --oneline main..HEAD`; `openspec validate add-web-ui --strict` passes.
-- [ ] 6.2 Green Actions run on the exact branch head before Gate 2: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-web-ui` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
-- [ ] 6.3 `scripts/pregate-verify.sh gate2 add-web-ui` passes and `scripts/gate-run.sh add-web-ui 2 full` is run; findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-web-ui 2 confirm <round>`. Verify: review.md carries a Gate 2 round bound to the requested commit; the merge verifier checks that the last Gate 2 decision reads approved/confirmed and is fresh.
+- [x] 6.2 Green Actions run on the exact branch head before Gate 2: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/add-web-ui` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
+- [x] 6.3 `scripts/pregate-verify.sh gate2 add-web-ui` passes and `scripts/gate-run.sh add-web-ui 2 full` is run; findings via `/workflow:fix-findings`, confirmation with `scripts/gate-run.sh add-web-ui 2 confirm <round>`. Verify: review.md carries a Gate 2 round bound to the requested commit; the merge verifier checks that the last Gate 2 decision reads approved/confirmed and is fresh.
 
 ## Post-merge acceptance (not a Gate 2 task)
 

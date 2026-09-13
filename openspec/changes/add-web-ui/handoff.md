@@ -1,7 +1,7 @@
 # Handoff — add-web-ui
 
 **Updated:** 2026-09-13 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/add-web-ui
 
 ## Done this session
@@ -30,7 +30,7 @@
 - Branch run 1 (`9cf4dca`) failed in `make cs`: a missing trailing comma in a `match` arm of `src/Web/Link/LinkListController.php`. The local check had reported green because PHP-CS-Fixer's cache marked that file clean; with `--using-cache=no` it reports the same violation CI did. Fixed, and `make cs` now passes `--using-cache=no` so the gate floor cannot report green on stale knowledge again (`cs-fix` keeps the cache for speed). Worth the reviewer's attention as a verifier change.
 
 ## Next step
-The user pushes `change/add-web-ui`; then task 6.2 (the Actions run on the exact head must be `completed`/`success`, URL and SHA recorded here) and task 6.3 — `scripts/pregate-verify.sh gate2 add-web-ui` and `scripts/gate-run.sh add-web-ui 2 full`.
+`scripts/gate-run.sh add-web-ui 2 full` on the branch head; findings via `/workflow:fix-findings`, then `/git:merge`. Green Actions run on the reviewed code: `ae9d02544bbbb81fc260e6e557151cc3bc833967` — https://github.com/Azazu/linkboard/actions/runs/34777536429 (completed/success). Only `tasks.md` and `handoff.md` change after it, which the Gate 2 freshness rule allows.
 
 ## Blockers
 None.
