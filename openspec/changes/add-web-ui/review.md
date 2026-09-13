@@ -19,3 +19,24 @@
 - `scripts/pregate-verify.sh gate1 add-web-ui` passes, including strict OpenSpec validation.
 - Direct evaluation of the proposed path expressions confirms the prefix-slug matches and the `/api-keys` CSP exclusion.
 - This is an artifact review; implementation tests are not yet applicable. Only this review file was written; no git write commands were run.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-13
+**Reviewed-Commit:** e46102345f2682bd60fbece83f8cdea874bf12f7
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Design decision 3, the authorization applicability row and task 4.2 now use a segment boundary. The prefix-slug scenario refers to the redirect capability (which covers GET and HEAD), and task 4.2 requires public redirects without a session cookie, guest denial on the dashboard, and a failing-input demonstration for removal of the boundary. |
+| 2 | confirmed — Design decision 6 and task 2.2 bound the exclusion to the API segment, preserving CSP on `/api-keys`; the spec and task explicitly cover both the list and the response displaying a new key. Excluded HTML retains the other three headers, and widening the exclusion is a planned failing input. |
+| 3 | changes-requested — Decision 9a and task 4.8 address Turbo snapshots, but incorrectly treat `Cache-Control: no-store` as preventing the browser's back-forward cache. Chrome can retain such documents; a full-document navigation away from a directly loaded secret-bearing page and Back need not invoke Turbo's snapshot machinery. The new spec's guarantee about every browser/navigation cache therefore lacks a mechanism. Also, task 5.1 only requires documenting a manual check, not executing and recording a browser navigation with Turbo active; the planned negative checks assert markup rather than demonstrate secret redisplay when protection is removed. Specify protection for full-document history restoration (or explicitly reconcile the supported guarantee), and add an executable browser acceptance task with recorded results for Turbo navigation and full-document away/back, plus a failing-input demonstration of the secret-restoration guard. Keep the HTTP no-store header, but do not claim it alone excludes bfcache. |
+
+### Validation
+- Reviewed only `600f8522c1190360f2f91ea2962f67664f7e97e6..e46102345f2682bd60fbece83f8cdea874bf12f7` and collateral reachable from findings 1–3. No unrelated findings were introduced.
+- Branch and HEAD match the request; the working tree was initially clean. All source-round findings have been dispositioned.
+- Direct path-expression evaluation excludes all three prefix slugs from UI protection, protects the actual UI paths, and keeps `/api-keys` outside the CSP exclusion.
+- `scripts/pregate-verify.sh gate1 add-web-ui` passes, including strict OpenSpec validation. This is a planning confirmation; application/browser tests are not yet applicable.
+- [Turbo caching documentation](https://turbo.hotwired.dev/handbook/building#understanding-caching) confirms the proposed temporary-element and no-cache mechanisms for Turbo's own snapshots. [Chrome's no-store/bfcache documentation](https://developer.chrome.com/docs/web-platform/bfcache-ccns) explicitly allows no-store documents in bfcache under specified conditions; HTTP cache exclusion is not a universal history-restoration exclusion.
+- Only `review.md` was modified; no git write commands were run.
