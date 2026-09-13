@@ -102,7 +102,7 @@ The system SHALL send a newly created API key's plaintext in exactly one respons
 
 #### Scenario: A back navigation in a real browser shows no plaintext
 - **WHEN** a browser that runs scripting creates a key, navigates away — both within the application and as a full document load — and returns through its history
-- **THEN** the restored page shows no plaintext, and removing the page's protections makes the plaintext reappear
+- **THEN** neither return shows the plaintext; and with the protections that govern each of those two returns removed, the plaintext reappears, which is how the protections are known to be the reason
 
 #### Scenario: Another user's key cannot be revoked
 - **WHEN** a signed-in user submits a revocation for a key that belongs to somebody else
