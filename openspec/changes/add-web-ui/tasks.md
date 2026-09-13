@@ -36,7 +36,7 @@ High tier (a second authenticated surface, the ownership boundary on new pages, 
 
 ## 5. Docs
 
-- [ ] 5.1 `docs/how-to/local-development.md`: a "Using the web UI" section (the pages, the demo login from `app:demo:seed`, what needs JavaScript and what does not, the policy and the one documentation-page exclusion, the browser acceptance run of task 4.9 with its exact command and expected output, how to regenerate the vendored assets); `docs/explanation/requirements.md`: the FR-WEB rows and §7 row 11 brought in line with what shipped. Verify: every documented command run in its exact form; both files re-read whole after the last edit; `rg -n 'importmap:require|asset-map:compile' docs` shows the commands that exist.
+- [x] 5.1 `docs/how-to/local-development.md`: a "Using the web UI" section (the pages, the demo login from `app:demo:seed`, what needs JavaScript and what does not, the policy and the one documentation-page exclusion, the browser acceptance run of task 4.9 with its exact command and expected output, how to regenerate the vendored assets); `docs/explanation/requirements.md`: the FR-WEB rows and §7 row 11 brought in line with what shipped. Verify: every documented command run in its exact form; both files re-read whole after the last edit; `rg -n 'importmap:require|asset-map:compile' docs` shows the commands that exist.
 
 ## 6. Wrap-up
 

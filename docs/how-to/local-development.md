@@ -35,6 +35,91 @@ http://localhost:8082/api/docs.json · API base path:
 http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
 `127.0.0.1:6382`.
 
+## Using the web UI
+
+The pages are server-rendered Twig, styled with Pico.css and enhanced by
+Turbo and three small Stimulus controllers. Sign in at
+http://localhost:8082/login — `make console ARGS='app:demo:seed'` prints
+the two demo accounts and their generated passwords — and the navigation
+carries the pages an owner uses:
+
+| Page | What it is for |
+|---|---|
+| `/dashboard` | your totals, a clicks-per-day chart over your links, your ten most recent links |
+| `/links` | your links, filtered by state or slug fragment, ordered by creation or clicks, 30 to a page |
+| `/links/new` · `/links/{id}` · `/links/{id}/edit` | create, see (short URL, copy button, QR code) and change a link, routing rules included |
+| `/api-keys` | create a key — its value is shown once — list your keys and revoke one |
+
+Two things behave the way they do on purpose:
+
+- **A link that is not yours is a 404**, exactly like an identifier no link
+  has. The API answers 403 for the same request (that is its contract, spec
+  `links`); the pages disclose less.
+- **The value of a new API key is sent in exactly one response.** The
+  server stores only its hash and cannot show it again. The page that
+  carries it is kept out of Turbo's snapshot, out of HTTP caches, and is
+  cleared when the browser restores the document from its history — but a
+  browser that restores an already-rendered page with scripting disabled,
+  a screenshot, and your clipboard are outside the application's control.
+
+**JavaScript is optional.** Every page renders and every form submits
+without it; only the dashboard chart, the copy button and the rules
+editor's convenience behaviour need it, and each degrades to readable
+content or a plain field. The rules editor offers structured rows and the
+raw JSON document; a document with A/B variants, or with a rule matching
+on several keys at once, opens as JSON, because the rows cannot hold it.
+
+**Security headers.** Every response carries `X-Content-Type-Options`;
+every rendered page also carries `X-Frame-Options: DENY`, a
+`Referrer-Policy` and a content security policy that admits only this
+origin, with a per-request nonce for the import map and for the one style
+element Turbo injects. The single exception is `/api/docs`: API Platform's
+Swagger UI bootstraps with an inline script this application does not
+control, so that page carries the other three headers and no policy.
+
+### Regenerating the front-end assets
+
+The vendored files under `assets/vendor/` are committed, so neither a
+deployment nor CI needs network access to build the front end. To change a
+pinned version:
+
+```bash
+make console ARGS='importmap:require @hotwired/turbo'   # or update, or remove
+make console ARGS='importmap:audit'                     # known vulnerabilities
+git add assets/vendor importmap.php
+```
+
+Stylesheets are linked from `templates/base.html.twig` with `asset()`, not
+imported from `assets/app.js`: a CSS import makes the import map resolve
+the specifier to a `data:application/javascript,…` module, which the
+content security policy refuses — and a refused module takes the whole
+entry point down with it.
+
+### The browser acceptance run
+
+One claim cannot be tested by the PHPUnit suite: that returning to the
+page which showed an API key does not put the value back on the screen.
+That is checked in a real browser, outside `make check` because CI has no
+browser:
+
+```bash
+npm install --no-save --prefix /tmp/lb-acceptance puppeteer-core
+NODE_PATH=/tmp/lb-acceptance/node_modules \
+  node tests/Acceptance/api-key-back-navigation.mjs --base=http://localhost:8082
+```
+
+It prints one line, and exits non-zero if the value came back:
+
+```json
+{"turbo":{"leaked":false,"exercised":true},"full":{"leaked":false,"exercised":true}}
+```
+
+`exercised` says whether the browser really restored the document rather
+than refetching it; a case that was not exercised has not proven anything.
+`/login` and `/register` are rate limited to ten requests a minute per IP,
+so give the run a minute between attempts — it says so when the limiter is
+what refused it.
+
 ## Monitoring the deep probe
 
 `GET /health` (liveness) stays open everywhere. In `prod` the dependency
