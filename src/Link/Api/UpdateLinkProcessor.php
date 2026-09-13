@@ -7,12 +7,11 @@ namespace App\Link\Api;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
-use App\Analytics\Cache\ReportCache;
 use App\Auth\Entity\User;
 use App\Link\LinkRepositoryInterface;
 use App\Link\Rules\RulesDocumentParser;
-use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
+use App\Link\UseCase\LinkChanges;
+use App\Link\UseCase\UpdateLink;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -23,12 +22,14 @@ use Symfony\Component\Validator\ConstraintViolationList;
 
 /**
  * PATCH /api/v1/links/{id} as a merge patch: only the keys present in the
- * request body change (design decision 6). Null contract: expiresAt,
- * maxClicks, utm and rules may be cleared with null (a rules document
- * replaces the whole stored one); targetUrl and isActive may not be null;
- * slug is immutable. Admin actions on another user's link are audited
- * after the flush, and the link's cached reports are invalidated after the
- * flush (best effort — capability analytics).
+ * request body change (design decision 6 of add-links-and-redirect). This
+ * class is the HTTP half — which keys the body named, the null contract
+ * (`expiresAt`, `maxClicks`, `utm` and `rules` may be cleared with null;
+ * `targetUrl` and `isActive` may not; the slug is immutable), and the
+ * type-preserving decode of the rules document. The change itself, the flush,
+ * the cache invalidation and the audit line are App\Link\UseCase\UpdateLink,
+ * which the web UI calls with a LinkChanges built from a form instead
+ * (add-web-ui, design decision 2).
  *
  * @implements ProcessorInterface<UpdateLinkInput, LinkResource>
  */
@@ -36,12 +37,10 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
 {
     public function __construct(
         private LinkRepositoryInterface $links,
-        private EntityManagerInterface $em,
+        private UpdateLink $updateLink,
         private Security $security,
-        private LoggerInterface $auditLogger,
         private PublicUrl $publicUrl,
         private RulesDocumentParser $rulesParser,
-        private ReportCache $reportCache,
     ) {
     }
 
@@ -73,44 +72,28 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
             throw new ValidationException($violations);
         }
 
-        $now = new \DateTimeImmutable();
-        $wasActive = $link->isActive();
+        $changes = new LinkChanges();
         if (isset($present['targetUrl']) && null !== $data->targetUrl) {
-            $link->changeTarget($data->targetUrl, $now);
+            $changes = $changes->withTarget($data->targetUrl);
         }
         if (isset($present['utm'])) {
-            $link->replaceUtm($data->utm, $now);
+            $changes = $changes->withUtm($data->utm);
         }
         if (isset($present['expiresAt'])) {
-            $link->setExpiry($data->expiresAt, $now);
+            $changes = $changes->withExpiry($data->expiresAt);
         }
         if (isset($present['maxClicks'])) {
-            $link->setClickLimit($data->maxClicks, $now);
+            $changes = $changes->withClickLimit($data->maxClicks);
         }
         if (isset($present['rules'])) {
-            $link->replaceRules($this->canonicalRules($context), $now);
+            $changes = $changes->withRules($this->canonicalRules($context));
         }
         if (isset($present['isActive']) && null !== $data->isActive) {
-            $data->isActive ? $link->activate($now) : $link->deactivate($now);
+            $changes = $changes->withActive($data->isActive);
         }
-        $this->em->flush();
-        $this->reportCache->forgetLink($link->getId());
 
         $actor = $this->security->getUser();
-        if ($actor instanceof User && !$actor->getId()->equals($link->getOwner()->getId())) {
-            $action = match (true) {
-                $wasActive && !$link->isActive() => 'link.deactivate',
-                !$wasActive && $link->isActive() => 'link.activate',
-                default => 'link.update',
-            };
-            // after the flush: a failed write leaves no audit line
-            $this->auditLogger->info($action, [
-                'action' => $action,
-                'actor_id' => (string) $actor->getId(),
-                'target_id' => (string) $link->getId(),
-                'owner_id' => (string) $link->getOwner()->getId(),
-            ]);
-        }
+        ($this->updateLink)($link, $changes, $actor instanceof User ? $actor : null);
 
         return $this->publicUrl->toResource($link);
     }
