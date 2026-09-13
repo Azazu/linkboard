@@ -1,7 +1,7 @@
 # Handoff — add-web-ui
 
 **Updated:** 2026-09-13 · claude
-**State:** awaiting-gate-1
+**State:** implementing
 **Branch:** change/add-web-ui
 
 ## Done this session
@@ -19,8 +19,10 @@
 
 - Gate 1 Confirmation 2 (`e1acb57`, Reviewed-Commit `7127432`): findings 1 and 2 confirmed; finding 3 changes-requested a second time — the negative run kept `turbo-cache-control=no-cache`, and a `no-cache` page is fetched over the network on a restoration visit, so the mutation could not make the plaintext reappear. Two failures on one finding → the user arbitrated (proposal "User decisions"): split the negative cases and run a third confirmation. Fixed in the following commit: the Turbo case removes both Turbo markings, the full-document case removes only the `pageshow` clearing and records whether a persisted restoration actually happened (an unexercised case is recorded as unexercised, not as a pass), each case runs on a fresh key with the `no-store` header kept, and decision 10 and the browser scenario say the same thing.
 
+- Gate 1 Confirmation 3 (`39d9486`, Reviewed-Commit `7a76f5a`): all findings confirmed — **Gate 1 passed**. Task 0.1 ticked. (The first attempt at this confirmation stopped on the mechanical floor: a trailing blank line at the end of the proposal, fixed in the amended commit.)
+
 ## Next step
-`scripts/gate-run.sh add-web-ui 1 confirm 1` — the **third** confirmation on finding 3, authorised by the user after arbitration; if it fails again, stop and report. Then `/opsx:apply add-web-ui`.
+`/opsx:apply add-web-ui` — tasks 1.1 onwards: the asset pipeline, the shell and the response hardening, the link write use cases with the API processors as adapters, the pages, the browser acceptance run, docs. Then `make check`, the user pushes, a green Actions run on the exact head, and Gate 2.
 
 ## Blockers
 None.
