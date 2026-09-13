@@ -43,7 +43,7 @@ final class LinkListController extends AbstractController
 
         $query = new LinkListQuery(
             isActive: match ($state) {
-                'active' => true, 'inactive' => false, default => null
+                'active' => true, 'inactive' => false, default => null,
             },
             slugContains: '' === $slug ? null : $slug,
             orderField: $order,

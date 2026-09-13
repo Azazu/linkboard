@@ -27,6 +27,8 @@
 
 **What the browser acceptance found that the suite could not:** importing CSS from JavaScript resolved to a `data:` module the policy refuses, which took the whole entry point down — Stimulus and Turbo never ran in a real browser while every test was green; and two inline styles violated `style-src`. Both fixed, with the stylesheets linked from the layout and a `csp-nonce` meta tag for the one style element Turbo injects.
 
+- Branch run 1 (`9cf4dca`) failed in `make cs`: a missing trailing comma in a `match` arm of `src/Web/Link/LinkListController.php`. The local check had reported green because PHP-CS-Fixer's cache marked that file clean; with `--using-cache=no` it reports the same violation CI did. Fixed, and `make cs` now passes `--using-cache=no` so the gate floor cannot report green on stale knowledge again (`cs-fix` keeps the cache for speed). Worth the reviewer's attention as a verifier change.
+
 ## Next step
 The user pushes `change/add-web-ui`; then task 6.2 (the Actions run on the exact head must be `completed`/`success`, URL and SHA recorded here) and task 6.3 — `scripts/pregate-verify.sh gate2 add-web-ui` and `scripts/gate-run.sh add-web-ui 2 full`.
 
