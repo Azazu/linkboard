@@ -1,0 +1,17 @@
+framework:
+    asset_mapper:
+        # The paths to make available to the asset mapper.
+        paths:
+            - assets/
+        missing_import_mode: strict
+        # No es-module-shims loader: it is an inline script whose nonce cannot be
+        # baked in (the renderer strips it on purpose), and every browser this
+        # project targets supports import maps natively. Keeping it would force
+        # the content security policy to admit a script the policy cannot name
+        # (change add-web-ui, design decision 5).
+        importmap_polyfill: false
+
+when@prod:
+    framework:
+        asset_mapper:
+            missing_import_mode: warn
