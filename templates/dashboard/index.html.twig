@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Dashboard · Linkboard{% endblock %}
+
+{% block body %}
+    <h1>Dashboard</h1>
+
+    <div class="grid">
+        <article><h2>{{ totals.links }}</h2><p>links, {{ totals.activeLinks }} active</p></article>
+        <article><h2>{{ totals.clicks }}</h2><p>clicks</p></article>
+        <article><h2>{{ totals.uniqueVisitors }}</h2><p>unique visitors</p></article>
+        <article><h2>{{ totals.clicksToday }}</h2><p>clicks today</p></article>
+    </div>
+
+    <h2>Clicks per day</h2>
+    <p><small>{{ period.from|date('Y-m-d') }} to {{ period.to|date('Y-m-d') }}, UTC, bots excluded.</small></p>
+    <div style="height: 20rem">{{ render_chart(chart) }}</div>
+    {# the chart needs JavaScript; the numbers above and the table below do not #}
+
+    <h2>Recent links</h2>
+    {% if recent is empty %}
+        <p>No links yet. <a href="{{ path('app_link_new') }}">Create the first one.</a></p>
+    {% else %}
+        <div class="lb-table-scroll">
+            <table>
+                <thead><tr><th>Slug</th><th>Target</th><th>Clicks</th><th>Created</th></tr></thead>
+                <tbody>
+                    {% for link in recent %}
+                        <tr>
+                            <td><a href="{{ path('app_link_show', {id: link.id}) }}">{{ link.slug }}</a></td>
+                            <td>{{ link.targetUrl|slice(0, 60) }}{{ link.targetUrl|length > 60 ? '…' }}</td>
+                            <td>{{ link.clickCount }}</td>
+                            <td>{{ link.createdAt|date('Y-m-d') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p><a href="{{ path('app_links') }}">All links</a></p>
+    {% endif %}
+{% endblock %}

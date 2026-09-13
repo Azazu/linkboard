@@ -42,6 +42,16 @@ final class LinkFactory extends PersistentObjectFactory
         });
     }
 
+    /**
+     * @param array<string, mixed> $rules canonical form
+     */
+    public function withRules(array $rules): static
+    {
+        return $this->afterInstantiate(static function (Link $link) use ($rules): void {
+            $link->replaceRules($rules, new \DateTimeImmutable());
+        });
+    }
+
     public function expiring(\DateTimeImmutable $at): static
     {
         return $this->afterInstantiate(static function (Link $link) use ($at): void {

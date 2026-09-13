@@ -1,0 +1,57 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ link.slug }} · Linkboard{% endblock %}
+
+{% block body %}
+    <hgroup>
+        <h1>{{ link.slug }}</h1>
+        <p>{{ link.active ? 'Active' : 'Inactive' }}{% if link.expiresAt %}, expires {{ link.expiresAt|date('Y-m-d H:i') }} UTC{% endif %}{% if link.maxClicks %}, limited to {{ link.maxClicks }} clicks{% endif %}</p>
+    </hgroup>
+
+    <article data-controller="clipboard">
+        <p class="lb-monospace" data-clipboard-target="source">{{ resource.shortUrl }}</p>
+        <button type="button" class="secondary" data-clipboard-target="button" data-action="clipboard#copy">Copy</button>
+    </article>
+
+    <div class="grid">
+        <div>
+            <h2>Details</h2>
+            <dl>
+                <dt>Target</dt><dd class="lb-monospace">{{ link.targetUrl }}</dd>
+                <dt>Clicks</dt><dd>{{ link.clickCount }}</dd>
+                <dt>Created</dt><dd>{{ link.createdAt|date('Y-m-d H:i') }} UTC</dd>
+                <dt>Updated</dt><dd>{{ link.updatedAt|date('Y-m-d H:i') }} UTC</dd>
+                {% if link.utm %}
+                    <dt>UTM</dt>
+                    <dd>{% for key, value in link.utm %}{{ key }}={{ value }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+                {% endif %}
+            </dl>
+        </div>
+        <div>
+            <h2>QR code</h2>
+            <img src="{{ path('app_link_qr', {id: link.id}) }}" alt="QR code of {{ resource.shortUrl }}" width="256" height="256">
+            <p>
+                <a href="{{ path('app_link_qr', {id: link.id}) }}" download="{{ link.slug }}.svg">Download SVG</a> ·
+                <a href="{{ path('app_link_qr', {id: link.id, format: 'png'}) }}" download="{{ link.slug }}.png">PNG</a>
+            </p>
+        </div>
+    </div>
+
+    {% if link.rules %}
+        <h2>Routing rules</h2>
+        <pre><code>{{ link.rules|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</code></pre>
+    {% endif %}
+
+    <h2>Actions</h2>
+    <p>
+        <a href="{{ path('app_link_edit', {id: link.id}) }}" role="button">Edit</a>
+    </p>
+    <details>
+        <summary>Delete this link</summary>
+        <p>Deleting removes the link and its clicks. The short URL stops working. This cannot be undone.</p>
+        <form method="post" action="{{ path('app_link_delete', {id: link.id}) }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('submit') }}">
+            <button type="submit" class="secondary">Delete {{ link.slug }}</button>
+        </form>
+    </details>
+{% endblock %}

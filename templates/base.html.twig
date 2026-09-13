@@ -19,7 +19,9 @@
                 </ul>
                 <ul>
                     {% if app.user %}
-                        {# each page adds its own entry here as it lands (change add-web-ui) #}
+                        <li><a href="{{ path('app_dashboard') }}">Dashboard</a></li>
+                        <li><a href="{{ path('app_links') }}">Links</a></li>
+                        <li><a href="{{ path('app_api_keys') }}">API keys</a></li>
                         <li>
                             <form method="post" action="{{ path('app_logout') }}">
                                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
