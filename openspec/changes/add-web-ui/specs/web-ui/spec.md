@@ -90,15 +90,19 @@ The system SHALL let an owner edit a link's routing rules both as a structured e
 - **THEN** the stored rules are that document in its canonical form and the link's page shows them
 
 ### Requirement: The API-keys page shows a new key once
-The system SHALL show a newly created API key's plaintext exactly once, on the page that follows its creation, and never again — later renderings of the page SHALL show only the prefix and the key's metadata, as the API does. That page SHALL NOT be retained in any cache the browser or the navigation layer keeps, so returning to it through history shows a page without the plaintext rather than a restored copy of it. The page SHALL list the user's own keys, revoked and expired ones included, and SHALL revoke a key on a confirmed, CSRF-protected submission. It SHALL show another user's key neither in the list nor through a revocation.
+The system SHALL send a newly created API key's plaintext in exactly one response — the page that follows its creation — and SHALL be unable to send it again, because only its hash is stored; later renderings of the page SHALL show the prefix and the key's metadata, as the API does. That page SHALL instruct the reader to copy the value now, SHALL be marked so that the navigation layer keeps no copy of it and HTTP caches do not store it, and SHALL clear the value from a document the browser restores from its own history whenever scripting is available. A browser that restores an already-rendered document without scripting, a screenshot and the reader's clipboard are outside this capability's control, and no part of it claims otherwise. The page SHALL list the user's own keys, revoked and expired ones included, and SHALL revoke a key on a confirmed, CSRF-protected submission. It SHALL show another user's key neither in the list nor through a revocation.
 
 #### Scenario: The plaintext is shown once
 - **WHEN** a signed-in user creates an API key from `/api-keys` and then opens `/api-keys` again
 - **THEN** the first response shows the plaintext once and the second shows only the prefix and the metadata
 
-#### Scenario: A back navigation does not bring the plaintext back
-- **WHEN** the page that showed a new key is left and then reached again through the browser's history
-- **THEN** that response is fetched rather than restored from a cached copy, and it carries no plaintext
+#### Scenario: The page that showed a key is marked against being kept
+- **WHEN** the page that showed a new key is rendered
+- **THEN** the response carries `Cache-Control: no-store`, the page tells the navigation layer not to cache it, the element holding the value is marked as temporary so a navigation snapshot drops it, and the page carries the behaviour that empties that element when the browser restores the document from history
+
+#### Scenario: A back navigation in a real browser shows no plaintext
+- **WHEN** a browser that runs scripting creates a key, navigates away — both within the application and as a full document load — and returns through its history
+- **THEN** the restored page shows no plaintext, and removing the page's protections makes the plaintext reappear
 
 #### Scenario: Another user's key cannot be revoked
 - **WHEN** a signed-in user submits a revocation for a key that belongs to somebody else
