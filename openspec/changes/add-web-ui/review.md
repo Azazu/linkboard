@@ -61,3 +61,24 @@
 - [Turbo's caching documentation](https://turbo.hotwired.dev/handbook/building#opting-out-of-caching) states that `no-cache` pages are fetched over the network even on restoration visits. This makes the retained meta directive material to the negative test. [Chrome's bfcache documentation](https://developer.chrome.com/docs/web-platform/bfcache-ccns) confirms that HTTP `no-store` alone does not exclude persisted documents.
 - Finding 3 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before another review attempt.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-13
+**Reviewed-Commit:** 7a76f5a8482440deeb2ac54f10b39a963a719f62
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Decision 3, the authorization applicability row and task 4.2 retain the segment boundary. The prefix-slug scenario incorporates the redirect capability's anonymous GET/HEAD contract, including no session cookie, while actual UI paths remain protected. Removing the boundary is a specified failing input. |
+| 2 | confirmed — Decision 6 and task 2.2 restrict the CSP exclusion to the API segment, leaving `/api-keys` protected. The spec and task require all four headers on both the key list and the response displaying a new key; excluded HTML retains the other three headers. Widening the exclusion is a specified failing input. |
+| 3 | confirmed — Decisions 9a and 10 and task 4.9 now separate the negative browser cases: remove both Turbo snapshot protections for Turbo restoration; remove only the `pageshow` clearing for full-document restoration. Each uses a fresh key and retains HTTP `no-store`. The full-document case must demonstrate persisted restoration; a refetch is explicitly not exercised, never a pass. Both negative runs must demonstrate plaintext redisplay, with execution results recorded in the commit body and handoff. These criteria agree with the browser scenario and close the remaining objection about overlapping protections masking the failing input. The server-side once-only guarantee and the limits of client-side mitigation remain explicit. |
+
+### Validation
+- Reviewed only `600f8522c1190360f2f91ea2962f67664f7e97e6..7a76f5a8482440deeb2ac54f10b39a963a719f62` and collateral reachable from findings 1–3; no unrelated minor findings were introduced.
+- Branch and HEAD match the request; the working tree was initially clean and all source-round findings were dispositioned. This third confirmation follows the user's explicit review request and the arbitration recorded in the proposal.
+- Direct path-expression assertions pass for the three prefix slugs, actual UI paths and API exclusion boundary. Repository searches checked the affected claims against the current artifacts and redirect contract.
+- `scripts/pregate-verify.sh gate1 add-web-ui` passes, including strict OpenSpec validation. This confirms the planning artifacts; application and browser acceptance, including both demonstrated negative cases, remain required implementation work before Gate 2. An unexercised restoration does not satisfy that acceptance task.
+- Rechecked [Turbo's caching documentation](https://turbo.hotwired.dev/handbook/building#opting-out-of-caching), which specifies network retrieval for no-cache restoration visits, and [Chrome's bfcache documentation](https://developer.chrome.com/docs/web-platform/bfcache-ccns), which allows no-store documents under specified conditions. The revised negative cases account for both behaviors.
+- Only `review.md` was modified; no git write commands were run.
