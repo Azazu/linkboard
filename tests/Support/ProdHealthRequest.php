@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Support;
 
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -48,8 +49,14 @@ final readonly class ProdHealthRequest
             'DATABASE_URL' => ProbeTestEnvironment::appDatabaseUrl(),
             'REDIS_URL' => ProbeTestEnvironment::redisUrl(),
             ...$environment,
-        ], null, 30);
-        $process->mustRun();
+        ], null, 20);
+        try {
+            $process->mustRun();
+        } catch (ProcessTimedOutException $e) {
+            // A bare "exceeded the timeout" tells a future reader nothing; the
+            // child's own output says how far the request got.
+            throw new \RuntimeException(\sprintf("the prod kernel did not answer within %.0f s.\nstdout: %s\nstderr: %s", $e->getProcess()->getTimeout() ?? 0.0, trim($process->getOutput()), trim($process->getErrorOutput())), 0, $e);
+        }
 
         $payload = json_decode(trim($process->getOutput()), true, 512, \JSON_THROW_ON_ERROR);
         \assert(\is_array($payload));
@@ -103,15 +110,18 @@ final readonly class ProdHealthRequest
     }
 
     /**
-     * The prod container is cached without resource tracking, so a stale
-     * var/cache/prod from an earlier configuration would test the wrong thing —
-     * removed once per test process, then reused by every child.
+     * The prod container is cached without resource tracking, so a stale build
+     * from an earlier configuration would test the wrong thing — removed once
+     * per test process, then reused by every child. The directory is the
+     * children's own (tests/Fixture/prod-health-request.php): `var/cache/prod`
+     * belongs to HealthTest, which removes it under its own feet, and a
+     * container build holds a blocking lock on a file inside it.
      */
     private static function clearProdCacheOnce(): void
     {
         static $cleared = false;
         if (!$cleared) {
-            (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/prod');
+            (new Filesystem())->remove(\dirname(__DIR__, 2).'/var/cache/probe-prod');
             $cleared = true;
         }
     }

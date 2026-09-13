@@ -29,7 +29,23 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
-$kernel = new Kernel('prod', false);
+/**
+ * The prod kernel with a cache directory of its own. `var/cache/prod` is
+ * shared with HealthTest, which removes it before each of its own prod boots:
+ * a container build takes a blocking lock on a file in that directory, so a
+ * removal underneath a building process is a race with no upper bound. A
+ * named subclass (not an anonymous one — the container class is derived from
+ * the kernel's name) keeps the configuration identical and the cache apart.
+ */
+final class ProbeProdKernel extends Kernel
+{
+    public function getCacheDir(): string
+    {
+        return $this->getProjectDir().'/var/cache/probe-prod';
+    }
+}
+
+$kernel = new ProbeProdKernel('prod', false);
 $request = Request::create('/health?deep=1', server: null === $authorization ? [] : ['HTTP_AUTHORIZATION' => $authorization]);
 
 $started = microtime(true);
