@@ -21,8 +21,14 @@
 
 - Gate 1 Confirmation 3 (`39d9486`, Reviewed-Commit `7a76f5a`): all findings confirmed — **Gate 1 passed**. Task 0.1 ticked. (The first attempt at this confirmation stopped on the mechanical floor: a trailing blank line at the end of the proposal, fixed in the amended commit.)
 
+- Implementation (tasks 1.1–6.1), `make check` green (735 tests, 9198 assertions): the asset pipeline (AssetMapper, Turbo, Stimulus, Chart.js, Pico, all vendored and committed, polyfill off); the response hardening (four headers, a per-request nonce, session cookie flags); `src/Link/UseCase/` as one authority for link writes with the API processors reduced to adapters — `tests/Api/Link` passes untouched, 118 tests; `OwnerDashboardQuery` with its `EXPLAIN` recorded; seven pages with their `WebTestCase` suites; the browser acceptance run with its recorded positive and two negative results; docs.
+
+**Security-relevant parts for Gate 2:** the ownership boundary on every page (`LinkPages::findGranted` asks `LinkVoter` on the converted `LinkResource` and answers 404; the list and dashboard queries are scoped by `owner_id` in SQL), the access-control pattern's segment boundary, CSRF on every state-changing form (token first, then ownership, in both delete paths), `SecurityHeadersSubscriber` and the nonce, and the API-key page's once-sent secret.
+
+**What the browser acceptance found that the suite could not:** importing CSS from JavaScript resolved to a `data:` module the policy refuses, which took the whole entry point down — Stimulus and Turbo never ran in a real browser while every test was green; and two inline styles violated `style-src`. Both fixed, with the stylesheets linked from the layout and a `csp-nonce` meta tag for the one style element Turbo injects.
+
 ## Next step
-`/opsx:apply add-web-ui` — tasks 1.1 onwards: the asset pipeline, the shell and the response hardening, the link write use cases with the API processors as adapters, the pages, the browser acceptance run, docs. Then `make check`, the user pushes, a green Actions run on the exact head, and Gate 2.
+The user pushes `change/add-web-ui`; then task 6.2 (the Actions run on the exact head must be `completed`/`success`, URL and SHA recorded here) and task 6.3 — `scripts/pregate-verify.sh gate2 add-web-ui` and `scripts/gate-run.sh add-web-ui 2 full`.
 
 ## Blockers
 None.
