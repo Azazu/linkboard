@@ -29,6 +29,8 @@
 
 - Branch run 1 (`9cf4dca`) failed in `make cs`: a missing trailing comma in a `match` arm of `src/Web/Link/LinkListController.php`. The local check had reported green because PHP-CS-Fixer's cache marked that file clean; with `--using-cache=no` it reports the same violation CI did. Fixed, and `make cs` now passes `--using-cache=no` so the gate floor cannot report green on stale knowledge again (`cs-fix` keeps the cache for speed). Worth the reviewer's attention as a verifier change.
 
+- Before requesting Gate 2 the mechanical floor found two things worth naming: `git diff --check` on the committed, generated `assets/vendor/installed.php` (AssetMapper writes a trailing space after each `=>`) — a `.gitattributes` entry now exempts that generated tree instead of anyone reformatting it; and a checked task naming `tests/Unit/Link/RuleViolationMapperTest.php`, which did not exist. The test is written (11 cases, every path the structured rows cannot hold included), and the task text now describes what was actually built where it had drifted: the nonce listener lives in `src/Web/Http/CspNonce.php` rather than a separate class, the session assertions live in the headers test, and `LinkChanges` carries its three states itself rather than through a separate wrapper type.
+
 ## Next step
 `scripts/gate-run.sh add-web-ui 2 full` on the branch head; findings via `/workflow:fix-findings`, then `/git:merge`. Green Actions run on the reviewed code: `ae9d02544bbbb81fc260e6e557151cc3bc833967` — https://github.com/Azazu/linkboard/actions/runs/34777536429 (completed/success). Only `tasks.md` and `handoff.md` change after it, which the Gate 2 freshness rule allows.
 
