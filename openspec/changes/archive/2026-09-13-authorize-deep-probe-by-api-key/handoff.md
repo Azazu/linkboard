@@ -1,7 +1,7 @@
 # Handoff — authorize-deep-probe-by-api-key
 
 **Updated:** 2026-09-13 · claude
-**State:** ready-to-merge
+**State:** archived
 **Branch:** change/authorize-deep-probe-by-api-key
 
 ## Done this session
@@ -37,7 +37,7 @@
 **Artifact sync during implementation** (descriptions of the implementation, no change of scope, requirements or architecture — Gate 1 not reopened): the prod cases run the kernel in a child process so its stderr carries the warnings; the fake Redis gained `--get-value`; the interleaving tests drive the real authorizer with a wrapped lookup; the `health` log channel and the extractor's static `keyFromHeader()` are named in the design and the proposal's Impact.
 
 ## Next step
-The user pushes the branch; the executor checks the Actions run on the new head (the code changed after the run recorded in task 5.2) and then `/git:merge authorize-deep-probe-by-api-key`. After the user pushes `main` and its run is green: `/opsx:archive`.
+None — merged into `main` (`e318f18`, run 34752760149 green) and archived on 2026-09-13; the health-check requirement is synced into `openspec/specs` and roadmap row 10a is gone. Next on the plan: `add-web-ui` (row 11).
 
 ## Blockers
 None.

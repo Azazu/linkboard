@@ -11,12 +11,6 @@ exit criterion. Each row is a summary; the change's `proposal.md`
 carries the full scope and the declared tier (the tier here is the
 minimum). Ids are stable between the specification and this file.
 
-## Stage 3 — analytics, QR, API keys
-
-| # | Change id | Scope (summary) | Tier |
-|---|---|---|---|
-| 10a | `authorize-deep-probe-by-api-key` | the prod deep health probe becomes available to a valid admin API key: a bounded key lookup with an enforceable total deadline, fail-closed 404, refused/delayed/stalled cases tested end to end (split out of row 10 by user arbitration, 2026-09-12) | high |
-
 ## Stage 4 — web UI, API polish, quality
 
 | # | Change id | Scope (summary) | Tier |
