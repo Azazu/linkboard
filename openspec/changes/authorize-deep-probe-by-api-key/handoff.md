@@ -1,7 +1,7 @@
 # Handoff — authorize-deep-probe-by-api-key
 
-**Updated:** 2026-09-12 · claude
-**State:** fixing-g2
+**Updated:** 2026-09-13 · claude
+**State:** ready-to-merge
 **Branch:** change/authorize-deep-probe-by-api-key
 
 ## Done this session
@@ -30,10 +30,14 @@
 
 - Gate 2 round 1 (`b5e49cb`, Reviewed-Commit `5163c14`): changes-requested — two majors, both real and both fixed. (1) `symfony/process` sat in `require-dev` (a linter's dependency), so `composer install --no-dev` left production raising a class-not-found error: promoted to `require`, and `ProductionDependenciesTest` now reads `composer.lock` and refuses any `require-dev` namespace in `src/`, `bin/` or `public/` — the check the suite itself cannot make. Verified on a clean `--no-dev` tree: admin key → the probe report, unknown key → the identical 404; with the package removed again, the same tree answers 500. (2) The 0.25-second Redis timeout was a per-read timeout, not a deadline: a server dribbling its reply made progress forever. `BoundedRedisConnection` (a small RESP client over a non-blocking socket) now gives every operation one absolute deadline, the memory and the probe's own Redis check share it, the fake Redis can fragment replies, and three witnesses cover the pre-lookup read, the post-lookup consultation and the prod request.
 
+- Gate 2 Confirmation 1 (`add4ad5`, Reviewed-Commit `1fb744f`): both findings confirmed — **Gate 2 passed**. The reviewer could not run `make check` in its sandbox (no docker socket, no host PHP) and inspected the recorded evidence instead: the mutation witnesses, the clean `--no-dev` demonstration and three green full-suite runs.
+
+- A flaky failure found on the way (it broke the first confirmation's mechanical floor, not the review): the prod-request children built the container in `var/cache/prod` while `HealthTest` removes that directory before each of its own prod boots, and a container build holds a blocking `flock` on a file inside it. The children now use `var/cache/probe-prod` through a named kernel subclass, and a timed-out child reports its own partial output.
+
 **Artifact sync during implementation** (descriptions of the implementation, no change of scope, requirements or architecture — Gate 1 not reopened): the prod cases run the kernel in a child process so its stderr carries the warnings; the fake Redis gained `--get-value`; the interleaving tests drive the real authorizer with a wrapped lookup; the `health` log channel and the extractor's static `keyFromHeader()` are named in the design and the proposal's Impact.
 
 ## Next step
-`scripts/gate-run.sh authorize-deep-probe-by-api-key 2 confirm 1` — the confirmation on findings 1–2, both `fixed`. Then the user pushes, the Actions run on the new head must be green, and `/git:merge`.
+The user pushes the branch; the executor checks the Actions run on the new head (the code changed after the run recorded in task 5.2) and then `/git:merge authorize-deep-probe-by-api-key`. After the user pushes `main` and its run is green: `/opsx:archive`.
 
 ## Blockers
 None.
