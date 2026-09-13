@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\CoversNothing;
 #[CoversNothing]
 final class LinkDeleteTest extends WebPageTestCase
 {
-    public function testTheOwnerDeletesFromTheLinkPageAndItIsGone(): void
+    public function testTheOwnerConfirmsAndTheLinkIsGone(): void
     {
         $client = self::createClient();
         $ann = $this->user('ann@example.com');
@@ -23,6 +23,11 @@ final class LinkDeleteTest extends WebPageTestCase
         $this->signIn($client, 'ann@example.com');
 
         $client->request('GET', '/links/'.$id);
+        $client->clickLink('Delete ann-one…');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'Delete this link?');
+        self::assertSelectorTextContains('[role=alert]', 'cannot be undone');
+        self::assertNotNull($this->find($id), 'reaching the confirmation deletes nothing');
         $client->submitForm('Delete ann-one');
 
         self::assertResponseStatusCodeSame(303);
@@ -34,17 +39,21 @@ final class LinkDeleteTest extends WebPageTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
-    public function testAGetDeletesNothing(): void
+    public function testAGetDeletesNothingAndCancellingLeavesTheLink(): void
     {
         $client = self::createClient();
         $ann = $this->user('ann@example.com');
-        $link = LinkFactory::createOne(['owner' => $ann]);
+        $link = LinkFactory::createOne(['owner' => $ann, 'slug' => 'ann-one']);
         $this->signIn($client, 'ann@example.com');
 
+        // a link in an e-mail opens the question, it does not answer it
         $client->request('GET', '/links/'.$link->getId().'/delete');
-
-        self::assertResponseStatusCodeSame(405);
+        self::assertResponseIsSuccessful();
         self::assertNotNull($this->find((string) $link->getId()));
+
+        $client->clickLink('Cancel');
+        self::assertSelectorTextContains('h1', 'ann-one');
+        self::assertNotNull($this->find((string) $link->getId()), 'cancelling leaves the link alone');
     }
 
     public function testAPostWithoutAValidTokenDeletesNothing(): void
@@ -71,7 +80,7 @@ final class LinkDeleteTest extends WebPageTestCase
 
         // a token from Bea's own page, so the refusal is about ownership and
         // nothing else: an existing link she does not own looks like no link
-        $client->request('GET', '/links/'.$beasLink->getId());
+        $client->request('GET', '/links/'.$beasLink->getId().'/delete');
         $token = (string) $client->getCrawler()->filter('input[name=_token]')->attr('value');
 
         $client->request('POST', '/links/'.$annsLink->getId().'/delete', ['_token' => $token]);

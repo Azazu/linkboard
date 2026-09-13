@@ -36,7 +36,7 @@ use Symfony\Component\Uid\Uuid;
 #[IsGranted(User::ROLE_USER)]
 final class ApiKeyPageController extends AbstractController
 {
-    private const int PER_PAGE = 50;
+    public const int PER_PAGE = 30;
 
     public function __construct(
         private readonly ApiKeyRepositoryInterface $keys,
@@ -78,11 +78,21 @@ final class ApiKeyPageController extends AbstractController
         $flashed = $session instanceof FlashBagAwareSessionInterface ? $session->getFlashBag()->get('api_key_created') : [];
         $created = \is_array($flashed[0] ?? null) ? $flashed[0] : null;
 
+        // every key the owner holds must be reachable, revoked and expired ones
+        // included — they outnumber the ten active ones over time (Gate 2 round 1,
+        // finding 4), so the list is paginated like the links list rather than
+        // truncated at a limit nothing tells the reader about
+        $total = $this->keys->countByOwner($user);
+        $pages = max(1, (int) ceil($total / self::PER_PAGE));
+        $page = max(1, min($pages, $request->query->getInt('page', 1)));
+
         $response = $this->render('api_key/index.html.twig', [
             'form' => $form,
             'created' => $created,
-            'keys' => $this->keys->listByOwner($user, 0, self::PER_PAGE),
-            'total' => $this->keys->countByOwner($user),
+            'keys' => $this->keys->listByOwner($user, ($page - 1) * self::PER_PAGE, self::PER_PAGE),
+            'total' => $total,
+            'page' => $page,
+            'pages' => $pages,
             'max_active' => ApiKey::MAX_ACTIVE_PER_USER,
         ], new Response(status: $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
 
@@ -94,7 +104,12 @@ final class ApiKeyPageController extends AbstractController
         return $response;
     }
 
-    #[Route('/api-keys/{id}/revoke', name: 'app_api_key_revoke', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    /**
+     * Revoking asks first (spec web-ui, Gate 2 round 1 finding 3): the list
+     * links here, this page says what revoking does, and only its own form —
+     * a POST with a valid token — actually revokes. It needs no JavaScript.
+     */
+    #[Route('/api-keys/{id}/revoke', name: 'app_api_key_revoke', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['GET', 'POST'])]
     public function revoke(string $id, Request $request): Response
     {
         $user = $this->getUser();
@@ -102,6 +117,15 @@ final class ApiKeyPageController extends AbstractController
         if (!Uuid::isValid($id)) {
             throw new NotFoundHttpException('No such API key.');
         }
+        if ($request->isMethod('GET')) {
+            $key = $this->keys->findByIdAndOwner(Uuid::fromString($id), $user) ?? throw new NotFoundHttpException('No such API key.');
+
+            return $this->render('api_key/revoke.html.twig', ['key' => $key]);
+        }
+
+        // the token first on the write, as on every state-changing page here: a
+        // forged request is refused before anything is looked up, and a
+        // well-formed one for somebody else's key then gets the ordinary 404
         if (!$this->isCsrfTokenValid('submit', (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }

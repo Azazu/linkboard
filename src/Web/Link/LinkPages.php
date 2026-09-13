@@ -90,10 +90,10 @@ final readonly class LinkPages
         $rules = $form->get('rules');
         foreach ($result->violations as $violation) {
             [$row, $field] = RuleViolationMapper::locate($violation->path);
-            $located = !$data->isRaw() && null !== $row && null !== $field && $rules->get('rows')->has((string) $row);
+            $located = !$data->usesRawDocument() && null !== $row && null !== $field && $rules->get('rows')->has((string) $row);
             $target = $located
                 ? $rules->get('rows')->get((string) $row)->get((string) $field)
-                : ($data->isRaw() ? $rules->get('raw') : $rules);
+                : ($data->usesRawDocument() ? $rules->get('raw') : $rules);
             // a violation the rows cannot hold keeps its document path in the message
             $target->addError(new FormError(RuleViolationMapper::message($violation, $located)));
         }

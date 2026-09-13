@@ -67,7 +67,7 @@ final class RulesDocumentMapper
      */
     public static function toNode(RulesFormData $data): mixed
     {
-        if ($data->isRaw()) {
+        if ($data->usesRawDocument()) {
             $raw = trim((string) $data->raw);
 
             return '' === $raw ? null : json_decode($raw, false, 512, \JSON_THROW_ON_ERROR);

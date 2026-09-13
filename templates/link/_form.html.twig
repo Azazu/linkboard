@@ -22,40 +22,38 @@
     </div>
     {% if form.isActive is defined %}{{ form_row(form.isActive) }}{% endif %}
 
-    <details {{ form.rules.vars.value.mode == 'raw' or form.rules.vars.errors|length ? 'open' }}>
+    <details {{ form.rules.vars.value.mode == 'raw' or form.rules.vars.errors|length or form.rules.children.raw.vars.errors|length ? 'open' }}>
         <summary>Routing rules</summary>
-        <div data-controller="rules-editor">
+        <div data-controller="rules-editor"
+             data-rules-editor-prototype-value="{% apply escape('html_attr') %}{% include 'link/_rule_row.html.twig' with {row: form.rules.rows.vars.prototype} %}{% endapply %}"
+             data-rules-editor-next-index-value="{{ form.rules.rows|length }}">
             {{ form_errors(form.rules) }}
-            {{ form_widget(form.rules.mode, {attr: {'data-rules-editor-target': 'mode'}}) }}
-            <p>
-                <button type="button" class="secondary outline"
-                        data-rules-editor-target="toggle"
-                        data-action="rules-editor#toggle">Edit as JSON</button>
-            </p>
+
+            {# the radio decides which view the server reads; with JavaScript the
+               controller follows it, without JavaScript both views stay visible #}
+            <fieldset>
+                <legend>{{ form_label(form.rules.mode) }}</legend>
+                {% for choice in form.rules.mode %}
+                    <label>
+                        {{ form_widget(choice, {attr: {'data-rules-editor-target': 'mode', 'data-action': 'rules-editor#modeChanged'}}) }}
+                        {{ choice.vars.label }}
+                    </label>
+                {% endfor %}
+            </fieldset>
 
             <div data-rules-editor-target="structured">
                 <div data-rules-editor-target="rows">
                     {% for row in form.rules.rows %}
-                        <fieldset data-rules-editor-target="row">
-                            <div class="grid">
-                                {{ form_row(row.matchKey) }}
-                                {{ form_row(row.values) }}
-                                {{ form_row(row.target) }}
-                            </div>
-                            <button type="button" class="secondary outline" data-action="rules-editor#removeRow">Remove rule</button>
-                        </fieldset>
+                        {% include 'link/_rule_row.html.twig' with {row: row} %}
                     {% endfor %}
                 </div>
-                <template data-rules-editor-target="template">
-                    {{ form_widget(form.rules.rows.vars.prototype)|e('html_attr')|raw|replace({'__name__': '__index__'}) }}
-                </template>
                 <button type="button" class="secondary" data-action="rules-editor#addRow">Add rule</button>
-                <p><small>One match key per rule here. A document with several keys in one rule, or with A/B variants, opens as JSON.</small></p>
+                <p><small>One match key per rule here. A document with several keys in one rule, or with A/B variants, is edited as JSON.</small></p>
             </div>
 
-            <div data-rules-editor-target="raw" {{ form.rules.vars.value.mode == 'raw' ? '' : 'hidden' }}>
-                {{ form_row(form.rules.raw, {attr: {'data-invalid': form.rules.raw.vars.errors|length ? 'true' : 'false'}}) }}
-                <p><small>The whole document, as the API stores it. See <a href="/api/docs">the API documentation</a> for its shape.</small></p>
+            <div data-rules-editor-target="raw">
+                {{ form_row(form.rules.raw) }}
+                <p><small>The whole document, as the API stores it. See the API documentation for its shape.</small></p>
             </div>
         </div>
     </details>

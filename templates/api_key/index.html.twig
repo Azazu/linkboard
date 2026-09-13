@@ -54,10 +54,7 @@
                             </td>
                             <td>
                                 {% if not key.revoked %}
-                                    <form method="post" action="{{ path('app_api_key_revoke', {id: key.id}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('submit') }}">
-                                        <button type="submit" class="secondary outline">Revoke {{ key.prefix }}</button>
-                                    </form>
+                                    <a href="{{ path('app_api_key_revoke', {id: key.id}) }}" role="button" class="secondary outline">Revoke {{ key.prefix }}…</a>
                                 {% endif %}
                             </td>
                         </tr>
@@ -66,5 +63,14 @@
             </table>
         </div>
         <p><small>{{ total }} in total, revoked and expired keys included.</small></p>
+        {% if pages > 1 %}
+            <nav>
+                <ul>
+                    {% if page > 1 %}<li><a href="{{ path('app_api_keys', {page: page - 1}) }}">Previous</a></li>{% endif %}
+                    <li>Page {{ page }} of {{ pages }}</li>
+                    {% if page < pages %}<li><a href="{{ path('app_api_keys', {page: page + 1}) }}">Next</a></li>{% endif %}
+                </ul>
+            </nav>
+        {% endif %}
     {% endif %}
 {% endblock %}

@@ -1,31 +1,34 @@
 import { Controller } from '@hotwired/stimulus';
 
 /*
- * The routing-rules editor's convenience layer: switch between the structured
- * fields and the raw JSON document, and add or drop a rule row. Both views
- * post the same form, and the server validates the document either way — with
- * JavaScript off the raw field is an ordinary textarea and the structured rows
- * are ordinary inputs, which is why nothing here writes into the document.
+ * The routing-rules editor's convenience layer (change add-web-ui). The server
+ * reads the `mode` radio to decide which view a submission meant, so this
+ * controller never changes what is submitted — it only follows the radio,
+ * hiding the view that is not chosen, and adds or removes rule rows.
+ *
+ * With JavaScript off, both views are visible and the radio is how a person
+ * says which one they filled in. Nothing here is required to save a document.
  */
 export default class extends Controller {
-    static targets = ['structured', 'raw', 'toggle', 'row', 'rows', 'template'];
+    static targets = ['structured', 'raw', 'row', 'rows', 'mode'];
+    static values = { prototype: String, nextIndex: Number };
 
     connect() {
-        this.showStructured = !this.hasRawTarget || this.rawTarget.dataset.invalid !== 'true';
         this.render();
     }
 
-    toggle(event) {
-        event.preventDefault();
-        this.showStructured = !this.showStructured;
+    /* The radio changed: follow it. */
+    modeChanged() {
         this.render();
     }
 
     addRow(event) {
         event.preventDefault();
-        const index = this.rowTargets.length;
-        const markup = this.templateTarget.innerHTML.replace(/__index__/g, String(index));
-        this.rowsTarget.insertAdjacentHTML('beforeend', markup);
+        // indices are allocated, never derived from the number of rows: removing
+        // a row must not make the next one reuse a surviving index
+        const index = this.nextIndexValue;
+        this.nextIndexValue = index + 1;
+        this.rowsTarget.insertAdjacentHTML('beforeend', this.prototypeValue.replace(/__name__/g, String(index)));
     }
 
     removeRow(event) {
@@ -34,14 +37,18 @@ export default class extends Controller {
     }
 
     render() {
+        const raw = this.chosenMode() === 'raw';
         if (this.hasStructuredTarget) {
-            this.structuredTarget.hidden = !this.showStructured;
+            this.structuredTarget.hidden = raw;
         }
         if (this.hasRawTarget) {
-            this.rawTarget.hidden = this.showStructured;
+            this.rawTarget.hidden = !raw;
         }
-        if (this.hasToggleTarget) {
-            this.toggleTarget.textContent = this.showStructured ? 'Edit as JSON' : 'Edit as fields';
-        }
+    }
+
+    chosenMode() {
+        const chosen = this.modeTargets.find((input) => input.checked);
+
+        return chosen ? chosen.value : 'structured';
     }
 }

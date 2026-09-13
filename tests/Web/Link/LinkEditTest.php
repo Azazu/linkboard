@@ -117,6 +117,67 @@ final class LinkEditTest extends WebPageTestCase
         self::assertSelectorTextContains('[role=alert]', 'not valid JSON');
     }
 
+    public function testChoosingTheJsonViewIsWhatMakesTheServerReadIt(): void
+    {
+        // the mode is a control a person operates, not a hidden field a test
+        // sets: a document typed into a view nobody chose must not be stored,
+        // and one typed into the chosen view must be (Gate 2 round 1, finding 1)
+        $client = self::createClient();
+        $ann = $this->user('ann@example.com');
+        $link = LinkFactory::createOne(['owner' => $ann]);
+        $this->signIn($client, 'ann@example.com');
+
+        $crawler = $client->request('GET', '/links/'.$link->getId().'/edit');
+        self::assertCount(2, $crawler->filter('input[name="link[rules][mode]"]'), 'both views are offered');
+        self::assertCount(1, $crawler->filter('textarea[name="link[rules][raw]"]'), 'the document field is on the page without any scripting');
+
+        // typed into the JSON field while the fields view stays chosen: not stored
+        $client->submitForm('Save changes', [
+            'link[targetUrl]' => $link->getTargetUrl(),
+            'link[rules][raw]' => '{"version":1,"rules":[{"match":{"device":["tablet"]},"target":"https://example.com/t"}]}',
+        ]);
+        self::assertResponseStatusCodeSame(303);
+        self::assertNull($this->reload($link->getId())->getRules(), 'a view nobody chose is not read');
+
+        // the same document with the JSON view chosen: stored
+        $client->request('GET', '/links/'.$link->getId().'/edit');
+        $client->submitForm('Save changes', [
+            'link[targetUrl]' => $link->getTargetUrl(),
+            'link[rules][mode]' => 'raw',
+            'link[rules][raw]' => '{"version":1,"rules":[{"match":{"device":["tablet"]},"target":"https://example.com/t"}]}',
+        ]);
+        self::assertResponseStatusCodeSame(303);
+        self::assertEquals(
+            ['version' => 1, 'rules' => [['match' => ['device' => ['tablet']], 'target' => 'https://example.com/t']]],
+            $this->reload($link->getId())->getRules(),
+        );
+    }
+
+    public function testADocumentTheRowsCannotHoldComesBackAsJson(): void
+    {
+        $client = self::createClient();
+        $ann = $this->user('ann@example.com');
+        $link = LinkFactory::new(['owner' => $ann])
+            ->withRules(['version' => 1, 'variants' => [
+                ['name' => 'a', 'weight' => 50, 'target' => 'https://example.com/a'],
+                ['name' => 'b', 'weight' => 50, 'target' => 'https://example.com/b'],
+            ]])
+            ->create();
+        $this->signIn($client, 'ann@example.com');
+
+        $crawler = $client->request('GET', '/links/'.$link->getId().'/edit');
+
+        self::assertSame('raw', $crawler->filter('input[name="link[rules][mode]"]:checked')->attr('value'), 'a document with variants opens as JSON');
+        self::assertStringContainsString('"variants"', $crawler->filter('textarea[name="link[rules][raw]"]')->text());
+
+        // and saving it unchanged keeps it, rather than dropping what rows cannot hold
+        $client->submitForm('Save changes', ['link[targetUrl]' => $link->getTargetUrl()]);
+        self::assertResponseStatusCodeSame(303);
+        $stored = $this->reload($link->getId())->getRules();
+        self::assertIsArray($stored);
+        self::assertArrayHasKey('variants', $stored);
+    }
+
     public function testTheStructuredEditorWritesTheSameDocument(): void
     {
         $client = self::createClient();

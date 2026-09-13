@@ -31,8 +31,16 @@
 
 - Before requesting Gate 2 the mechanical floor found two things worth naming: `git diff --check` on the committed, generated `assets/vendor/installed.php` (AssetMapper writes a trailing space after each `=>`) — a `.gitattributes` entry now exempts that generated tree instead of anyone reformatting it; and a checked task naming `tests/Unit/Link/RuleViolationMapperTest.php`, which did not exist. The test is written (11 cases, every path the structured rows cannot hold included), and the task text now describes what was actually built where it had drifted: the nonce listener lives in `src/Web/Http/CspNonce.php` rather than a separate class, the session assertions live in the headers test, and `LinkChanges` carries its three states itself rather than through a separate wrapper type.
 
+- Gate 2 round 1 (`9d7763e`, Reviewed-Commit `2550374`): changes-requested — four majors, all real, all fixed in the following commit.
+  1. The rules editor never wrote the `mode` the server reads: a document typed as JSON was silently dropped. `mode` is now a visible radio the person operates (both views work without JavaScript), the controller only follows it, and a `WebTestCase` proves that a document typed into a view nobody chose is *not* stored while the chosen one is. Fixing it uncovered a second silent defect the tests had been hiding: `RulesFormData::isRaw()` was taken by PropertyAccess for the accessor of the `raw` property, so the document field had been rendering `1` instead of the stored document — renamed, with the reason in the code.
+  2. "Add rule" inserted escaped markup and reused indices. The prototype is now real markup in a Stimulus value, rows come from one shared template, and indices are allocated and never reused.
+  3. Revoking a key happened on the first click. Both destructive actions — revoking a key and deleting a link — now go through a confirmation page that states the consequence, with cancel, and only that page's POST acts.
+  4. The key list was capped at fifty with no way past it. It is paginated like the links list, with coverage for fifty-six keys where the only active one is an old one on the second page.
+
+- Browser acceptance now covers the editor as well (`tests/Acceptance/rules-editor.mjs`), because the findings were exactly about controls a `WebTestCase` cannot operate. Recorded runs: adding two rules, removing the first and adding another stores exactly the two rules still on screen (`country`, `os`) with no index collision; choosing the JSON view stores the typed document and hides the fields view; a document with variants reopens as JSON. Negative runs: with the chosen view ignored the typed document is dropped and the page reopens as fields; with the index derived from the row count the save no longer lands, because the new row overwrites a survivor.
+
 ## Next step
-`scripts/gate-run.sh add-web-ui 2 full` on the branch head; findings via `/workflow:fix-findings`, then `/git:merge`. Green Actions run on the reviewed code: `ae9d02544bbbb81fc260e6e557151cc3bc833967` — https://github.com/Azazu/linkboard/actions/runs/34777536429 (completed/success). Only `tasks.md` and `handoff.md` change after it, which the Gate 2 freshness rule allows.
+The user pushes the branch; the executor records the Actions run on the new head (the reviewer noted, rightly, that the recorded run was older than the reviewed commit) and then runs `scripts/gate-run.sh add-web-ui 2 confirm 1`.
 
 ## Blockers
 None.

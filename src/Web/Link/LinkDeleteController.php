@@ -14,9 +14,10 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Deleting a link from its page: a POST with a confirmation, never a GET — a
- * link in an e-mail must not delete anything — and never without a valid CSRF
- * token.
+ * Deleting a link asks first, like revoking a key (spec web-ui): this page
+ * says what deletion does, and only its own form — a POST with a valid token —
+ * deletes. A link in an e-mail cannot delete anything, and neither can a first
+ * click. It needs no JavaScript.
  */
 #[IsGranted(User::ROLE_USER)]
 final class LinkDeleteController extends AbstractController
@@ -27,9 +28,13 @@ final class LinkDeleteController extends AbstractController
     ) {
     }
 
-    #[Route('/links/{id}/delete', name: 'app_link_delete', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
+    #[Route('/links/{id}/delete', name: 'app_link_delete', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['GET', 'POST'])]
     public function __invoke(string $id, Request $request): Response
     {
+        if ($request->isMethod('GET')) {
+            return $this->render('link/delete.html.twig', ['link' => $this->pages->findGranted($id, LinkVoter::DELETE)]);
+        }
+
         // the token first, as on every state-changing page of this UI: a forged
         // request is refused before anything is looked up, and a well-formed one
         // by a stranger then gets the same 404 as an identifier no link has

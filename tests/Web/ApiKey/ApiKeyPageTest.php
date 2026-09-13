@@ -99,18 +99,31 @@ final class ApiKeyPageTest extends WebPageTestCase
         $ann = $this->user('ann@example.com');
         $bea = $this->user('bea@example.com');
         $annsKey = ApiKeyFactory::createOne(['owner' => $ann, 'name' => 'ann-active']);
-        ApiKeyFactory::createOne(['owner' => $ann, 'name' => 'ann-second']);
+        $annsSecond = ApiKeyFactory::createOne(['owner' => $ann, 'name' => 'ann-second']);
         $beasKey = ApiKeyFactory::createOne(['owner' => $bea, 'name' => 'bea-secret']);
 
         $this->signIn($client, 'ann@example.com');
         $client->request('GET', '/api-keys');
+
+        // revoking asks first, and reaching the question changes nothing
+        $client->clickLink('Revoke '.$annsKey->getPrefix().'…');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'Revoke this key?');
+        self::assertSelectorTextContains('[role=alert]', 'stops working');
+        self::assertFalse($this->reload($annsKey->getId())->isRevoked());
+
+        $client->clickLink('Cancel');
+        self::assertFalse($this->reload($annsKey->getId())->isRevoked(), 'cancelling leaves the key usable');
+
+        $client->request('GET', '/api-keys/'.$annsKey->getId().'/revoke');
         $client->submitForm('Revoke '.$annsKey->getPrefix());
 
         self::assertResponseStatusCodeSame(303);
         self::assertTrue($this->reload($annsKey->getId())->isRevoked());
 
-        // a token from Ann's own page: the refusal is about ownership, not the token
-        $client->request('GET', '/api-keys');
+        // a token from Ann's own confirmation page: the refusal is about
+        // ownership, not the token
+        $client->request('GET', '/api-keys/'.$annsSecond->getId().'/revoke');
         $token = (string) $client->getCrawler()->filter('input[name=_token]')->first()->attr('value');
 
         $client->request('POST', '/api-keys/'.$beasKey->getId().'/revoke', ['_token' => $token]);
@@ -133,6 +146,31 @@ final class ApiKeyPageTest extends WebPageTestCase
 
         self::assertResponseStatusCodeSame(422);
         self::assertSelectorTextContains('[role=alert]', 'active API keys');
+    }
+
+    public function testEveryKeyIsReachableEvenPastAPageOfRevokedOnes(): void
+    {
+        // the cap of ten applies to active keys; revoked and expired ones pile up,
+        // and an old active key must not fall off the end of the list
+        // (Gate 2 round 1, finding 4)
+        $client = self::createClient();
+        $ann = $this->user('ann@example.com');
+        $oldest = ApiKeyFactory::createOne(['owner' => $ann, 'name' => 'the-old-one', 'now' => new \DateTimeImmutable('-2 years')]);
+        ApiKeyFactory::new(['owner' => $ann])->revoked()->many(55)->create();
+
+        $this->signIn($client, 'ann@example.com');
+        $first = $client->request('GET', '/api-keys');
+
+        self::assertStringContainsString('56 in total', $first->filter('body')->text());
+        self::assertStringNotContainsString('the-old-one', $first->filter('table')->text(), 'it is not on the first page');
+
+        $client->clickLink('Next');
+        self::assertStringContainsString('the-old-one', $client->getCrawler()->filter('table')->text(), 'but it is reachable');
+        self::assertStringContainsString('Page 2 of 2', $client->getCrawler()->filter('body')->text());
+
+        $client->clickLink('Revoke '.$oldest->getPrefix().'…');
+        $client->submitForm('Revoke '.$oldest->getPrefix());
+        self::assertTrue($this->reload($oldest->getId())->isRevoked());
     }
 
     public function testAnEmptyNameIsRefused(): void

@@ -1,0 +1,24 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Delete {{ link.slug }} · Linkboard{% endblock %}
+
+{% block body %}
+    <h1>Delete this link?</h1>
+
+    <article>
+        <p><strong>{{ link.slug }}</strong></p>
+        <p class="lb-monospace">{{ link.targetUrl }}</p>
+        <p>{{ link.clickCount }} clicks · created {{ link.createdAt|date('Y-m-d H:i') }} UTC</p>
+    </article>
+
+    <p role="alert">
+        Deleting removes the link and every click recorded for it. The short URL
+        stops working for everyone who already has it. This cannot be undone.
+    </p>
+
+    <form method="post" action="{{ path('app_link_delete', {id: link.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('submit') }}">
+        <button type="submit">Delete {{ link.slug }}</button>
+        <a href="{{ path('app_link_show', {id: link.id}) }}" role="button" class="secondary outline">Cancel</a>
+    </form>
+{% endblock %}

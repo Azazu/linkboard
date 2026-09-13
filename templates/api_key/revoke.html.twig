@@ -1,0 +1,28 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Revoke {{ key.prefix }} · Linkboard{% endblock %}
+
+{% block body %}
+    <h1>Revoke this key?</h1>
+
+    <article>
+        <p><strong>{{ key.name }}</strong></p>
+        <p class="lb-monospace">{{ key.prefix }}…</p>
+        <p>
+            Created {{ key.createdAt|date('Y-m-d H:i') }} UTC ·
+            last used {{ key.lastUsedAt ? key.lastUsedAt|date('Y-m-d H:i') ~ ' UTC' : 'never' }}
+        </p>
+    </article>
+
+    <p role="alert">
+        Revoking stops this key from authenticating on the very next request.
+        Anything using it — a script, a monitor, an integration — stops working.
+        The row is kept for audit; a new key cannot be given the same value.
+    </p>
+
+    <form method="post" action="{{ path('app_api_key_revoke', {id: key.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('submit') }}">
+        <button type="submit">Revoke {{ key.prefix }}</button>
+        <a href="{{ path('app_api_keys') }}" role="button" class="secondary outline">Cancel</a>
+    </form>
+{% endblock %}
