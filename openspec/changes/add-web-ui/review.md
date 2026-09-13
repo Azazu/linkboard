@@ -40,3 +40,24 @@
 - `scripts/pregate-verify.sh gate1 add-web-ui` passes, including strict OpenSpec validation. This is a planning confirmation; application/browser tests are not yet applicable.
 - [Turbo caching documentation](https://turbo.hotwired.dev/handbook/building#understanding-caching) confirms the proposed temporary-element and no-cache mechanisms for Turbo's own snapshots. [Chrome's no-store/bfcache documentation](https://developer.chrome.com/docs/web-platform/bfcache-ccns) explicitly allows no-store documents in bfcache under specified conditions; HTTP cache exclusion is not a universal history-restoration exclusion.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-13
+**Reviewed-Commit:** 7127432900a04e7b61be1d58d7836a4aac42829a
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Design decision 3, the authorization applicability row and task 4.2 use the segment boundary. The prefix-slug regression scenario preserves the redirect capability's anonymous GET/HEAD contract, including no session cookie, while the actual UI routes remain protected. Removing the boundary is a specified failing input. |
+| 2 | confirmed — Design decision 6 and task 2.2 restrict the CSP exclusion to the API segment. The spec and task require positive header assertions on both `/api-keys` and the response displaying a new key; excluded HTML retains the other three headers. Widening the exclusion is a specified failing input. |
+| 3 | changes-requested — Decision 9a now correctly separates HTTP caching from bfcache, adds clearing on persisted `pageshow`, and explicitly bounds the guarantee; task 4.9 also requires executing and recording browser acceptance. However, its negative run removes only `data-turbo-temporary` and the `pageshow` clearing, leaving `turbo-cache-control=no-cache` active. Turbo therefore refetches the consumed-flash page on restoration, so the specified Turbo navigation cannot demonstrate plaintext returning under that mutation. Decision 10 likewise promises redisplay after individual removals even though the remaining protection can prevent it. Define separate negative cases: remove both Turbo snapshot protections for the Turbo restoration case; remove the `pageshow` guard for the full-document case and record that an actual persisted restoration occurred (a network reload does not exercise that guard). Use a fresh secret-bearing page for each case, retain HTTP `no-store`, and reconcile the expected outcomes in task 4.9, decision 10 and the browser scenario. The remaining objection concerns the already-requested executable failing-input demonstration, not a new unrelated finding. |
+
+### Validation
+- Reviewed only `600f8522c1190360f2f91ea2962f67664f7e97e6..7127432900a04e7b61be1d58d7836a4aac42829a` and collateral reachable from findings 1–3. All source-round findings were dispositioned; no unrelated minor findings were introduced.
+- Branch and HEAD match the request, and the working tree was initially clean. Direct path-expression assertions pass for the three prefix slugs, actual UI paths and API exclusion boundary.
+- `scripts/pregate-verify.sh gate1 add-web-ui` passes, including strict OpenSpec validation. This is an artifact confirmation; application/browser acceptance remains implementation work.
+- [Turbo's caching documentation](https://turbo.hotwired.dev/handbook/building#opting-out-of-caching) states that `no-cache` pages are fetched over the network even on restoration visits. This makes the retained meta directive material to the negative test. [Chrome's bfcache documentation](https://developer.chrome.com/docs/web-platform/bfcache-ccns) confirms that HTTP `no-store` alone does not exclude persisted documents.
+- Finding 3 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before another review attempt.
+- Only `review.md` was modified; no git write commands were run.
