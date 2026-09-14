@@ -1,0 +1,9 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Edit {{ link.slug }} · Linkboard{% endblock %}
+
+{% block body %}
+    <h1>Edit {{ link.slug }}</h1>
+    <p><small>The slug cannot be changed: the short URL is already out in the world.</small></p>
+    {% include 'link/_form.html.twig' with {submit_label: 'Save changes', cancel_path: path('app_link_show', {id: link.id})} %}
+{% endblock %}

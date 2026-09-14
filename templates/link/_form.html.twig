@@ -1,0 +1,66 @@
+{{ form_start(form) }}
+    {{ form_errors(form) }}
+    {{ form_row(form.targetUrl) }}
+    {% if form.slug is defined %}{{ form_row(form.slug) }}{% endif %}
+
+    <details>
+        <summary>UTM tags</summary>
+        <div class="grid">
+            {{ form_row(form.utmSource) }}
+            {{ form_row(form.utmMedium) }}
+            {{ form_row(form.utmCampaign) }}
+        </div>
+        <div class="grid">
+            {{ form_row(form.utmTerm) }}
+            {{ form_row(form.utmContent) }}
+        </div>
+    </details>
+
+    <div class="grid">
+        {{ form_row(form.expiresAt) }}
+        {{ form_row(form.maxClicks) }}
+    </div>
+    {% if form.isActive is defined %}{{ form_row(form.isActive) }}{% endif %}
+
+    {% set rules_open = form.rules.vars.value.usesRawDocument or form.rules.vars.errors|length or form.rules.children.raw.vars.errors|length %}
+    <details {{ rules_open ? 'open' }}>
+        <summary>Routing rules</summary>
+        {# One view at a time: the button below switches, and the server carries
+           the document across with the same mapper that stores it. Nothing here
+           needs JavaScript. #}
+        <div data-controller="rules-editor"
+             data-rules-editor-prototype-value="{% apply escape('html_attr') %}{% include 'link/_rule_row.html.twig' with {row: form.rules.rows.vars.prototype} %}{% endapply %}"
+             data-rules-editor-next-index-value="{% set next = 0 %}{% for key in form.rules.rows.children|keys %}{% set next = max(next, key + 1) %}{% endfor %}{{ next }}">
+            {{ form_errors(form.rules) }}
+            {{ form_widget(form.rules.mode) }}
+
+            {% if form.rules.vars.value.usesRawDocument %}
+                <div data-rules-editor-target="raw">
+                    {{ form_row(form.rules.raw) }}
+                    <p><small>The whole document, as the API stores it. See the API documentation for its shape.</small></p>
+                </div>
+                {{ form_widget(form.rules.toFields) }}
+            {% else %}
+                <div data-rules-editor-target="structured">
+                    <div data-rules-editor-target="rows">
+                        {% for row in form.rules.rows %}
+                            {% include 'link/_rule_row.html.twig' with {row: row} %}
+                        {% endfor %}
+                    </div>
+                    {# one control: the controller intercepts the click when it is
+                       there, and the server answers the submission when it is not #}
+                    {{ form_widget(form.rules.addRow, {attr: {'data-action': 'rules-editor#addRow'}}) }}
+                    <p><small>One match key per rule here. A document with several keys in one rule, or with A/B variants, is edited as JSON.</small></p>
+                </div>
+                {{ form_widget(form.rules.toJson) }}
+            {% endif %}
+        </div>
+    </details>
+
+    <button type="submit">{{ submit_label }}</button>
+    <a href="{{ cancel_path }}" role="button" class="secondary outline">Cancel</a>
+
+    {# every field is rendered above, one view at a time; without render_rest
+       Symfony would also print the buttons of the view that is not shown #}
+    {{ form_widget(form._token) }}
+{{ form_end(form, {render_rest: false}) }}

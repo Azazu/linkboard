@@ -1,0 +1,76 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}API keys · Linkboard{% endblock %}
+
+{% block head_meta %}
+    {% if created %}
+        {# a page that carries a secret is not kept by the navigation layer #}
+        <meta name="turbo-cache-control" content="no-cache">
+    {% endif %}
+{% endblock %}
+
+{% block body %}
+    <h1>API keys</h1>
+
+    {% if created %}
+        <article data-controller="secret" data-turbo-temporary>
+            <header><strong>Copy this key now</strong></header>
+            <p>It is shown once. The server keeps only its hash and cannot show it again.</p>
+            <p class="lb-monospace" data-secret-target="value" data-clipboard-target="source">{{ created.key }}</p>
+            <p><small>Key “{{ created.name }}”, prefix {{ created.prefix }}.</small></p>
+        </article>
+    {% endif %}
+
+    <h2>New key</h2>
+    <p><small>At most {{ max_active }} active keys.</small></p>
+    {{ form_start(form) }}
+        {{ form_errors(form) }}
+        <div class="grid">
+            {{ form_row(form.name) }}
+            {{ form_row(form.expiresAt) }}
+        </div>
+        <button type="submit">Create key</button>
+    {{ form_end(form) }}
+
+    <h2>Your keys</h2>
+    {% if keys is empty %}
+        <p>No keys yet.</p>
+    {% else %}
+        <div class="lb-table-scroll">
+            <table>
+                <thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th>Last used</th><th>Expires</th><th>State</th><th></th></tr></thead>
+                <tbody>
+                    {% for key in keys %}
+                        <tr>
+                            <td>{{ key.name }}</td>
+                            <td class="lb-monospace">{{ key.prefix }}</td>
+                            <td>{{ key.createdAt|date('Y-m-d') }}</td>
+                            <td>{{ key.lastUsedAt ? key.lastUsedAt|date('Y-m-d H:i') : 'never' }}</td>
+                            <td>{{ key.expiresAt ? key.expiresAt|date('Y-m-d') : 'never' }}</td>
+                            <td>
+                                {% if key.revoked %}revoked
+                                {%- elseif key.expiresAt and key.expiresAt < date() %}expired
+                                {%- else %}active{% endif %}
+                            </td>
+                            <td>
+                                {% if not key.revoked %}
+                                    <a href="{{ path('app_api_key_revoke', {id: key.id}) }}" role="button" class="secondary outline">Revoke {{ key.prefix }}…</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p><small>{{ total }} in total, revoked and expired keys included.</small></p>
+        {% if pages > 1 %}
+            <nav>
+                <ul>
+                    {% if page > 1 %}<li><a href="{{ path('app_api_keys', {page: page - 1}) }}">Previous</a></li>{% endif %}
+                    <li>Page {{ page }} of {{ pages }}</li>
+                    {% if page < pages %}<li><a href="{{ path('app_api_keys', {page: page + 1}) }}">Next</a></li>{% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% endif %}
+{% endblock %}

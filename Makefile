@@ -90,7 +90,10 @@ cs: ## Code style check (no changes)
 ifdef APP_MISSING
 	$(SKIP_MSG)
 else
-	$(EXEC) $(CSFIX) fix --dry-run --diff
+	# --using-cache=no: the cache made this target report green on a file CI
+	# then refused (change add-web-ui). A check that can pass on stale
+	# knowledge is not a check; cs-fix below keeps the cache for speed.
+	$(EXEC) $(CSFIX) fix --dry-run --diff --using-cache=no
 endif
 
 cs-fix: ## Code style fix

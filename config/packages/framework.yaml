@@ -62,7 +62,18 @@ framework:
             lock_factory: lock.factory
 
     # Note that the session will be started ONLY if you read or write from it.
-    session: true
+    # NFR-SEC-5: the cookie is not readable from scripts, is not sent on a
+    # cross-site request that is not a top-level navigation, and is Secure
+    # wherever the request itself is (so a local plain-HTTP stack still works
+    # and production behind TLS gets the flag). Symfony 8.1 happens to default
+    # to these three values; they are written out because a security property
+    # of this application should not depend on a framework default staying put,
+    # and because the test that asserts them would otherwise be asserting a
+    # default (change add-web-ui).
+    session:
+        cookie_httponly: true
+        cookie_samesite: lax
+        cookie_secure: auto
 
     #esi: true
     #fragments: true

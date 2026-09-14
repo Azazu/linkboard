@@ -1,0 +1,18 @@
+{% use 'form_div_layout.html.twig' %}
+
+{# Pico styles native elements, so the default layout's markup is nearly right:
+   what this theme adds is the [role=alert] the tests select on and the
+   aria-invalid Pico uses to colour an invalid field. #}
+
+{% block form_errors -%}
+    {%- if errors|length > 0 -%}
+        {%- for error in errors -%}
+            <p role="alert">{{ error.message }}</p>
+        {%- endfor -%}
+    {%- endif -%}
+{%- endblock form_errors %}
+
+{% block widget_attributes -%}
+    {%- if not valid %}{% set attr = attr|merge({'aria-invalid': 'true'}) %}{% endif -%}
+    {{- parent() -}}
+{%- endblock widget_attributes %}

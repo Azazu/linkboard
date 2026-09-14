@@ -1,0 +1,5 @@
+# assets/vendor/ is written by AssetMapper's importmap commands and committed so
+# a deployment needs no network (change add-web-ui). The generator leaves a
+# trailing space after each `=>` in installed.php; it is not ours to reformat,
+# and a regenerated file would bring it back, so whitespace checks skip it.
+assets/vendor/** -whitespace

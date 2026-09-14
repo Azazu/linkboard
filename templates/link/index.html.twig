@@ -1,0 +1,75 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Links · Linkboard{% endblock %}
+
+{% block body %}
+    <hgroup>
+        <h1>Links</h1>
+        <p>{{ total }} in total</p>
+    </hgroup>
+
+    <p><a href="{{ path('app_link_new') }}" role="button">New link</a></p>
+
+    <form method="get" action="{{ path('app_links') }}">
+        <div class="grid">
+            <label>Slug contains
+                <input type="search" name="slug" value="{{ filters.slug }}">
+            </label>
+            <label>State
+                <select name="state">
+                    <option value="" {{ filters.state == '' ? 'selected' }}>Any</option>
+                    <option value="active" {{ filters.state == 'active' ? 'selected' }}>Active</option>
+                    <option value="inactive" {{ filters.state == 'inactive' ? 'selected' }}>Inactive</option>
+                </select>
+            </label>
+            <label>Order by
+                <select name="order">
+                    <option value="createdAt" {{ filters.order == 'createdAt' ? 'selected' }}>Created</option>
+                    <option value="clickCount" {{ filters.order == 'clickCount' ? 'selected' }}>Clicks</option>
+                </select>
+            </label>
+            <label>Direction
+                <select name="direction">
+                    <option value="desc" {{ filters.direction == 'desc' ? 'selected' }}>Descending</option>
+                    <option value="asc" {{ filters.direction == 'asc' ? 'selected' }}>Ascending</option>
+                </select>
+            </label>
+        </div>
+        <button type="submit">Filter</button>
+    </form>
+
+    {% if links is empty %}
+        <p>No links match.</p>
+    {% else %}
+        <div class="lb-table-scroll">
+            <table>
+                <thead><tr><th>Slug</th><th>Target</th><th>Clicks</th><th>State</th><th>Created</th></tr></thead>
+                <tbody>
+                    {% for link in links %}
+                        <tr>
+                            <td><a href="{{ path('app_link_show', {id: link.id}) }}">{{ link.slug }}</a></td>
+                            <td>{{ link.targetUrl|slice(0, 60) }}{{ link.targetUrl|length > 60 ? '…' }}</td>
+                            <td>{{ link.clickCount }}</td>
+                            <td>{{ link.active ? 'active' : 'inactive' }}</td>
+                            <td>{{ link.createdAt|date('Y-m-d') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if pages > 1 %}
+            <nav>
+                <ul>
+                    {% if page > 1 %}
+                        <li><a href="{{ path('app_links', filters|merge({page: page - 1})) }}">Previous</a></li>
+                    {% endif %}
+                    <li>Page {{ page }} of {{ pages }}</li>
+                    {% if page < pages %}
+                        <li><a href="{{ path('app_links', filters|merge({page: page + 1})) }}">Next</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% endif %}
+{% endblock %}

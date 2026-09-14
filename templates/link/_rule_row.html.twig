@@ -1,0 +1,10 @@
+{# One row of the structured editor. Used for the rows that exist and for the
+   prototype the controller clones, so a new row is exactly like an old one. #}
+<fieldset data-rules-editor-target="row">
+    <div class="grid">
+        {{ form_row(row.matchKey) }}
+        {{ form_row(row.values) }}
+        {{ form_row(row.target) }}
+    </div>
+    <button type="button" class="secondary outline" data-action="rules-editor#removeRow">Remove rule</button>
+</fieldset>

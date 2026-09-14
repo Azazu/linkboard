@@ -1,5 +1,9 @@
 twig:
     file_name_pattern: '*.twig'
+    # The project's form theme: Pico styles the native elements, so this only
+    # adds the [role=alert] errors the web tests select on and aria-invalid
+    # (change add-web-ui, design decision 8).
+    form_themes: ['form/pico_layout.html.twig']
 
 when@test:
     twig:

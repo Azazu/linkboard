@@ -321,7 +321,7 @@ Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encor
 - **NFR-SEC-2** Passwords hashed with Symfony `auto`; API keys stored as SHA-256; no plaintext credential is ever persisted or logged.
 - **NFR-SEC-3** Open-redirect and SSRF classes are addressed by the URL policy (FR-LNK-5) applied to every stored target and by the fact that the server never fetches a target. Residual risk (public hostname resolving to a private address) is documented, not silently accepted.
 - **NFR-SEC-4** Untrusted input on the hot path (UA, `Accept-Language`, `Referer`, slug) is length-bounded before processing (UA ≤ 1 KB, `Accept-Language` ≤ 256 B, `Referer` ≤ 2 KB) and never interpolated into SQL or shell.
-- **NFR-SEC-5** Security headers on web responses (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, a CSP allowing only self-hosted assets); CSRF on all web forms; session cookies `HttpOnly`, `Secure` in prod, `SameSite=Lax`.
+- **NFR-SEC-5** Security headers on web responses (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, a CSP allowing only self-hosted assets); CSRF on all web forms; session cookies `HttpOnly`, `Secure` in prod, `SameSite=Lax`. The policy admits this origin only, with a per-request nonce for the import map and for the one style element Turbo injects; `/api/docs` is its single exception, because API Platform's Swagger UI bootstraps with an inline script the application does not control, and it carries the other three headers.
 - **NFR-SEC-6** Personal data minimization: raw IPs are never stored; `visitor_hash` is salted; a salt rotation invalidates unique-visitor continuity and is documented as such; user agent is discarded after detection.
 - **NFR-SEC-7** Every change touching firewalls, voters, API keys, URL validation, rule evaluation, migrations that drop or partition, or Messenger failure handling is `high` tier in the workflow and carries a failing-input test for each new guard (`AGENTS.md`).
 
@@ -401,7 +401,8 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 
 | # | Change id | Scope | Tier | Exit criterion |
 |---|---|---|---|---|
-| 11 | `add-web-ui` | Twig + UX + AssetMapper shell, all pages of FR-WEB-1, forms, rules editor, charts, security headers, CSP | medium | `WebTestCase` suite; screenshots for README produced from seeded data |
+| 11 | `add-web-ui` | Twig + UX + AssetMapper shell, security headers and CSP, forms, and the owner-facing pages of FR-WEB-1: login/register in the shell, dashboard, links list, create, details with QR, edit with the rules editor, API keys | high | `WebTestCase` suite; screenshots for README produced from seeded data |
+| 11a | `add-web-admin-and-stats` | the rest of FR-WEB-1: `/links/{id}/stats` (every report of 2.6 as charts and tables, period, granularity, bots toggle) and `/admin/users`, `/admin/links`, `/admin/stats` (split out of row 11 by user arbitration, 2026-09-13) | high | admin pages refuse a non-admin; the stats page renders every report |
 | 12 | `polish-api-and-openapi` | OpenAPI descriptions and examples for every operation, filters and ordering, `ApiTestCase` contract tests, error catalogue in `docs/reference/` | medium | OpenAPI validates; contract tests green |
 | 13 | `harden-quality-and-docs` | README with screenshots/diagram/benchmarks, PHPStan strictness sweep, migration down/up in CI, architecture tests (NFR-QA-2), ADR index | low | README complete; CI matrix green |
 

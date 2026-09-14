@@ -1,23 +1,69 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>{% block title %}Welcome!{% endblock %}</title>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        {# Turbo reads this when it creates its progress-bar <style>; without it
+           the policy refuses that element (found by the browser acceptance run). #}
+        <meta name="csp-nonce" content="{{ csp_nonce() }}">
+        <title>{% block title %}Linkboard{% endblock %}</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.1em%22 font-size=%22104%22>🔗</text></svg>">
+        {% block head_meta %}{% endblock %}
         {% block stylesheets %}
+            {# Linked, not imported from JavaScript: an `import 'x.css'` makes the
+               import map resolve the specifier to a `data:application/javascript,…`
+               module, which the content security policy refuses — and a refused
+               module takes the whole entry point down with it, Stimulus and Turbo
+               included (found by the browser acceptance run of add-web-ui). #}
+            <link rel="stylesheet" href="{{ asset('vendor/@picocss/pico/css/pico.min.css') }}">
+            <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
         {% endblock %}
-
         {% block javascripts %}
+            {% block importmap %}{{ importmap('app', { nonce: csp_nonce() }) }}{% endblock %}
         {% endblock %}
-
-        {% set frankenphp_hot_reload = app.request.server.get('FRANKENPHP_HOT_RELOAD') %}
-        {% if frankenphp_hot_reload %}
-        <meta name="frankenphp-hot-reload:url" content="{{ frankenphp_hot_reload }}">
-        <script src="https://cdn.jsdelivr.net/npm/idiomorph"></script>
-        <script src="https://cdn.jsdelivr.net/npm/frankenphp-hot-reload/+esm" type="module"></script>
-        {% endif %}
     </head>
     <body>
-        {% block body %}{% endblock %}
+        <header>
+            <nav>
+                <ul>
+                    <li><strong><a href="{{ path('app_home') }}">Linkboard</a></strong></li>
+                </ul>
+                <ul>
+                    {% if app.user %}
+                        <li><a href="{{ path('app_dashboard') }}">Dashboard</a></li>
+                        <li><a href="{{ path('app_links') }}">Links</a></li>
+                        <li><a href="{{ path('app_api_keys') }}">API keys</a></li>
+                        <li>
+                            <form method="post" action="{{ path('app_logout') }}">
+                                <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+                                <button type="submit" class="secondary">Log out</button>
+                            </form>
+                        </li>
+                    {% else %}
+                        <li><a href="{{ path('app_login') }}">Log in</a></li>
+                        <li><a href="{{ path('app_register') }}">Register</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            {% block flashes %}
+                {% for label, messages in app.flashes(['success', 'error']) %}
+                    {% for message in messages %}
+                        <p role="alert" class="lb-flash-{{ label }}">{{ message }}</p>
+                    {% endfor %}
+                {% endfor %}
+            {% endblock %}
+
+            {% block body %}{% endblock %}
+        </main>
+
+        <footer>
+            <small>
+                <a href="/api/docs">API documentation</a> ·
+                <a href="/api/docs.json">OpenAPI document</a>
+            </small>
+        </footer>
     </body>
 </html>

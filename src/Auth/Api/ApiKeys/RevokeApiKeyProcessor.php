@@ -45,12 +45,23 @@ final readonly class RevokeApiKeyProcessor implements ProcessorInterface
         if (!$user instanceof User) {
             throw new AccessDeniedException();
         }
-        $key = $this->keys->findByIdAndOwner(Uuid::fromString($data->id), $user) ?? throw new NotFoundHttpException('No such API key.');
+        $this->revoke($user, Uuid::fromString($data->id));
+
+        return null;
+    }
+
+    /**
+     * Public with an explicit owner so the web page drives exactly this path,
+     * as the creation processor already allows (add-web-ui).
+     *
+     * @throws NotFoundHttpException for an unknown id and for another user's key alike
+     */
+    public function revoke(User $owner, Uuid $id): void
+    {
+        $key = $this->keys->findByIdAndOwner($id, $owner) ?? throw new NotFoundHttpException('No such API key.');
         if (!$this->security->isGranted(ApiKeyVoter::REVOKE, $key)) {
             throw new AccessDeniedException();
         }
         $this->keys->revoke($key->getId(), $this->clock->now());
-
-        return null;
     }
 }

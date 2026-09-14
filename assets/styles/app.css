@@ -1,0 +1,38 @@
+/* Pico itself is imported by assets/app.js, which is how the import map
+   resolves a vendored stylesheet; a CSS @import would be resolved relative to
+   this file and fail. The few rules Pico does not cover follow. Everything here is layout, not theming:
+   the palette, spacing and form controls are Pico's. */
+
+:root {
+    --lb-max-width: 72rem;
+}
+
+body > header,
+body > main,
+body > footer {
+    max-width: var(--lb-max-width);
+    margin-inline: auto;
+    padding-inline: 1rem;
+}
+
+/* The short URL and the key prefix are read character by character. */
+.lb-monospace {
+    font-family: var(--pico-font-family-monospace);
+    word-break: break-all;
+}
+
+/* A validation message. The role is what the tests select on. */
+[role='alert'] {
+    color: var(--pico-del-color);
+}
+
+/* The table of links scrolls on a narrow screen instead of widening the page. */
+.lb-table-scroll {
+    overflow-x: auto;
+}
+
+/* The chart's box. A height belongs in the stylesheet, not in a style
+   attribute: the content security policy refuses those. */
+.lb-chart {
+    height: 20rem;
+}
