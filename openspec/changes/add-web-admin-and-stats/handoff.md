@@ -36,8 +36,10 @@
 
 - The mechanical floor for Gate 2 caught two things worth naming. A checked task named `tests/Web/Admin/UserListTest.php`, which did not exist: the account-listing assertions had been folded into the block test, so they moved into the file the task names, where they belong. And several checked tasks named routes in backticks (**/admin/users** and its siblings), which the floor reads as file paths — they are plain text now.
 
+- Branch run on the exact head (`a646230`) is green: run 34847362006, `make check EXEC=` native in CI (2026-09-14). Task 6.2 ticked.
+
 ## Next step
-The user pushes the branch; the executor records the Actions run on the exact head (task 6.2) and then requests Gate 2, `scripts/gate-run.sh add-web-admin-and-stats 2 full` (task 6.3). Both tasks are ticked as they are done — the floor requires every task checked at the gate.
+`scripts/gate-run.sh add-web-admin-and-stats 2 full` (task 6.3), then fix and confirm every finding.
 
 ## Blockers
 None.
