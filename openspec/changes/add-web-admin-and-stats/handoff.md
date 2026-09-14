@@ -1,7 +1,7 @@
 # Handoff — add-web-admin-and-stats
 
 **Updated:** 2026-09-14 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/add-web-admin-and-stats
 
 ## Done this session
@@ -23,8 +23,21 @@
 
 - Gate 1 Confirmation 1 (`91fa943`, Reviewed-Commit `64764ab`): both majors confirmed — **Gate 1 passed**. Task 0.1 ticked. The reviewer notes that the minors it raised were dispositioned outside the confirmation's scope (they were fixed in the same commit) and that the implementation and its mutation evidence remain for Gate 2.
 
+- Implementation (tasks 1.1–5.1), `make check` green (809 tests, 9627 assertions):
+  - **One authority for a report.** `LinkReports` and `GlobalReports` own the cache key, the tag and the computation of the nine reports; the two providers are adapters. The normalization that lived in the providers' flags is now `ReportRequest::reducedTo()`, next to `cacheKey()` because the two must agree. `tests/Api/Analytics` is unedited.
+  - **One authority for an account action.** `BlockUser`/`UnblockUser` hold the self-block guard, the state change, the flush and the audit line; the processors translate the domain exception into the API's violation. `tests/Api` is unedited.
+  - **`/links/{id}/stats`** with the six reports, the controls, and a refusal rendered on the control that carried it (422, no figures). **`/admin/users`, `/admin/links`, `/admin/stats`** behind `^/admin(/|$)` and `#[IsGranted(ROLE_ADMIN)]`, with blocking behind a confirmation page. The dashboard's daily series became a table too.
+
+**Security-relevant parts for Gate 2:** the two authorization boundaries (`LinkPages::findGranted` with `LinkVoter::VIEW` and a 404 on the statistics page; `ROLE_ADMIN` on `/admin/*`, in `access_control` and on each controller), the move of the self-block guard and the audit line out of an API Platform processor, and the CSRF-protected confirmation flow for blocking.
+
+**Demonstrated failing inputs recorded this session:** `ReportRequest::reducedTo()` returning `$this` fails `CacheSharedWithPagesTest` on the first report of both cases; `findGranted` replaced by a plain lookup makes the stranger's statistics request answer 200; the owner read per row makes the query-count test fail with 6 user queries instead of 2; without the role guards an ordinary user's block submission succeeds; without the token check a forged POST acts.
+
+**Worth the reviewer's attention.** The query-count test was vacuous at first: the fixtures are made through the same entity manager, so its identity map answered every owner lookup and the assertion held however the page fetched them. It clears the manager before the request now, and only then does the per-row alternative fail. Two report tests also clear the cache pool in `setUp`, not only `tearDown`: a global report's key is the same in every test and the pool outlives a run, so an entry from an earlier run answered once during this session and produced figures from another test's fixtures.
+
+- The mechanical floor for Gate 2 caught two things worth naming. A checked task named `tests/Web/Admin/UserListTest.php`, which did not exist: the account-listing assertions had been folded into the block test, so they moved into the file the task names, where they belong. And several checked tasks named routes in backticks (**/admin/users** and its siblings), which the floor reads as file paths — they are plain text now.
+
 ## Next step
-`/opsx:apply add-web-admin-and-stats` — implement in the task order: the two refactors first (one authority for a report, one for an account action), then the statistics page, then the administrative pages, then docs. Then `make check`, a green branch run, and Gate 2.
+The user pushes the branch; the executor records the Actions run on the exact head (task 6.2) and then requests Gate 2, `scripts/gate-run.sh add-web-admin-and-stats 2 full` (task 6.3). Both tasks are ticked as they are done — the floor requires every task checked at the gate.
 
 ## Blockers
 None.

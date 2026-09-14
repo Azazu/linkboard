@@ -38,7 +38,7 @@ http://localhost:8082/api/v1 · PostgreSQL: `127.0.0.1:5434` · Redis:
 ## Using the web UI
 
 The pages are server-rendered Twig, styled with Pico.css and enhanced by
-Turbo and three small Stimulus controllers. Sign in at
+Turbo and four small Stimulus controllers. Sign in at
 http://localhost:8082/login — `make console ARGS='app:demo:seed'` prints
 the two demo accounts and their generated passwords — and the navigation
 carries the pages an owner uses:
@@ -48,7 +48,18 @@ carries the pages an owner uses:
 | `/dashboard` | your totals, a clicks-per-day chart over your links, your ten most recent links |
 | `/links` | your links, filtered by state or slug fragment, ordered by creation or clicks, 30 to a page |
 | `/links/new` · `/links/{id}` · `/links/{id}/edit` | create, see (short URL, copy button, QR code) and change a link, routing rules included |
+| `/links/{id}/stats` | every report of that link: the summary, the timeseries as a chart and a table, and the breakdowns by country, device, operating system, referrer and A/B variant |
 | `/api-keys` | create a key — its value is shown once — list your keys and revoke one |
+
+The statistics page carries the period, the bucket size and the bots
+toggle as a plain form, and the address describes what is shown, so a view
+can be bookmarked or shared. The bounds are UTC and half-open, as the API's
+are: **from** is included, **to** is not. A value the analytics capability
+refuses — a period whose end is not after its start, one longer than 366
+days, hourly buckets over more than 14 days — comes back on the control
+that carried it, and no figures are shown until it is corrected. The
+numbers are the ones the API answers for the same parameters, from the same
+cache entry, and the page says how old they may be.
 
 Two things behave the way they do on purpose:
 
@@ -62,12 +73,37 @@ Two things behave the way they do on purpose:
   browser that restores an already-rendered page with scripting disabled,
   a screenshot, and your clipboard are outside the application's control.
 
+### The administrative pages
+
+An account with `ROLE_ADMIN` also sees an **Admin** entry in the
+navigation. To make one locally:
+
+```bash
+make console ARGS='app:user:promote you@example.com'
+```
+
+| Page | What it is for |
+|---|---|
+| `/admin/users` | every account, newest first, 30 to a page: address, roles, blocked state, registration date — and blocking or unblocking one |
+| `/admin/links` | every user's links with the same filters the owner's list offers, each row naming its owner |
+| `/admin/stats` | the service-wide totals, the clicks per bucket over every link with its running total, and the most clicked links of the period |
+
+Blocking asks first: the confirmation page states that a blocked account
+cannot sign in and that every request made with its credentials is refused
+from the next one on, and only its own form acts. An administrator cannot
+block their own account. A signed-in user without the role gets 403 on
+every one of these pages and on both actions — a valid form token proves a
+request was not forged, never that its sender may make it.
+
 **JavaScript is optional.** Every page renders and every form submits
-without it; only the dashboard chart, the copy button and the rules
-editor's convenience behaviour need it, and each degrades to readable
-content or a plain field. The rules editor offers structured rows and the
-raw JSON document; a document with A/B variants, or with a rule matching
-on several keys at once, opens as JSON, because the rows cannot hold it.
+without it; only the charts, the copy button and the rules editor's
+convenience behaviour need it, and each degrades to readable content or a
+plain field. Every number a chart draws is also on the page as a table
+row — on the dashboard and on both statistics pages — so what a reader
+without scripting loses is the picture, not the figures. The rules editor
+offers structured rows and the raw JSON document; a document with A/B
+variants, or with a rule matching on several keys at once, opens as JSON,
+because the rows cannot hold it.
 
 **Security headers.** Every response carries `X-Content-Type-Options`;
 every rendered page also carries `X-Frame-Options: DENY`, a

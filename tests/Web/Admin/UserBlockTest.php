@@ -109,23 +109,6 @@ final class UserBlockTest extends WebPageTestCase
         self::assertFalse($this->reload('bea@example.com')->isBlocked());
     }
 
-    public function testEveryAccountIsReachableThroughThePages(): void
-    {
-        $client = self::createClient();
-        $this->user('root@example.com', admin: true);
-        UserFactory::createMany(31);
-        $oldest = $this->reload('root@example.com');
-
-        $this->signIn($client, 'root@example.com');
-        $first = $client->request('GET', '/admin/users');
-        self::assertCount(30, $first->filter('tbody tr'));
-        self::assertStringNotContainsString('root@example.com', $first->filter('tbody')->text());
-
-        $second = $client->click($first->selectLink('Next')->link());
-        self::assertCount(2, $second->filter('tbody tr'));
-        self::assertStringContainsString($oldest->getEmail(), $second->filter('tbody')->text(), 'the oldest account is reachable');
-    }
-
     private function reload(string $email): User
     {
         $users = self::getContainer()->get(UserRepositoryInterface::class);
