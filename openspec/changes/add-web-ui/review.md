@@ -148,3 +148,25 @@
 - The handoff records successful Actions run 34819584049 on `ba246317bcc9a41594fa0eaab7c00ced28922c53`; only `handoff.md` differs between that commit and the reviewed HEAD. The remote run result was not independently verified here.
 - Finding 1 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before another review attempt.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 3 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-14
+**Reviewed-Commit:** 70bb4e8ca07a648de7fbc5e7cbb05d8d0c1d34b8
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Server-side view switching preserves the document through the storage mapper, refuses conversion of variants or other documents the fields cannot represent, and renders the selected view with its submitted mode. The raw-property accessor collision is removed, and the JSON fallback works through ordinary form submissions without JavaScript. The remaining verification objection is resolved: the acceptance script now submits malformed JSON against a stored variants document, records the active JSON view, retained text and parse error, reads the unchanged stored document in a second tab, then corrects and saves on the refused page. Commit `0c9ac52` and the handoff record the expected observations and a negative run in which returning null on parse failure causes an accepted save and makes the browser case fail. The strengthened web test asserts 422, the retained JSON field and text, and unchanged nonempty stored rules. |
+| 2 | confirmed — The prototype and existing rows share the same fieldset, controls and remove action. The template initializes the allocation counter above the maximum existing child index, and the controller increments it independently of row count. Sparse surviving indices therefore cannot collide on a subsequent addition after validation re-rendering. The browser acceptance and recorded runs cover removal, addition, an invalid submission, correction, another addition and saving the displayed rules. |
+| 3 | confirmed — The key list opens an owner-scoped confirmation page with the consequence and Cancel link. GET and cancellation do not revoke; the confirming POST retains CSRF validation and owner-scoped revocation. The web test covers arrival, cancellation and confirmation. The collateral link-deletion confirmation similarly retains its voter and CSRF checks and performs no deletion on GET. |
+| 4 | confirmed — Owner-scoped count and list queries, a bounded page and offset, and Previous/Next links expose all keys over deterministic newest-first ordering. The test creates 55 newer revoked keys, reaches the old active key on page two and revokes it through confirmation. The original first-50 truncation is resolved. |
+
+### Validation
+- Reviewed only `255037463321b36cbd8781d71fc316fd605f100e..70bb4e8ca07a648de7fbc5e7cbb05d8d0c1d34b8` and collateral reachable from findings 1–4. Branch and HEAD match the request; the working tree was initially clean. All four source-round majors were dispositioned as fixed; there were no blockers. No unrelated minor findings were introduced.
+- This third confirmation follows the explicit user request and the arbitration recorded in the proposal. Read the affected forms, mapping, controllers, templates, repository queries, web/browser tests and related artifacts; searched the affected editor, fallback, validation, confirmation and pagination claims.
+- `node --check tests/Acceptance/rules-editor.mjs` passes. Executing the current Stimulus methods with stubbed targets and the template's maximum-index formula confirms that surviving indices 1 and 2 allocate distinct indices 3 and 4. This is an isolated check, not a browser run.
+- `scripts/pregate-verify.sh gate2 add-web-ui` passes whitespace, strict OpenSpec validation, artifact and referenced-path checks. Its `make check` fails because this sandbox cannot access `/var/run/docker.sock`; application/browser tests were not rerun successfully here. The browser script reports observations for manual acceptance; its recorded positive and negative results were reviewed, not independently reproduced.
+- The handoff records successful Actions run 34825801565 on `0c9ac52`; only `handoff.md` differs between that commit and the reviewed HEAD. The remote run result was not independently verified here. This confirmation resolves the named findings and does not replace the required green check evidence.
+- Only `review.md` was modified; no git write commands were run.
