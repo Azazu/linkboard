@@ -1,0 +1,46 @@
+# Tasks — add-web-admin-and-stats
+
+Tier `high`: Gate 1 before implementation, Gate 2 before merge, and every
+new or changed check needs a demonstrated failing input — a test that
+fails when the guard it defends is removed.
+
+## 0. Gate 1
+
+- [ ] 0.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh add-web-admin-and-stats 1 full`) and disposition every finding before any implementation task starts. Verify: the last Gate 1 record in `review.md` reads `confirmed` or `approved` and no finding row is left `open`.
+
+## 1. One authority for a report
+
+- [ ] 1.1 Add `src/Analytics/Report/LinkReports.php` and `src/Analytics/Report/GlobalReports.php` (design decision 1): one method per report, each returning the object the corresponding API operation returns today, through `ReportCache::remember` with the same key name and tag it uses today. Verify: `tests/Integration/Analytics/ReportServicesTest.php` asserts, for one link report and one global report, that the key and tag passed to the cache are byte-identical to the ones the provider used before (asserted against `ReportRequest::cacheKey()`/`cacheTag()` with the same report name strings), and that a second call within the time-to-live returns the identical object including `generatedAt`.
+- [ ] 1.2 Reduce `src/Analytics/Api/LinkReportProvider.php` and `src/Analytics/Api/AdminStatsProvider.php` to adapters that build the `ReportRequest` and call the services. Verify: `make test ARGS='tests/Api/Analytics'` passes with that suite unedited — it is the regression net for every API status, payload and cache behaviour, and this change does not touch it.
+- [ ] 1.3 Split parameter parsing from API-shaped wrapping in `src/Analytics/Api/ReportRequestFactory.php` (design decision 2): a method that lets `InvalidReportParameter` escape, with `fromRequest()` wrapping it into `ValidationException` as today. Verify: a unit test asserts the parsing method raises `InvalidReportParameter` naming `to`, `granularity`, `limit` and `includeBots` for the four refused inputs, and `tests/Api/Analytics` still shows 422 with a violation on the named parameter.
+
+## 2. One authority for an account action
+
+- [ ] 2.1 Add `src/Auth/UseCase/BlockUser.php` and `UnblockUser.php` holding the self-block guard, the state change, the flush and the audit line in that order (design decision 5), raising a domain exception for the self-block case. Verify: `tests/Integration/Auth/UseCase/BlockUserTest.php` asserts a blocked account, an idempotent second block, the refusal on self-block with nothing changed, and the audit record's action, actor and target.
+- [ ] 2.2 Reduce `BlockUserProcessor` and `UnblockUserProcessor` to adapters translating the domain exception into the `ValidationException` the API answers today. Verify: `make test ARGS='tests/Api'` passes with the admin API suite unedited.
+
+## 3. The link statistics page
+
+- [ ] 3.1 Add `src/Web/Stats/LinkStatsController.php` at `/links/{id}/stats`, authorized by `LinkPages::findGranted($id, LinkVoter::VIEW)` (design decision 4), rendering every report of the `analytics` capability for the link. Verify: `tests/Web/Stats/LinkStatsTest.php` asserts the summary figures, one row per timeseries bucket, and one row per country, device type, operating system, referrer host and variant, each number equal to the one the corresponding report answers for the same parameters.
+- [ ] 3.2 Add the period, granularity and bots controls as a GET form whose address describes what is shown, and render a refused parameter on its own control with status 422 and no figures (design decision 3). Verify: `tests/Web/Stats/LinkStatsParametersTest.php` covers an end before the start, a period beyond the capability's maximum, an hourly granularity over a period too long, and asserts for each a 422 that keeps the reader on the page with the message on the named control and no report table rendered; plus that a chosen address reopened in a new session shows the same parameters and figures, and that the bots toggle changes the totals.
+- [ ] 3.3 Render every charted series as a table as well, and link the page from `templates/link/show.html.twig` (design decision 7). Verify: `tests/Web/Stats/LinkStatsTest.php` asserts the bucket rows exist independently of the chart element and that the link page offers the statistics link; a test with a link that has no clicks asserts 200 with zeros and an empty-state line per breakdown, not an error.
+- [ ] 3.4 The page's ownership boundary. Verify: `tests/Web/Stats/LinkStatsAccessTest.php` asserts 200 for the owner and for an admin, 404 for another signed-in user with none of the link's data in the body, 404 for a well-formed identifier no link has and for a malformed one, and a redirect to `/login` for a guest — and a demonstrated failing input: removing the `findGranted` call makes the stranger case return 200.
+
+## 4. The administrative pages
+
+- [ ] 4.1 Add the access-control line `^/admin(/|$)` with `ROLE_ADMIN` to `config/packages/security.yaml` and `#[IsGranted(User::ROLE_ADMIN)]` on each new controller (design decision 4). Verify: `tests/Web/Admin/AdminAccessTest.php` asserts 200 for an admin, 403 with no data for a signed-in ordinary user and a login redirect for a guest on all three pages, plus a prefix-slug regression test that `/admin-sale` still redirects as the `redirect` capability defines; and a demonstrated failing input: without `(/|$)` the prefix-slug test fails.
+- [ ] 4.2 Add `src/Web/Admin/UserListController.php` at `/admin/users`: every account newest first, paginated, with address, roles, blocked state and creation time. Verify: `tests/Web/Admin/UserListTest.php` asserts the columns, and with more accounts than one page holds asserts that every account appears on exactly one page and the oldest is reachable.
+- [ ] 4.3 Add the block and unblock actions behind a confirmation page that names the account and the consequence and offers a way back, with the CSRF check before the lookup on the POST, calling the use case of task 2.1. Verify: `tests/Web/Admin/UserBlockTest.php` asserts that arriving at the confirmation page changes nothing, that the way back changes nothing, that a confirmed block blocks and a confirmed unblock unblocks, that a blocked account can no longer sign in, that an admin confirming a block of their own account is refused with the reason and stays signed in, and that a POST without a valid token changes nothing.
+- [ ] 4.4 Add `src/Web/Admin/LinkListController.php` at `/admin/links` over every user's links, sharing the filter and ordering parsing with the owner's list (design decision 6), each row naming its owner and leading to the link's own page. Verify: `tests/Web/Admin/AdminLinkListTest.php` asserts links of two owners are listed with their owners while `/links` still lists only the signed-in user's, and that the state filter, the slug fragment and the click-count ordering select exactly the expected links in the expected order.
+- [ ] 4.5 Add `src/Web/Admin/StatsController.php` at `/admin/stats` with the three global reports, the same controls as task 3.2 and the same refusal behaviour. Verify: `tests/Web/Admin/AdminStatsTest.php` asserts the totals, a row per global bucket with its running total, the top links with their owners — each equal to the corresponding report for the same parameters — and a refused period rendered on its control with 422.
+- [ ] 4.6 Show the administrative entry in the navigation only to an administrator. Verify: `tests/Web/Admin/AdminAccessTest.php` asserts the entry is present for an admin and absent for an ordinary user on the same page.
+- [ ] 4.7 Owners' addresses on `/admin/links` come from one batch lookup, not one per row (design decision 6). Verify: a test asserts the number of queries executed while rendering a page of twenty links owned by five users does not grow with the number of rows.
+
+## 5. Documentation
+
+- [ ] 5.1 `docs/how-to/local-development.md`: extend the "Using the web UI" section with the statistics page and the administrative pages, including how to obtain an administrator locally (`app:user:promote`, already in `src/Auth/Command/PromoteUserCommand.php`) and what the pages show. `docs/explanation/requirements.md`: bring the FR-WEB-1 row and the §7 row 11a in line with what shipped. Verify: every documented command run in its exact form; both files re-read whole after the last edit.
+
+## 6. Wrap-up
+
+- [ ] 6.1 `make check` green; `openspec validate add-web-admin-and-stats --strict` passes; `scripts/pregate-verify.sh gate2 add-web-admin-and-stats` passes; `handoff.md` updated to `awaiting-gate-2` with the security-relevant parts named for the reviewer (both authorization boundaries, the two refactors of merged code, and the CSRF-protected account actions).
+- [ ] 6.2 Request Gate 2 (`scripts/gate-run.sh add-web-admin-and-stats 2 full`) after the branch's CI run on the exact head is green, and disposition every finding. Verify: the last Gate 2 record reads `confirmed` or `approved` with no finding row left `open`.
