@@ -21,6 +21,8 @@ implementing change)_
 
 - [`reference/commands.md`](reference/commands.md) — contributor
   command surface: make targets, scripts, agent slash commands
+- [`reference/api-errors.md`](reference/api-errors.md) — every error
+  type the API can produce, what it means and how a client recovers
 
 ## Tutorials (learning-oriented)
 

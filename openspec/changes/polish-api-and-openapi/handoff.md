@@ -1,7 +1,7 @@
 # Handoff — polish-api-and-openapi
 
 **Updated:** 2026-09-14 · claude
-**State:** proposing
+**State:** awaiting-gate-2
 **Branch:** change/polish-api-and-openapi
 
 ## Done this session
@@ -15,8 +15,21 @@
 
 **Design choices worth the reviewer's attention:** (1) the common error responses come from one `OpenApiFactoryInterface` decorator reading the firewall and limiter patterns from configuration, rather than a hundred hand-written attributes that drift the first time a firewall changes; (2) examples live on the property they illustrate, so they are constrained by the same schema; (3) the contract tests compare the document with real responses rather than with itself, and the design states what that sampling cannot prove.
 
+- Implementation (tasks 1.1–4.2), `make check` green (829 tests, 10732 assertions):
+  - **`CommonErrorResponses`**, one `OpenApiFactoryInterface` decorator, adds 401 where a firewall guards the path or the operation authenticates, 429 where either limiter covers it, and 406 everywhere, and narrows every response of 400 or higher to `application/problem+json` with the RFC 9457 schema and an example. Measured after: 25 operations, 401 on 24 (registration takes no credential), 429 on 25 with `Retry-After`, 409 on the one operation that answers it. It is the outermost decorator (priority −100) so it also sees the operation the JWT bundle's factory adds.
+  - **The path rules live once** in `config/services.yaml`; `security.yaml`'s access control, its `json_login` check path, `config/routes.yaml`, `ApiRateLimitListener` and the decorator all read them.
+  - **Examples** on every property of every resource and input DTO; API Platform's own `Error` and `ConstraintViolation` schemas carry none and a test asserts nothing references them any more.
+  - **`tests/Api/Contract/`**: a case per documented operation plus the refusals, asserting the observed status is declared for that operation and the media type matches; the filters and ordering assert what they select; the 429 case drives the limiter rather than being skipped.
+  - **`docs/reference/api-errors.md`** with a completeness test.
+
+**Worth the reviewer's attention.** The example type-check caught a real documentation defect: `rules` on both link inputs is `mixed` in PHP, so the generated schema said `string|null` for a field that takes a JSON object — the document now says object, like the resource's own. And the rate-limit header rule had to be split: both limiters name a delay when they refuse, but only the per-identity one reports the remaining allowance, so the auth endpoints document `Retry-After` alone.
+
+**What the contract tests do not prove:** they are a sample. They cannot show the API never answers an undocumented status, only that the answers they asked for are documented.
+
+**Demonstrated failing input recorded:** removing the `/errors/409` row from the catalogue fails `ErrorCatalogueTest` naming `/errors/409 (declared by an operation)`; restoring it passes.
+
 ## Next step
-`/opsx:apply polish-api-and-openapi` — implement in the task order. Tier `medium`: no Gate 1; Gate 2 on the code diff before merge.
+The user pushes the branch; the executor records the Actions run on the exact head (task 5.2) and then requests Gate 2, `scripts/gate-run.sh polish-api-and-openapi 2 full` (task 5.3).
 
 ## Blockers
 None.
