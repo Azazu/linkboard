@@ -43,8 +43,10 @@
   2. **`limit` was accepted but had no control**: `?limit=500` answered 422 with only the generic instruction to correct controls that could not express it, and a valid `limit=7` was dropped on the next submission. The page now has a top-N control that carries its value and its refusal, covered on both statistics pages.
   3. **Sub-day bounds lost their time on a round trip**: a same-day hourly interval rendered into date controls and came back as one day, refused. The bounds are `datetime-local` now, carrying minute precision through the form, and a test presses Show with the controls untouched and asserts the same interval is reported.
 
+- Branch run on the fix head (`8cc990f`) is green: run 34868261980 (2026-09-14).
+
 ## Next step
-The user pushes the branch; the executor records the Actions run on the new head and then runs `scripts/gate-run.sh add-web-admin-and-stats 2 confirm 1`.
+`scripts/gate-run.sh add-web-admin-and-stats 2 confirm 1` — the confirmation on findings 1–3.
 
 ## Blockers
 None.
