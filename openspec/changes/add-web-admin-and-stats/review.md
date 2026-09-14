@@ -36,3 +36,23 @@
 - Branch and HEAD match the requested identifiers; the working tree was clean before this confirmation.
 - `scripts/pregate-verify.sh gate1 add-web-admin-and-stats` passed, including strict OpenSpec validation, with zero warnings.
 - This confirms the Gate 1 planning corrections; implementation and the planned test/mutation evidence remain for Gate 2. Only `review.md` was modified; no Git write commands were run.
+
+## Round 1 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-14
+**Reviewed-Commit:** dd322c79161b7dc4478fa64f7561d87e117022d3
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | major | tasks.md:32,35; handoff.md:33; src/Auth/UseCase/BlockUser.php:39 | The required high-tier mutation evidence is incomplete despite tasks 4.1 and 4.4 being checked. The implementation commits and handoff record observed failures for report normalization, ownership, batch loading, the administrator role and CSRF, but do not record an executed failure with the moved self-block guard removed or with the admin path segment boundary removed. The corresponding ordinary tests exist; their existence is not the demonstrated failing run required by AGENTS.md and explicitly promised at Gate 1. Execute these two mutations independently, record the exact test command and observed failing assertion for each, restore the guards and show the restored tests passing. Reconcile the checked-task evidence before requesting confirmation. | open |
+| 2 | minor | src/Web/Stats/StatsControls.php:65; templates/stats/_controls.html.twig:5 | Both pages parse and apply `limit`, but their form has no limit control, value preservation or error rendering. For example, `/admin/stats?limit=500` returns 422 with only the generic instruction to correct the controls above: the actual limit error is never displayed and none of those controls can correct it. A valid `limit=7` is also silently dropped on the next form submission. Either make limit a supported control with its value and refusal, or exclude it from the page's accepted parameters and use the report default; cover the chosen behavior on both pages. | open |
+| 3 | minor | src/Web/Stats/StatsControls.php:71–73 | Accepted RFC 3339 bounds lose their time when copied into the date controls. Opening a same-day hourly interval such as `from=2026-09-01T10:00:00Z&to=2026-09-01T12:00:00Z&granularity=hour` produces a valid report, but pressing Show with the displayed controls unchanged submits September 1 for both bounds and returns 422. Other sub-day bounds silently change the report interval. Preserve the accepted precision through the form, or explicitly constrain the page to date-only bounds before computing reports, and test a form round trip. | open |
+
+### Validation
+- Confirmed the requested branch and HEAD, with a clean working tree before review; inspected the diff against `main`, the change artifacts, OpenSpec configuration, new tests, and the affected report, authorization, account-action and template code.
+- `scripts/pregate-verify.sh gate2 add-web-admin-and-stats`: whitespace, strict OpenSpec validation, tier, task-path and Markdown checks passed. Its `make check` step could not start the PHP checks because this review sandbox cannot access `/var/run/docker.sock` (permission denied). This is an execution limitation, not an observed lint or test failure; no independent green test run is claimed.
+- The handoff reports 809 passing tests and a successful CI run for `a646230`; these are executor-recorded results, not independently rerun here.
+- Findings 2 and 3 follow from the shared request parser and rendered form; runtime reproduction was unavailable in this sandbox.
+- Only `review.md` was modified. No Git write commands or implementation edits were run.
