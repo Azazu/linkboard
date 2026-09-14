@@ -47,8 +47,10 @@
 
 - Gate 2 Confirmation 1 (`a322de0`, Reviewed-Commit `6f0daa3`): finding 1 changes-requested, correctly. The mutations, their observed failures and the restoration were recorded, but not the commands that produced them — and the page case was named as a second `BlockUserTest` case when it is `UserBlockTest::testAnAdministratorCannotBlockTheirOwnAccount`. Both fixed in the following commit: tasks 4.1 and 4.4 now carry the exact commands, including the test-container rebuild the security-configuration mutation needs, with the failing output and the restored passing result.
 
+- Branch run on this head (`c76a76e`) is green: run 34871984825 (2026-09-14).
+
 ## Next step
-The user pushes the branch; the executor records the Actions run on the new head and then runs `scripts/gate-run.sh add-web-admin-and-stats 2 confirm 1` again — the second confirmation, on finding 1. If it fails again, stop and ask the user to arbitrate (AGENTS.md).
+`scripts/gate-run.sh add-web-admin-and-stats 2 confirm 1` — the second confirmation, on finding 1. If it fails again, stop and ask the user to arbitrate (AGENTS.md).
 
 ## Blockers
 None.
