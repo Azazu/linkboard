@@ -1,0 +1,35 @@
+{# The period, granularity and bots controls, shared by the link page and the
+   global one. A plain GET form: the address describes what is shown, so it can
+   be bookmarked and shared, and nothing here needs JavaScript. A parameter the
+   report layer refused carries its message on its own control. #}
+<form method="get" action="{{ action }}">
+    <div class="grid">
+        <label>From (inclusive, UTC)
+            <input type="date" name="from" value="{{ controls.values.from }}"
+                   {{ controls.messageFor('from') ? 'aria-invalid="true"' }}>
+            {% if controls.messageFor('from') %}<small role="alert">{{ controls.messageFor('from') }}</small>{% endif %}
+        </label>
+        <label>To (exclusive, UTC)
+            <input type="date" name="to" value="{{ controls.values.to }}"
+                   {{ controls.messageFor('to') ? 'aria-invalid="true"' }}>
+            {% if controls.messageFor('to') %}<small role="alert">{{ controls.messageFor('to') }}</small>{% endif %}
+        </label>
+        <label>Buckets
+            <select name="granularity" {{ controls.messageFor('granularity') ? 'aria-invalid="true"' }}>
+                <option value="day" {{ controls.values.granularity == 'day' ? 'selected' }}>One a day</option>
+                <option value="hour" {{ controls.values.granularity == 'hour' ? 'selected' }}>One an hour</option>
+            </select>
+            {% if controls.messageFor('granularity') %}<small role="alert">{{ controls.messageFor('granularity') }}</small>{% endif %}
+        </label>
+    </div>
+    <label>
+        <input type="checkbox" name="includeBots" value="1" {{ controls.values.includeBots ? 'checked' }}>
+        Count clicks identified as bots
+        {% if controls.messageFor('includeBots') %}<small role="alert">{{ controls.messageFor('includeBots') }}</small>{% endif %}
+    </label>
+    <button type="submit">Show</button>
+</form>
+
+{% if controls.refused %}
+    <p role="alert">The figures are not shown until the parameters above are corrected.</p>
+{% endif %}

@@ -35,6 +35,15 @@ final class DashboardTest extends WebPageTestCase
         self::assertStringContainsString('ann-one', $body);
         self::assertStringNotContainsString('bea-one', $body, "another owner's link is not on this dashboard");
         self::assertSame('3', $crawler->filter('article h2')->eq(1)->text(), "the click total counts only Ann's links");
+
+        // every bucket the chart draws is also a row: the page's figures do not
+        // depend on JavaScript (spec web-ui, "Pages work without JavaScript")
+        $days = $crawler->filter('table')->eq(0)->filter('tbody tr')->each(
+            static fn (\Symfony\Component\DomCrawler\Crawler $row): array => $row->filter('td')->each(static fn (\Symfony\Component\DomCrawler\Crawler $c): string => trim($c->text())),
+        );
+        self::assertCount(30, $days, 'the default period is the current UTC day and the 29 before it');
+        self::assertSame('3', $days[29][1], "today's clicks are the last row");
+        self::assertSame(3, array_sum(array_map(static fn (array $row): int => (int) $row[1], $days)), 'the rows sum to the charted total');
     }
 
     public function testAnEmptyDashboardInvitesTheFirstLink(): void

@@ -1,0 +1,22 @@
+{# One breakdown table: a label, a count and a share. `rows` are the report's
+   own items, `label` names what each row is, and `empty` is what to say when
+   there is nothing — an empty breakdown is data, not an error. #}
+<h3>{{ title }}</h3>
+{% if rows is empty %}
+    <p>{{ empty }}</p>
+{% else %}
+    <div class="lb-table-scroll">
+        <table>
+            <thead><tr><th>{{ label }}</th><th>Clicks</th><th>Share</th></tr></thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ attribute(row, key) ?? unknown }}</td>
+                        <td>{{ row.clicks }}</td>
+                        <td>{{ row.share|number_format(1) }}%</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
