@@ -1,7 +1,7 @@
 # Handoff — add-web-ui
 
 **Updated:** 2026-09-14 · claude
-**State:** ready-to-merge
+**State:** archived
 **Branch:** change/add-web-ui
 
 ## Done this session
@@ -57,8 +57,12 @@
 
 - Gate 2 Confirmation 3 (`f48a07e`, Reviewed-Commit `70bb4e8`): all four findings confirmed — **Gate 2 passed**. The reviewer notes what it could and could not do itself: it read the code, the artifacts and the recorded runs, checked the index allocation by executing the Stimulus methods with stubbed targets, and ran the mechanical floor; it could not reach Docker, so neither `make check` nor the browser runs were reproduced there. Both stand on this side: `make check` green locally (750 tests, 9279 assertions) and natively in CI on `0c9ac52`, and the browser runs recorded with their output.
 
+- Merged into `main` as `9468f2a` (`--no-ff`, "gate 2 approved") after `openspec validate --strict` and `make check` on the branch; the user pushed `main` and its run 34829413048 on `9468f2a` is green.
+
+- Archived on 2026-09-14: the `web-ui` capability is now `openspec/specs/web-ui/spec.md` (the delta's nine requirements verbatim, `ADDED Requirements` → `Requirements`), roadmap row 11 removed. `docs/explanation/requirements.md` §7 keeps its row 11, as it keeps every shipped row — that table is the plan with its exit criteria, not a live queue.
+
 ## Next step
-`/git:merge add-web-ui` — the user's action. Then the user pushes `main`, the executor verifies the run on it and archives the change (sync the new `web-ui` capability, remove roadmap row 11).
+The next change on the plan is 11a `add-web-admin-and-stats` (`/links/{id}/stats` and the three admin pages), tier `high`. Start it with `/workflow:start add-web-admin-and-stats`.
 
 ## Blockers
 None.
