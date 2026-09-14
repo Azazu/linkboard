@@ -1,7 +1,7 @@
 # Handoff — add-web-admin-and-stats
 
 **Updated:** 2026-09-14 · claude
-**State:** proposing
+**State:** implementing
 **Branch:** change/add-web-admin-and-stats
 
 ## Done this session
@@ -21,8 +21,10 @@
   3. "A link with no clicks in the period renders as zeros" was broader than the `analytics` summary contract: all-time clicks, unique visitors and the first/last click are not period-scoped. The requirement now says which figures read zero and which keep their values, with a scenario for a link whose clicks all fall before the period.
   4. The sharpest one, and a real defect the plan would have shipped: `ReportRequest::cacheKey()` digests the period, granularity and limit for *every* report, while the providers normalize them per report with flags. One page's controls handed unchanged to nine service methods would have produced keys the API never writes — the same numbers computed and cached twice, defeating the decision's whole purpose. The normalization moves out of the providers into the services, and a task now proves the shared entry across presenters for all nine reports with an explicit period, hourly granularity and a non-default limit, the admin summary included.
 
+- Gate 1 Confirmation 1 (`91fa943`, Reviewed-Commit `64764ab`): both majors confirmed — **Gate 1 passed**. Task 0.1 ticked. The reviewer notes that the minors it raised were dispositioned outside the confirmation's scope (they were fixed in the same commit) and that the implementation and its mutation evidence remain for Gate 2.
+
 ## Next step
-Gate 1 confirmation: `scripts/gate-run.sh add-web-admin-and-stats 1 confirm 1`. Implementation starts only after it reads `confirmed` with no finding left `open`.
+`/opsx:apply add-web-admin-and-stats` — implement in the task order: the two refactors first (one authority for a report, one for an account action), then the statistics page, then the administrative pages, then docs. Then `make check`, a green branch run, and Gate 2.
 
 ## Blockers
 None.

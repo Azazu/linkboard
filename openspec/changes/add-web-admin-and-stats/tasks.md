@@ -6,7 +6,7 @@ fails when the guard it defends is removed.
 
 ## 0. Gate 1
 
-- [ ] 0.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh add-web-admin-and-stats 1 full`) and disposition every finding before any implementation task starts. Verify: the last Gate 1 record in `review.md` reads `confirmed` or `approved` and no finding row is left `open`.
+- [x] 0.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh add-web-admin-and-stats 1 full`) and disposition every finding before any implementation task starts. Verify: the last Gate 1 record in `review.md` reads `confirmed` or `approved` and no finding row is left `open`.
 
 ## 1. One authority for a report
 
