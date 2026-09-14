@@ -28,8 +28,10 @@
 
 **Demonstrated failing input recorded:** removing the `/errors/409` row from the catalogue fails `ErrorCatalogueTest` naming `/errors/409 (declared by an operation)`; restoring it passes.
 
+- Branch run on the exact head (`c7765a6`) is green: run 34879393689, `make check EXEC=` native in CI (2026-09-14). Task 5.2 ticked; 5.3 is ticked as the gate is requested, which is what the floor requires.
+
 ## Next step
-The user pushes the branch; the executor records the Actions run on the exact head (task 5.2) and then requests Gate 2, `scripts/gate-run.sh polish-api-and-openapi 2 full` (task 5.3).
+`scripts/gate-run.sh polish-api-and-openapi 2 full`, then fix and confirm every finding.
 
 ## Blockers
 None.
