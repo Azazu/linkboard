@@ -28,24 +28,28 @@ The system SHALL render every page's content and accept every form submission wi
 
 #### Scenario: The chart degrades to its numbers
 - **WHEN** the dashboard is rendered and its chart cannot run
-- **THEN** the page still shows the totals and the recent links
+- **THEN** the page still shows the totals, the recent links, and a row per day of the series the chart would have drawn
 
 #### Scenario: Every charted series is also a table
-- **WHEN** a client that runs no JavaScript opens a link's statistics page and the global statistics page
-- **THEN** each bucket the timeseries chart would draw is present as a row with its own figures, and the period, granularity and bots controls submit and take effect
+- **WHEN** a client that runs no JavaScript opens the dashboard, a link's statistics page and the global statistics page
+- **THEN** on each of them every bucket the chart would draw is present as a row with its own figures, and on the statistics pages the period, granularity and bots controls submit and take effect
 
 ## ADDED Requirements
 
 ### Requirement: A link's statistics page shows every report the analytics capability defines
-The system SHALL serve, at `/links/{id}/stats`, every report the `analytics` capability defines for one link: the summary figures (all-time clicks, unique visitors, first and last click, clicks today, clicks in the period against the period before it with its delta), the timeseries over the period, and the breakdowns by country, by device type, by operating system, by referrer host and by A/B variant, each breakdown carrying its counts and shares. The page SHALL state the period it covers, that its figures are counted in UTC, whether bots are included, and how stale the numbers may be, taking that from the report's own generation time rather than from the moment of rendering. A link with no clicks in the period SHALL render as a page with zeros and empty breakdowns, not as an error. The page SHALL be reachable from the link's own page.
+The system SHALL serve, at `/links/{id}/stats`, every report the `analytics` capability defines for one link: the summary figures (all-time clicks, unique visitors, first and last click, clicks today, clicks in the period against the period before it with its delta), the timeseries over the period, and the breakdowns by country, by device type, by operating system, by referrer host and by A/B variant, each breakdown carrying its counts and shares. The page SHALL state the period it covers, that its figures are counted in UTC, whether bots are included, and how stale the numbers may be, taking that from the report's own generation time rather than from the moment of rendering. A link with no clicks in the selected period SHALL render as a page whose period-scoped figures read zero and whose breakdowns are empty, while the figures the `analytics` capability does not scope to the period — all-time clicks, unique visitors, the first and last click, and today's clicks — keep the values that capability answers; it SHALL NOT render as an error. The page SHALL be reachable from the link's own page.
 
 #### Scenario: Every report is on the page
 - **WHEN** the owner of a link with clicks from several countries, devices, operating systems and referrers, and with A/B variants, opens `/links/{id}/stats`
 - **THEN** the page shows the summary figures, a row per bucket of the timeseries, and a row per country, device type, operating system, referrer host and variant, with the same numbers the corresponding report of the `analytics` capability answers for the same parameters
 
 #### Scenario: A link nobody has clicked
-- **WHEN** the owner of a link with no clicks opens its statistics page
-- **THEN** the response is 200, the totals read zero, each breakdown says it has nothing to show, and no part of the page reports an error
+- **WHEN** the owner of a link with no clicks at all opens its statistics page
+- **THEN** the response is 200, every figure reads zero, the first and last click are shown as absent, each breakdown says it has nothing to show, and no part of the page reports an error
+
+#### Scenario: A link whose clicks are all outside the selected period
+- **WHEN** the owner of a link whose only clicks fall before the selected period opens its statistics page for that period
+- **THEN** the clicks in the period read zero and the breakdowns are empty, while the all-time clicks and unique visitors keep their non-zero values and the first and last click are shown with their dates
 
 #### Scenario: The page states its staleness from the report
 - **WHEN** a statistics page is rendered
@@ -77,12 +81,16 @@ The system SHALL let the reader choose the period, the granularity of the timese
 - **WHEN** a link's period holds both human and bot clicks and the owner views the page with and then without bots included
 - **THEN** the totals with bots included are the larger ones, and each page states which of the two it is showing
 
-### Requirement: The administrative pages are reachable only by an administrator
-The system SHALL serve `/admin/users`, `/admin/links` and `/admin/stats` only to a signed-in user with the administrator role. A signed-in user without that role SHALL receive 403 and none of the page's data; a guest SHALL be sent to `/login`. A short link whose slug begins with `admin` SHALL keep redirecting, unaffected by this boundary. The administrative entry in the navigation SHALL appear only for an administrator.
+### Requirement: The administrative pages and their actions are reachable only by an administrator
+The system SHALL serve `/admin/users`, `/admin/links` and `/admin/stats`, and SHALL accept the actions those pages offer — the confirmation pages for blocking and unblocking an account and the submissions that carry them out — only to a signed-in user with the administrator role. A signed-in user without that role SHALL receive 403 and none of the page's data, and SHALL change nothing even when their submission carries a valid cross-site request forgery token; a guest SHALL be sent to `/login` and SHALL change nothing. A short link whose slug begins with `admin` SHALL keep redirecting, unaffected by this boundary. The administrative entry in the navigation SHALL appear only for an administrator.
 
 #### Scenario: Administrator, ordinary user, guest
 - **WHEN** an administrator, a signed-in ordinary user and a client with no session each request `/admin/users`, `/admin/links` and `/admin/stats`
 - **THEN** the administrator's responses are 200, the ordinary user's are 403 carrying none of the data, and the guest is sent to `/login`
+
+#### Scenario: A non-administrator cannot block an account even with a valid token
+- **WHEN** a signed-in ordinary user requests the confirmation page for blocking an account, and submits the block and the unblock with a cross-site request forgery token their own session would accept
+- **THEN** every response is 403, and the target account's blocked state is unchanged
 
 #### Scenario: A short link whose slug begins with the administrative prefix
 - **WHEN** a guest requests `/admin-sale`, a valid slug of an existing link

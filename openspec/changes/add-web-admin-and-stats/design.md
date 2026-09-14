@@ -33,6 +33,8 @@ See `proposal.md` — Why. What matters for the approach is what already exists 
 
 *Alternatives.* (a) The page computes through the queries itself: two code paths to the same SQL, two cache entries or none, and the first place a number could drift. Rejected. (b) The shared service returns the query DTOs and each presenter assembles its own report object: the cached payload would have to change shape, and `generatedAt` would have to be cached beside it — a key and payload change to a contract that is under test, for a namespace boundary. Rejected. (c) Move the nine report classes out of `src/Analytics/Api/` into `src/Analytics/Report/`: a rename of nine classes and every reference, with no behavioural gain, inflating a diff that a reviewer has to read. Rejected.
 
+**Each report normalizes the request to the parameters it actually uses.** `ReportRequest::cacheKey()` digests the period, the granularity and the limit for *every* report, while today the parameters that reach it are normalized by the provider's flags: granularity is parsed only for a timeseries (otherwise it stays `day`), the limit only for the breakdowns that take one (otherwise the default), and the admin summary ignores the period entirely (`Period::defaults`). A page has one set of controls feeding nine reports, so handing the reader's request unchanged to every service method would produce a different key from the API's for eight of them — the same numbers computed twice and cached twice, which is precisely what this decision exists to prevent. The normalization therefore moves out of the providers' flags and into the services: each report method reduces the request it is given to the parameters that report uses, and keys and echoes the reduced one. The providers stop deciding it, so the two presenters cannot diverge; the API's keys, echoes and payloads are unchanged, because the reduction reproduces exactly what the flags did.
+
 *What this does not guarantee:* the web pages name classes in the `Analytics\Api` namespace. That is the honest cost of the decision — those classes are the read model's output shape and API Platform's attributes are one presenter's metadata on them. It is recorded here rather than hidden behind a second DTO that would have to be kept in step.
 
 ### 2. Parsing is shared; rendering a refused parameter is each presenter's own
@@ -41,7 +43,7 @@ See `proposal.md` — Why. What matters for the approach is what already exists 
 
 *Why:* the rules about periods, granularity bounds and the bots flag stay in one place; only the rendering differs. The exception already carries the parameter name, which is exactly what a form needs to place the message.
 
-*What this does not guarantee:* the page's messages are the report layer's wording, not a form constraint's — they are written for a reader and are the same words the API returns.
+*What this does not guarantee:* the page's messages are the report layer's wording, not a form constraint's — they are written for a reader and are the same words the API returns. One further asymmetry is deliberate: the API ignores `from`/`to` on the admin summary and therefore never refuses a malformed one there, while the global page parses the period once for the three reports it shows and refuses a malformed value for the whole page. The summary is still computed over the defaults, as decision 1's normalization requires.
 
 ### 3. A refused parameter re-renders the page with 422 and no figures
 
@@ -77,6 +79,8 @@ When a parameter is refused the page renders with the controls carrying what was
 
 Every chart on the two statistics pages is built with `ChartBuilderInterface`, as the dashboard's is, and every series it draws is also rendered as a table row. No inline style or script is introduced: the row 11 acceptance run showed that an inline `style` attribute violates the policy, so anything visual is a class in `assets/styles/app.css`.
 
+This also settles the dashboard, whose daily series is today drawn only as a chart: it gains the same table, so the strengthened requirement is true everywhere rather than true on the new pages and false on the old one.
+
 *What this does not guarantee:* with scripting off the reader loses the picture, not the numbers.
 
 ## Applicability
@@ -85,8 +89,8 @@ Every chart on the two statistics pages is built with `ChartBuilderInterface`, a
 |---|---|
 | Crash before/after an external effect | Blocking flushes, then writes the audit line: a crash between them leaves the state changed and unaudited (decision 5). Reports have no external effect — a cache write that fails is logged and the report is answered anyway. |
 | Concurrent writers | Two administrators acting on the same account write an absolute state (blocked / not blocked), not a relative one, so the later write wins and no update is lost. A block concurrent with the target's own request is decided by the authenticator on each request, unchanged. |
-| Authorization boundary | Two: the link voter's `LINK_VIEW` for a link's statistics (404 on denial), and `ROLE_ADMIN` for `/admin/*` (403 for a signed-in non-admin, login for a guest). Both are asked of existing mechanisms (decision 4), and both are exercised with owner, admin, stranger and guest. |
-| Empty / zero / null inputs | A link with no clicks, a period with no buckets, an empty top-links list, and the `null` groups the breakdowns define (unknown country, unrecognised device or operating system, `direct` referrer) all render as data, not as errors. An account list with one page and a link list with none are covered. |
+| Authorization boundary | Two: the link voter's `LINK_VIEW` for a link's statistics (404 on denial), and `ROLE_ADMIN` for `/admin/*` (403 for a signed-in non-admin, login for a guest). Both are asked of existing mechanisms (decision 4), and both are exercised with owner, admin, stranger and guest — the role boundary on the account-changing submissions as well as on the pages, including a non-admin submission carrying a token its own session would accept, so a passing forgery check can never stand in for a missing role check. |
+| Empty / zero / null inputs | A link with no clicks at all, a link whose clicks all fall outside the selected period (period figures zero, all-time figures intact — the distinction the `analytics` summary draws), a period with no buckets, an empty top-links list, and the `null` groups the breakdowns define (unknown country, unrecognised device or operating system, `direct` referrer) all render as data, not as errors. An account list with one page and a link list with none are covered. |
 | Deletion / expiry | Nothing is deleted here. A deleted link's statistics page answers 404 like its other pages; an inactive or expired link keeps its statistics, as the `analytics` capability requires. |
 | Idempotency of retries | Blocking an already blocked account and unblocking an unblocked one change nothing and answer the same — the API's behaviour, now shared. A resubmitted confirmation is therefore safe. |
 | Money rounding | n/a — no monetary value exists in this project. |
@@ -96,6 +100,7 @@ Every chart on the two statistics pages is built with `ChartBuilderInterface`, a
 - **The two refactors touch merged, reviewed code** → the existing `tests/Api/Analytics`, `tests/Api/Admin` and `tests/Integration/Analytics` suites are the regression net and are not edited; a task states that explicitly, as row 11 did for `tests/Api/Link`.
 - **A page that renders nine reports could become the slowest page in the project** → every report is served from the same cache entry the API uses, and the page issues no query of its own beyond the link lookup; the tables are rendered from the report objects. The first request after an invalidation computes all of them, and that cost is the API's existing cost, measured by the analytics change's `EXPLAIN` work.
 - **The web layer naming `Analytics\Api` classes** → recorded in decision 1 with the alternatives that were weighed; the reviewer should judge it as a deliberate trade, not an oversight.
+- **A forgery check that looks like an authorization check** → the two guards are separated in the tests: a non-admin submission with a valid token must be refused by the role, and a missing token must be refused on a request that would otherwise be authorized. Each has its own demonstrated failing input.
 - **A `/admin` prefix is a new public surface** → guarded twice (decision 4), with a prefix-slug regression test of the same shape row 11 added for its own pages.
 - **Charts drawn from figures a reader cannot check** → every charted series is also a table (decision 7), which is also what makes the page usable without JavaScript.
 

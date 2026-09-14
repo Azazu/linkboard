@@ -15,8 +15,14 @@
 
 **Security-relevant parts:** the two authorization boundaries (the link voter's `LINK_VIEW` for a link's statistics with 404 on denial; `ROLE_ADMIN` for `/admin/*`, guarded both in `access_control` and on each controller), the move of the self-block guard and the audit line out of an API Platform processor into a use case, and the CSRF-protected confirmation flow for blocking an account.
 
+- Gate 1 round 1 (`ca4be4c`, Reviewed-Commit `562ff24`): changes-requested — two majors and two minors, all four real, all fixed in the following commit.
+  1. The strengthened no-JavaScript rule ("every number a chart draws is also on the page as text") would have been false on the dashboard, whose daily series is drawn only as a chart — the plan covered only the two new pages. Rather than scoping the guarantee down, the dashboard gains the same table: the controller already holds the figures, and the alternative was a rule that holds on the new pages and not on the old one.
+  2. The authorization coverage stopped at the three listing pages: the block and unblock confirmations and their submissions had no guest or non-admin test, so a passing forgery check could have stood in for a missing role check. A task now asserts 403 and no change for a signed-in ordinary user submitting **with a token their own session would accept**, a login redirect and no change for a guest, and three demonstrated failing inputs that remove one guard at a time — the role, the token check, and the moved self-block guard.
+  3. "A link with no clicks in the period renders as zeros" was broader than the `analytics` summary contract: all-time clicks, unique visitors and the first/last click are not period-scoped. The requirement now says which figures read zero and which keep their values, with a scenario for a link whose clicks all fall before the period.
+  4. The sharpest one, and a real defect the plan would have shipped: `ReportRequest::cacheKey()` digests the period, granularity and limit for *every* report, while the providers normalize them per report with flags. One page's controls handed unchanged to nine service methods would have produced keys the API never writes — the same numbers computed and cached twice, defeating the decision's whole purpose. The normalization moves out of the providers into the services, and a task now proves the shared entry across presenters for all nine reports with an explicit period, hourly granularity and a non-default limit, the admin summary included.
+
 ## Next step
-Gate 1: `scripts/gate-run.sh add-web-admin-and-stats 1 full` (task 0.1). Implementation starts only after it reads `confirmed`/`approved` with no finding left `open`.
+Gate 1 confirmation: `scripts/gate-run.sh add-web-admin-and-stats 1 confirm 1`. Implementation starts only after it reads `confirmed` with no finding left `open`.
 
 ## Blockers
 None.
