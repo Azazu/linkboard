@@ -1,7 +1,7 @@
 # Handoff — add-web-ui
 
 **Updated:** 2026-09-14 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/add-web-ui
 
 ## Done this session
@@ -55,8 +55,10 @@
 
 - Branch run on this head (`0c9ac52`) is green: run 34825801565 (2026-09-14).
 
+- Gate 2 Confirmation 3 (`f48a07e`, Reviewed-Commit `70bb4e8`): all four findings confirmed — **Gate 2 passed**. The reviewer notes what it could and could not do itself: it read the code, the artifacts and the recorded runs, checked the index allocation by executing the Stimulus methods with stubbed targets, and ran the mechanical floor; it could not reach Docker, so neither `make check` nor the browser runs were reproduced there. Both stand on this side: `make check` green locally (750 tests, 9279 assertions) and natively in CI on `0c9ac52`, and the browser runs recorded with their output.
+
 ## Next step
-`scripts/gate-run.sh add-web-ui 2 confirm 1` — the third confirmation, on finding 1 (the user's arbitration of 2026-09-14).
+`/git:merge add-web-ui` — the user's action. Then the user pushes `main`, the executor verifies the run on it and archives the change (sync the new `web-ui` capability, remove roadmap row 11).
 
 ## Blockers
 None.
