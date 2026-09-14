@@ -1,7 +1,7 @@
 # Handoff — add-web-admin-and-stats
 
 **Updated:** 2026-09-14 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/add-web-admin-and-stats
 
 ## Done this session
@@ -49,8 +49,10 @@
 
 - Branch run on this head (`c76a76e`) is green: run 34871984825 (2026-09-14).
 
+- Gate 2 Confirmation 2 (`11d4556`, Reviewed-Commit `314fe31`): finding 1 confirmed — **Gate 2 passed**. The reviewer states its own limits: it read the code, the artifacts, the commit bodies and the recorded runs, and ran the mechanical floor, but could not reach Docker, so neither `make check` nor the mutations were reproduced there. Both stand on this side: `make check` green locally (813 tests, 9665 assertions) and natively in CI on `c76a76e` (run 34871984825), and the mutations recorded with the commands that produce them.
+
 ## Next step
-`scripts/gate-run.sh add-web-admin-and-stats 2 confirm 1` — the second confirmation, on finding 1. If it fails again, stop and ask the user to arbitrate (AGENTS.md).
+`/git:merge add-web-admin-and-stats` — the user's action. Then the user pushes `main`, the executor verifies the run on it and archives the change (sync the `web-ui` delta into the capability, remove roadmap row 11a).
 
 ## Blockers
 None.
