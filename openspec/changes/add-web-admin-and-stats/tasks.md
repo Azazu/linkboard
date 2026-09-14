@@ -17,8 +17,8 @@ fails when the guard it defends is removed.
 
 ## 2. One authority for an account action
 
-- [ ] 2.1 Add `src/Auth/UseCase/BlockUser.php` and `UnblockUser.php` holding the self-block guard, the state change, the flush and the audit line in that order (design decision 5), raising a domain exception for the self-block case. Verify: `tests/Integration/Auth/UseCase/BlockUserTest.php` asserts a blocked account, an idempotent second block, the refusal on self-block with nothing changed, and the audit record's action, actor and target.
-- [ ] 2.2 Reduce `BlockUserProcessor` and `UnblockUserProcessor` to adapters translating the domain exception into the `ValidationException` the API answers today. Verify: `make test ARGS='tests/Api'` passes with the admin API suite unedited.
+- [x] 2.1 Add `src/Auth/UseCase/BlockUser.php` and `UnblockUser.php` holding the self-block guard, the state change, the flush and the audit line in that order (design decision 5), raising a domain exception for the self-block case. Verify: `tests/Integration/Auth/UseCase/BlockUserTest.php` asserts a blocked account, an idempotent second block, the refusal on self-block with nothing changed, and the audit record's action, actor and target.
+- [x] 2.2 Reduce `BlockUserProcessor` and `UnblockUserProcessor` to adapters translating the domain exception into the `ValidationException` the API answers today. Verify: `make test ARGS='tests/Api'` passes with the admin API suite unedited.
 
 ## 3. The link statistics page
 
