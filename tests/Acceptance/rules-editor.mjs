@@ -39,6 +39,16 @@ const browser = await puppeteer.launch({ executablePath, headless: 'new', args: 
 const page = await browser.newPage();
 const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
 
+/* The forms carry several submit buttons — add a rule, switch view, save — so
+   every click here names the button it means. */
+const clickButton = (label) => page.$$eval('button', (buttons, text) => {
+    const button = buttons.find((candidate) => candidate.textContent.trim() === text);
+    if (!button) {
+        throw new Error(`no button labelled ${text}`);
+    }
+    button.click();
+}, label);
+
 await page.goto(`${base}/login`, { waitUntil: 'load' });
 const registered = await page.evaluate(
     async (url, body) => (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).status,
@@ -55,8 +65,8 @@ await page.waitForFunction(() => window.location.pathname === '/');
 
 // a link to edit
 await page.goto(`${base}/links/new`, { waitUntil: 'load' });
-await page.type('#link_targetUrl', 'https://example.com/acceptance');
-await page.$eval('#link_targetUrl', (field) => field.form.querySelector('button[type=submit]').click());
+await page.$eval('#link_targetUrl', (field) => { field.value = 'https://example.com/acceptance'; });
+await clickButton('Create link');
 await page.waitForFunction(() => /^\/links\/[0-9a-f-]{36}$/.test(window.location.pathname));
 const linkPath = new URL(page.url()).pathname;
 
@@ -84,70 +94,99 @@ async function fillRow(index, key, values, target) {
     await page.$eval(`#link_rules_rows_${index}_target`, (field, value) => { field.value = value; }, target);
 }
 
-async function save() {
-    await page.$eval('#link_targetUrl', (field) => field.form.querySelector('button[type=submit]').click());
-    await page.waitForFunction((path) => window.location.pathname === path, { timeout: 15000 }, linkPath).catch(async () => {
-        const alerts = await page.$$eval('[role=alert]', (nodes) => nodes.map((node) => node.textContent.trim()));
-        throw new Error(`the save did not land on the link page — at ${page.url()}, alerts: ${JSON.stringify(alerts)}`);
-    });
+const rowIndices = () => page.$$eval('[data-rules-editor-target=row] select', (nodes) => nodes.map((node) => node.id.replace(/\D+/g, '')));
+const shownRows = () => page.$$eval('[data-rules-editor-target=row]', (rows) =>
+    rows.map((row) => ({
+        match: row.querySelector('select').value,
+        values: row.querySelector('input[id$=_values]').value,
+        target: row.querySelector('input[id$=_target]').value,
+    })),
+);
+const addRow = () => page.$eval('button[data-action="rules-editor#addRow"]', (button) => button.click());
+async function save(expect = 'saved') {
+    await clickButton('Save changes');
+    if (expect === 'saved') {
+        await page.waitForFunction((path) => window.location.pathname === path, { timeout: 15000 }, linkPath).catch(async () => {
+            const alerts = await page.$$eval('[role=alert]', (nodes) => nodes.map((node) => node.textContent.trim()));
+            throw new Error(`the save did not land on the link page — at ${page.url()}, alerts: ${JSON.stringify(alerts)}`);
+        });
+    } else {
+        await page.waitForSelector('[role=alert]', { timeout: 15000 });
+    }
     await settle();
 }
 
-// 1. rows: add two, remove the first, add a third
+// 1. rows: add two, remove the first, add a third, and keep them across an
+//    invalid submission — the case a re-render used to break (finding 2)
 {
     await openEditor();
-    // DOM clicks, not pointer clicks: the controls live inside a <details> and a
-    // headless pointer click can land on the wrong element while it opens
-    const add = () => page.$eval('button[data-action="rules-editor#addRow"]', (button) => button.click());
-    await add();
-    await add();
+    await addRow();
     await settle();
-    const indices = await page.$$eval('[data-rules-editor-target=row] select', (nodes) => nodes.map((node) => node.id.replace(/\D+/g, '')));
+    let indices = await rowIndices();
     await fillRow(indices[0], 'device', 'smartphone', 'https://example.com/first');
     await fillRow(indices[1], 'country', 'DE, AT', 'https://example.com/second');
 
     // drop the first, then add another: the new row must not reuse an index
     await page.$eval('[data-rules-editor-target=row] button', (button) => button.click());
     await settle();
-    await add();
+    await addRow();
     await settle();
-    const left = await page.$$eval('[data-rules-editor-target=row] select', (nodes) => nodes.map((node) => node.id.replace(/\D+/g, '')));
-    await fillRow(left[left.length - 1], 'os', 'iOS', 'https://example.com/third');
-    const shown = await page.$$eval('[data-rules-editor-target=row]', (rows) =>
-        rows.map((row) => ({
-            match: row.querySelector('select').value,
-            values: row.querySelector('input[id$=_values]').value,
-            target: row.querySelector('input[id$=_target]').value,
-        })),
-    );
+    indices = await rowIndices();
+    await fillRow(indices[indices.length - 1], 'os', 'iOS', 'not-a-url');
+
+    // an invalid target: the page comes back with the rules still on it
+    await save('refused');
+    results.afterInvalidSubmission = { rows: await shownRows(), url: new URL(page.url()).pathname };
+
+    // correct it, add one more row through the re-rendered page, and save
+    await page.$eval('details', (element) => { element.open = true; });
+    indices = await rowIndices();
+    await fillRow(indices[indices.length - 1], 'os', 'iOS', 'https://example.com/third');
+    await addRow();
+    await settle();
+    indices = await rowIndices();
+    await fillRow(indices[indices.length - 1], 'language', 'de', 'https://example.com/fourth');
+    const shown = await shownRows();
     await save();
 
     results.rows = { shown, stored: await stored() };
 }
 
-// 2. json: the document typed into the chosen view is the one stored
+// 2. switching carries the document across, in both directions
 {
     await openEditor();
-    await page.$eval('input[name="link[rules][mode]"][value=raw]', (radio) => radio.click());
-    await settle();
-    const structuredHidden = await page.$eval('[data-rules-editor-target=structured]', (node) => node.hidden);
+    await clickButton('Edit as JSON');
+    await page.waitForSelector('#link_rules_raw');
+    await page.$eval('details', (element) => { element.open = true; });
+    results.switchToJson = { document: JSON.parse(await page.$eval('#link_rules_raw', (field) => field.value)) };
+
+    await clickButton('Edit as fields');
+    await page.waitForSelector('[data-rules-editor-target=row]');
+    await page.$eval('details', (element) => { element.open = true; });
+    results.switchBackToFields = { rows: await shownRows() };
+}
+
+// 3. a document the fields cannot hold refuses the switch instead of dropping it
+{
+    await openEditor();
+    await clickButton('Edit as JSON');
+    await page.waitForSelector('#link_rules_raw');
+    await page.$eval('details', (element) => { element.open = true; });
     await page.$eval(
         '#link_rules_raw',
         (field, document) => { field.value = document; },
         '{"version":1,"variants":[{"name":"a","weight":60,"target":"https://example.com/a"},{"name":"b","weight":40,"target":"https://example.com/b"}]}',
     );
     await save();
+    results.variantsStored = await stored();
 
-    results.json = { structuredHidden, stored: await stored() };
-}
-
-// 3. reopen: a document the rows cannot hold comes back as JSON
-{
     await openEditor();
-    results.reopen = {
-        mode: await page.$eval('input[name="link[rules][mode]"]:checked', (radio) => radio.value),
-        rawHasVariants: await page.$eval('#link_rules_raw', (field) => field.value.includes('variants')),
-        rawVisible: await page.$eval('[data-rules-editor-target=raw]', (node) => !node.hidden),
+    await clickButton('Edit as fields');
+    await page.waitForSelector('[role=alert]');
+    results.refusedSwitch = {
+        message: await page.$eval('[role=alert]', (node) => node.textContent.trim()),
+        stillJson: await page.$('#link_rules_raw') !== null,
+        stored: await stored(),
     };
 }
 

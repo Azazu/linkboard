@@ -39,7 +39,19 @@ final class LinkCreateController extends AbstractController
         $form = $this->createForm(LinkType::class, $data, ['creating' => true]);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
+        // a switch between the two views of the rules is a submission of its own:
+        // it carries the document across and re-renders, it never saves. The form
+        // is rebuilt from the carried-over data, because a form that has handled
+        // a request renders what was submitted, not what the model holds now.
+        $switch = $form->isSubmitted() ? $this->pages->switchView($form, $data->rules) : RulesViewSwitch::none();
+        if ($switch->happened) {
+            $form = $this->createForm(LinkType::class, $data, ['creating' => true]);
+            if (null !== $switch->message) {
+                $form->get('rules')->get('raw')->addError(new FormError($switch->message));
+            }
+        }
+
+        if (!$switch->happened && $form->isSubmitted() && $form->isValid()) {
             $rules = $this->pages->rulesFrom($form, $data->rules);
             if (false !== $rules) {
                 try {
@@ -62,6 +74,6 @@ final class LinkCreateController extends AbstractController
             }
         }
 
-        return $this->render('link/new.html.twig', ['form' => $form], new Response(status: $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
+        return $this->render('link/new.html.twig', ['form' => $form], new Response(status: $switch->happened || $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 }

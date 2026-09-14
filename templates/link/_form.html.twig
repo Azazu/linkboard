@@ -22,42 +22,45 @@
     </div>
     {% if form.isActive is defined %}{{ form_row(form.isActive) }}{% endif %}
 
-    <details {{ form.rules.vars.value.mode == 'raw' or form.rules.vars.errors|length or form.rules.children.raw.vars.errors|length ? 'open' }}>
+    {% set rules_open = form.rules.vars.value.usesRawDocument or form.rules.vars.errors|length or form.rules.children.raw.vars.errors|length %}
+    <details {{ rules_open ? 'open' }}>
         <summary>Routing rules</summary>
+        {# One view at a time: the button below switches, and the server carries
+           the document across with the same mapper that stores it. Nothing here
+           needs JavaScript. #}
         <div data-controller="rules-editor"
              data-rules-editor-prototype-value="{% apply escape('html_attr') %}{% include 'link/_rule_row.html.twig' with {row: form.rules.rows.vars.prototype} %}{% endapply %}"
-             data-rules-editor-next-index-value="{{ form.rules.rows|length }}">
+             data-rules-editor-next-index-value="{% set next = 0 %}{% for key in form.rules.rows.children|keys %}{% set next = max(next, key + 1) %}{% endfor %}{{ next }}">
             {{ form_errors(form.rules) }}
+            {{ form_widget(form.rules.mode) }}
 
-            {# the radio decides which view the server reads; with JavaScript the
-               controller follows it, without JavaScript both views stay visible #}
-            <fieldset>
-                <legend>{{ form_label(form.rules.mode) }}</legend>
-                {% for choice in form.rules.mode %}
-                    <label>
-                        {{ form_widget(choice, {attr: {'data-rules-editor-target': 'mode', 'data-action': 'rules-editor#modeChanged'}}) }}
-                        {{ choice.vars.label }}
-                    </label>
-                {% endfor %}
-            </fieldset>
-
-            <div data-rules-editor-target="structured">
-                <div data-rules-editor-target="rows">
-                    {% for row in form.rules.rows %}
-                        {% include 'link/_rule_row.html.twig' with {row: row} %}
-                    {% endfor %}
+            {% if form.rules.vars.value.usesRawDocument %}
+                <div data-rules-editor-target="raw">
+                    {{ form_row(form.rules.raw) }}
+                    <p><small>The whole document, as the API stores it. See the API documentation for its shape.</small></p>
                 </div>
-                <button type="button" class="secondary" data-action="rules-editor#addRow">Add rule</button>
-                <p><small>One match key per rule here. A document with several keys in one rule, or with A/B variants, is edited as JSON.</small></p>
-            </div>
-
-            <div data-rules-editor-target="raw">
-                {{ form_row(form.rules.raw) }}
-                <p><small>The whole document, as the API stores it. See the API documentation for its shape.</small></p>
-            </div>
+                {{ form_widget(form.rules.toFields) }}
+            {% else %}
+                <div data-rules-editor-target="structured">
+                    <div data-rules-editor-target="rows">
+                        {% for row in form.rules.rows %}
+                            {% include 'link/_rule_row.html.twig' with {row: row} %}
+                        {% endfor %}
+                    </div>
+                    {# one control: the controller intercepts the click when it is
+                       there, and the server answers the submission when it is not #}
+                    {{ form_widget(form.rules.addRow, {attr: {'data-action': 'rules-editor#addRow'}}) }}
+                    <p><small>One match key per rule here. A document with several keys in one rule, or with A/B variants, is edited as JSON.</small></p>
+                </div>
+                {{ form_widget(form.rules.toJson) }}
+            {% endif %}
         </div>
     </details>
 
     <button type="submit">{{ submit_label }}</button>
     <a href="{{ cancel_path }}" role="button" class="secondary outline">Cancel</a>
-{{ form_end(form) }}
+
+    {# every field is rendered above, one view at a time; without render_rest
+       Symfony would also print the buttons of the view that is not shown #}
+    {{ form_widget(form._token) }}
+{{ form_end(form, {render_rest: false}) }}

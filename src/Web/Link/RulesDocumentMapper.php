@@ -29,6 +29,10 @@ final class RulesDocumentMapper
     {
         $data = new RulesFormData();
         if (null === $stored || [] === $stored) {
+            // one empty row, so the fields view is usable at once — with or
+            // without JavaScript
+            $data->rows[] = new RuleRowFormData();
+
             return $data;
         }
 

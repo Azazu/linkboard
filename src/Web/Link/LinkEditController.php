@@ -8,6 +8,7 @@ use App\Auth\Entity\User;
 use App\Link\Security\LinkVoter;
 use App\Link\UseCase\UpdateLink;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -36,7 +37,19 @@ final class LinkEditController extends AbstractController
         $form = $this->createForm(LinkType::class, $data);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
+        // a switch between the two views of the rules is a submission of its own:
+        // it carries the document across and re-renders, it never saves. The form
+        // is rebuilt from the carried-over data, because a form that has handled
+        // a request renders what was submitted, not what the model holds now.
+        $switch = $form->isSubmitted() ? $this->pages->switchView($form, $data->rules) : RulesViewSwitch::none();
+        if ($switch->happened) {
+            $form = $this->createForm(LinkType::class, $data);
+            if (null !== $switch->message) {
+                $form->get('rules')->get('raw')->addError(new FormError($switch->message));
+            }
+        }
+
+        if (!$switch->happened && $form->isSubmitted() && $form->isValid()) {
             $rules = $this->pages->rulesFrom($form, $data->rules);
             if (false !== $rules) {
                 ($this->updateLink)($link, $this->pages->changesFrom($data, $rules), $this->pages->actor());
@@ -49,6 +62,6 @@ final class LinkEditController extends AbstractController
         return $this->render('link/edit.html.twig', [
             'form' => $form,
             'link' => $link,
-        ], new Response(status: $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
+        ], new Response(status: $switch->happened || $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 }

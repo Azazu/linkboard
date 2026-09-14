@@ -12,6 +12,7 @@ use App\Link\Rules\RulesDocumentParser;
 use App\Link\Security\LinkVoter;
 use App\Link\UseCase\LinkChanges;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Form\ClickableInterface;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -58,6 +59,94 @@ final readonly class LinkPages
         $user = $this->security->getUser();
 
         return $user instanceof User ? $user : null;
+    }
+
+    /**
+     * A switch between the two views of the rules, if that is what was
+     * submitted (Gate 2 confirmation 1, finding 1). The document a person
+     * filled in is carried over by the same mapper that stores it — no second
+     * implementation, nothing transferred by the browser — and a document the
+     * rows cannot represent refuses the switch with a message instead of
+     * quietly dropping what the rows cannot hold.
+     *
+     * @param FormInterface<mixed> $form
+     */
+    public function switchView(FormInterface $form, RulesFormData $data): RulesViewSwitch
+    {
+        $rules = $form->get('rules');
+
+        // adding a row is the same kind of submission: with JavaScript the
+        // controller intercepts the click, without it the server answers, and
+        // either way one control does the job
+        if (self::clicked($rules, 'addRow')) {
+            $data->rows[] = new RuleRowFormData();
+            $data->mode = RulesFormData::MODE_STRUCTURED;
+
+            return RulesViewSwitch::made();
+        }
+
+        if (self::clicked($rules, 'toJson')) {
+            $node = null;
+            try {
+                $node = RulesDocumentMapper::toNode($data);
+            } catch (\JsonException) {
+                // the fields view cannot produce invalid JSON; nothing to carry
+            }
+            $data->raw = null === $node ? '' : json_encode($node, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR);
+            $data->mode = RulesFormData::MODE_RAW;
+
+            return RulesViewSwitch::made();
+        }
+
+        if (!self::clicked($rules, 'toFields')) {
+            return RulesViewSwitch::none();
+        }
+
+        $raw = trim((string) $data->raw);
+        if ('' === $raw) {
+            $data->rows = [new RuleRowFormData()];
+            $data->mode = RulesFormData::MODE_STRUCTURED;
+
+            return RulesViewSwitch::made();
+        }
+
+        try {
+            $node = json_decode($raw, false, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return RulesViewSwitch::refused('The document is not valid JSON, so it cannot be shown as fields: '.$e->getMessage());
+        }
+
+        $result = $this->rulesParser->parse($node);
+        if (!$result->isValid() || null === $result->document) {
+            return RulesViewSwitch::refused('The document has to be valid before it can be shown as fields.');
+        }
+
+        $asForm = RulesDocumentMapper::toForm($result->document->toArray());
+        if ($asForm->usesRawDocument()) {
+            return RulesViewSwitch::refused('This document can only be edited as JSON: the fields cannot hold A/B variants or a rule matching on more than one key.');
+        }
+
+        $data->rows = $asForm->rows;
+        $data->raw = $asForm->raw;
+        $data->mode = RulesFormData::MODE_STRUCTURED;
+
+        return RulesViewSwitch::made();
+    }
+
+    /**
+     * Whether that button of the rules form was the one submitted. The
+     * interface does not carry isClicked(); a submit button's form does.
+     *
+     * @param FormInterface<mixed> $form
+     */
+    private static function clicked(FormInterface $form, string $button): bool
+    {
+        if (!$form->has($button)) {
+            return false;
+        }
+        $child = $form->get($button);
+
+        return $child instanceof ClickableInterface && $child->isClicked();
     }
 
     /**
