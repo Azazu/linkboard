@@ -21,3 +21,21 @@
 - `git diff --check main...HEAD` passed.
 - Runtime checks were not rerun: `make ps` failed with permission denied on `/var/run/docker.sock`. Findings above are based on source inspection; the executor's reported green suite was not independently reproduced.
 - Only this review record was written; no git write commands were run.
+
+## Round 1 · Gate 1
+**Reviewer:** codex
+**Date:** 2026-09-14
+**Reviewed-Commit:** 97e82ee021befd98739b211a6945c0dc68398822
+**Verdict:** approved
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | minor | openspec/changes/polish-api-and-openapi/specs/api-docs/spec.md — The allowance is documented where it is sent; tasks.md — 1.3 | The scenario says every rate-limited operation documents allowance headers on success, but AuthRateLimitSubscriber sends only Retry-After on refusal and no allowance headers on success. The existing implementation and handoff correctly distinguish this from the identity limiter. Qualify the scenario and verification wording by limiter: assert allowance headers for identity-limited operations and Retry-After for both, without adding runtime headers. This keeps the normative example consistent with the requirement to document only headers the limiter actually sets and the no-runtime-behavior-change scope. | open |
+
+### Review evidence and limitations
+- Verified the requested branch, a clean initial worktree and HEAD equal to the Reviewed-Commit above. Read AGENTS.md, openspec/config.yaml, the proposal, design, tasks, both delta specs, existing capability specs, roadmap, handoff and prior Gate 2 record; inspected the relevant security configuration, runtime limiter classes, documentation decorator and installed Symfony authentication source for feasibility.
+- The high-tier scope now explicitly includes the firewall, token route and limiter parameterization. Tasks 6.4 and 7.1–7.2 provide runtime-policy equivalence checks, unchanged behavioral suites and executed negative inputs for the moved boundaries; tasks 6.1–6.5 cover the outstanding Gate 2 corrections. No blocking architectural or planning finding remains for Gate 1.
+- `openspec validate polish-api-and-openapi --strict`, `git diff --check main...HEAD` and `scripts/pregate-verify.sh gate1 polish-api-and-openapi` passed; the pre-gate floor reported zero warnings.
+- This is approval of the revised plan, not confirmation of the existing implementation or closure of Gate 2 round 1. Previously checked implementation claims must be reconciled with the pending corrective tasks and demonstrated evidence before Gate 2. Runtime suites were not rerun for this artifact review.
+- Only this review record was written; no git write commands were run.
