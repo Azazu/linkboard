@@ -73,3 +73,20 @@
 - Branch and HEAD match the requested identifiers; the working tree was clean before this confirmation. Repository searches and the intervening commit bodies did not locate the missing mutation commands.
 - `scripts/pregate-verify.sh gate2 add-web-admin-and-stats`: whitespace, strict OpenSpec validation, tier, task-path and Markdown checks passed. `make check` could not start the PHP checks because access to `/var/run/docker.sock` was denied. No independent passing PHP test run or mutation rerun is claimed; the handoff's green CI result is executor-recorded evidence.
 - Only `review.md` was modified. No Git write commands or implementation edits were run.
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-14
+**Reviewed-Commit:** 314fe3182295f596299087de3899ae8a9be209ec
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Tasks 4.1 and 4.4 now record the exact Docker Compose commands for each independent mutation, including `cache:clear --env=test`, the PHPUnit filters and test files, the observed failures, and the passing results after restoring each guard (`OK (1 test, 2 assertions)` and `OK (2 tests, 18 assertions)`). Task 4.4 and the handoff correctly identify the web case as `UserBlockTest::testAnAdministratorCannotBlockTheirOwnAccount`. The named tests and their assertions match the recorded failures; the self-block guard and `^/admin(/|$)` boundary are present and unchanged from the reviewed baseline. This completes the reproducible executor evidence requested by finding 1 and the first confirmation. |
+
+### Validation
+- Reviewed only the diff from `dd322c79161b7dc4478fa64f7561d87e117022d3` to `314fe3182295f596299087de3899ae8a9be209ec` for round 1's major finding 1 and its reachable collateral effects, including the task/handoff evidence, commit bodies, restored guards and corresponding tests. No blocker findings existed; minor findings 2 and 3 are outside this confirmation's requested scope.
+- Branch and HEAD match the requested identifiers; the working tree was clean before this confirmation. Re-read tasks and handoff in full and searched related mutation and self-block claims for consistency.
+- `scripts/pregate-verify.sh gate2 add-web-admin-and-stats`: whitespace, strict OpenSpec validation, tier, task-path and Markdown checks passed. `make check` could not start the PHP checks because access to `/var/run/docker.sock` was denied. No independent passing PHP test run or mutation rerun is claimed; the recorded mutation results and green CI run are executor-provided evidence.
+- Only `review.md` was modified. No Git write commands or implementation edits were run.
