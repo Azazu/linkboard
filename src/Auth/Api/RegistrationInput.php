@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Api;
 
+use ApiPlatform\Metadata\ApiProperty;
 use App\Auth\Validator\UniqueEmail;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -16,9 +17,11 @@ final class RegistrationInput
     #[Assert\Email(mode: Assert\Email::VALIDATION_MODE_HTML5)]
     #[Assert\Length(max: 180)]
     #[UniqueEmail]
+    #[ApiProperty(example: 'ada@example.com')]
     public string $email = '';
 
     #[Assert\NotBlank]
     #[Assert\Length(min: 12, max: 4096)]
+    #[ApiProperty(example: 'correct-horse-battery-staple')]
     public string $password = '';
 }

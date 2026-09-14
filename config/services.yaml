@@ -12,6 +12,33 @@ parameters:
     # Prefix of the click-counter keys `link:{id}:clicks` (FR-RED-3); '' in dev/prod,
     # `test:` in the test environment so the suite can clean its keys on a shared Redis
     app.click_counter_key_prefix: ''
+    # The API's own path rules, in one place because three readers need the
+    # same answer: security.yaml's access control, the rate-limit listener and
+    # the OpenAPI decorator that documents 401 and 429. A rule repeated is a
+    # rule that drifts (change polish-api-and-openapi, design decision 2).
+    # Anchored, without delimiters; each reader wraps them as it needs.
+    app.api.path.auth: '^/api/v1/auth/'
+    app.api.path.docs: '^/api/docs'
+    app.api.path.base: '^/api/v1$'
+    # The json_login check path of the api firewall: the one public operation
+    # that authenticates, so the one that answers 401 without a firewall
+    # refusing anything. Plain path — security.yaml and routes.yaml use it as
+    # given, the OpenAPI decorator anchors it.
+    app.api.path.token: '/api/v1/auth/token'
+    # Public under /api: no credential is required, so no 401 is documented.
+    # The test-only route is added to this list in the test environment.
+    app.api.public_paths:
+        - '%app.api.path.auth%'
+        - '%app.api.path.docs%'
+        - '%app.api.path.base%'
+    # Authenticated requests the API limiter does NOT count (FR-KEY-4) —
+    # they are covered by the per-IP auth limiter instead, which is why they
+    # can still answer 429.
+    app.api.unlimited_paths:
+        - '%app.api.path.auth%'
+    # Paths the per-IP auth limiter guards (FR-AUTH-4).
+    app.api.ip_limited_paths:
+        - '%app.api.path.auth%'
 
 services:
     # default configuration for services in *this* file

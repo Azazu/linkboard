@@ -117,19 +117,35 @@ final readonly class LinkResource
      * @param array<string, mixed>|null  $rules
      */
     public function __construct(
+        #[ApiProperty(example: '01920f3a-6f2e-7a1c-9c0d-2b4e8a1d3f57')]
         public string $id,
+        #[ApiProperty(example: '01920f3a-1111-7a1c-9c0d-2b4e8a1d3f57')]
         public string $ownerId,
+        #[ApiProperty(example: 'spring-sale')]
         public string $slug,
+        #[ApiProperty(example: 'https://lnk.example.com/spring-sale')]
         public string $shortUrl,
+        #[ApiProperty(example: 'https://example.com/products/spring?ref=newsletter')]
         public string $targetUrl,
+        #[ApiProperty(example: ['utm_source' => 'newsletter', 'utm_medium' => 'email', 'utm_campaign' => 'spring'])]
         public ?array $utm,
-        #[ApiProperty(description: 'Routing-rules document (version 1; schema: docs/reference/rules-schema.json in the repository) or null for a plain redirect.', openapiContext: ['type' => 'object', 'nullable' => true])]
+        #[ApiProperty(
+            description: 'Routing-rules document (version 1; schema: docs/reference/rules-schema.json in the repository) or null for a plain redirect.',
+            openapiContext: ['type' => 'object', 'nullable' => true],
+            example: ['version' => 1, 'rules' => [['match' => ['country' => ['DE', 'AT']], 'target' => 'https://example.de/fruehling']]],
+        )]
         public ?array $rules,
+        #[ApiProperty(example: '2026-12-31T23:59:59+00:00')]
         public ?\DateTimeImmutable $expiresAt,
+        #[ApiProperty(example: 10000)]
         public ?int $maxClicks,
+        #[ApiProperty(example: 1842)]
         public int $clickCount,
+        #[ApiProperty(example: true)]
         public bool $isActive,
+        #[ApiProperty(example: '2026-09-01T08:15:00+00:00')]
         public \DateTimeImmutable $createdAt,
+        #[ApiProperty(example: '2026-09-12T11:40:00+00:00')]
         public \DateTimeImmutable $updatedAt,
     ) {
     }

@@ -39,13 +39,19 @@ final readonly class LinkTimeseriesReport
      * @param list<TimeBucket> $buckets
      */
     public function __construct(
-        #[ApiProperty(identifier: true)]
+        #[ApiProperty(identifier: true, example: '01920f3a-6f2e-7a1c-9c0d-2b4e8a1d3f57')]
         public string $linkId,
+        #[ApiProperty(example: '2026-09-01T00:00:00+00:00')]
         public \DateTimeImmutable $from,
+        #[ApiProperty(example: '2026-10-01T00:00:00+00:00')]
         public \DateTimeImmutable $to,
+        #[ApiProperty(example: 'day')]
         public string $granularity,
+        #[ApiProperty(example: false)]
         public bool $includeBots,
+        #[ApiProperty(example: [['bucket' => '2026-09-01T00:00:00+00:00', 'clicks' => 120, 'uniqueVisitors' => 98, 'cumulativeClicks' => 120]])]
         public array $buckets,
+        #[ApiProperty(example: '2026-09-14T09:30:00+00:00')]
         public \DateTimeImmutable $generatedAt,
     ) {
     }

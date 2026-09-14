@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Api\ApiKeys;
 
+use ApiPlatform\Metadata\ApiProperty;
 use App\Auth\Entity\ApiKey;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -20,11 +21,13 @@ final class CreateApiKeyInput
 
     #[Assert\NotBlank(normalizer: 'trim', message: 'name must not be blank.')]
     #[Assert\Length(max: ApiKey::NAME_MAX_LENGTH, normalizer: 'trim', maxMessage: 'name must be at most {{ limit }} characters.')]
+    #[ApiProperty(example: 'deploy monitor')]
     public string $name = '';
 
     // NotBlank(allowNull) because the DateTime validator skips empty strings:
     // omitted or null means "never expires", "" is a rejected value (Gate 2 confirmation 1)
     #[Assert\NotBlank(allowNull: true, message: 'expiresAt must be an RFC 3339 timestamp, for example 2027-01-01T00:00:00Z.')]
     #[Assert\DateTime(format: self::EXPIRES_AT_FORMAT, message: 'expiresAt must be an RFC 3339 timestamp, for example 2027-01-01T00:00:00Z.')]
+    #[ApiProperty(example: '2027-01-01T00:00:00+00:00')]
     public ?string $expiresAt = null;
 }

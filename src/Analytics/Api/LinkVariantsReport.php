@@ -36,13 +36,19 @@ final readonly class LinkVariantsReport
      * @param list<VariantRow> $items
      */
     public function __construct(
-        #[ApiProperty(identifier: true)]
+        #[ApiProperty(identifier: true, example: '01920f3a-6f2e-7a1c-9c0d-2b4e8a1d3f57')]
         public string $linkId,
+        #[ApiProperty(example: '2026-09-01T00:00:00+00:00')]
         public \DateTimeImmutable $from,
+        #[ApiProperty(example: '2026-10-01T00:00:00+00:00')]
         public \DateTimeImmutable $to,
+        #[ApiProperty(example: false)]
         public bool $includeBots,
+        #[ApiProperty(example: 640)]
         public int $total,
+        #[ApiProperty(example: [['variant' => 'a', 'clicks' => 331, 'uniqueVisitors' => 300, 'share' => 51.7]])]
         public array $items,
+        #[ApiProperty(example: '2026-09-14T09:30:00+00:00')]
         public \DateTimeImmutable $generatedAt,
     ) {
     }

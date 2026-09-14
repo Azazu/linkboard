@@ -8,6 +8,7 @@ use App\Auth\ApiKey\ApiKeyTokenHandler;
 use App\Auth\Entity\User;
 use App\Shared\Api\ProblemDetails;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,19 +33,37 @@ final readonly class ApiRateLimitListener
 {
     public const string FIREWALL = 'api';
     public const string REQUEST_ATTRIBUTE = '_api_rate_limit';
-    private const string UNLIMITED_PATH = '#^/api/v1/auth/#';
 
+    /**
+     * @param list<string> $unlimitedPaths anchored patterns, without delimiters: the
+     *                                     same values security.yaml and the OpenAPI
+     *                                     decorator read (change polish-api-and-openapi)
+     */
     public function __construct(
         #[Target('api_identity')]
         private RateLimiterFactoryInterface $limiter,
         private LoggerInterface $logger,
+        #[Autowire('%app.api.unlimited_paths%')]
+        private array $unlimitedPaths = [],
     ) {
+    }
+
+    /** Whether the limiter counts a request for this path at all. */
+    public function counts(string $path): bool
+    {
+        foreach ($this->unlimitedPaths as $pattern) {
+            if (1 === preg_match('#'.$pattern.'#', $path)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function __invoke(LoginSuccessEvent $event): void
     {
         $request = $event->getRequest();
-        if (self::FIREWALL !== $event->getFirewallName() || 1 === preg_match(self::UNLIMITED_PATH, $request->getPathInfo())) {
+        if (self::FIREWALL !== $event->getFirewallName() || !$this->counts($request->getPathInfo())) {
             return;
         }
         $identity = self::identity($event);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Analytics\Api;
 
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
@@ -26,12 +27,19 @@ use App\Analytics\Report\ReportRequest;
 final readonly class AdminSummaryReport
 {
     public function __construct(
+        #[ApiProperty(example: false)]
         public bool $includeBots,
+        #[ApiProperty(example: 128)]
         public int $totalUsers,
+        #[ApiProperty(example: 1904)]
         public int $totalLinks,
+        #[ApiProperty(example: 1751)]
         public int $activeLinks,
+        #[ApiProperty(example: 482913)]
         public int $totalClicks,
+        #[ApiProperty(example: 1204)]
         public int $clicksToday,
+        #[ApiProperty(example: '2026-09-14T09:30:00+00:00')]
         public \DateTimeImmutable $generatedAt,
     ) {
     }

@@ -38,14 +38,21 @@ final readonly class LinkDevicesReport
      * @param list<OsRow>         $byOs
      */
     public function __construct(
-        #[ApiProperty(identifier: true)]
+        #[ApiProperty(identifier: true, example: '01920f3a-6f2e-7a1c-9c0d-2b4e8a1d3f57')]
         public string $linkId,
+        #[ApiProperty(example: '2026-09-01T00:00:00+00:00')]
         public \DateTimeImmutable $from,
+        #[ApiProperty(example: '2026-10-01T00:00:00+00:00')]
         public \DateTimeImmutable $to,
+        #[ApiProperty(example: false)]
         public bool $includeBots,
+        #[ApiProperty(example: 1842)]
         public int $total,
+        #[ApiProperty(example: [['deviceType' => 'smartphone', 'clicks' => 1103, 'share' => 59.9]])]
         public array $byDeviceType,
+        #[ApiProperty(example: [['os' => 'iOS', 'clicks' => 702, 'share' => 38.1]])]
         public array $byOs,
+        #[ApiProperty(example: '2026-09-14T09:30:00+00:00')]
         public \DateTimeImmutable $generatedAt,
     ) {
     }
