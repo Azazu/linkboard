@@ -53,8 +53,10 @@
 
 - The claim was swept, not just the line: the spec requirement now states that a refused submission comes back in the view it was made in still carrying what was entered, with a scenario for it; task 4.9 names the four editor cases and the negative run; `docs/how-to/local-development.md` documents the editor run with its command and expected output next to the API-key one. Both documented commands were run in their exact form.
 
+- Branch run on this head (`0c9ac52`) is green: run 34825801565 (2026-09-14).
+
 ## Next step
-The user pushes the branch; the executor records the Actions run on the new head and then runs `scripts/gate-run.sh add-web-ui 2 confirm 1` — the third confirmation, on finding 1 (the user's arbitration of 2026-09-14).
+`scripts/gate-run.sh add-web-ui 2 confirm 1` — the third confirmation, on finding 1 (the user's arbitration of 2026-09-14).
 
 ## Blockers
 None.
