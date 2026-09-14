@@ -125,3 +125,26 @@
 - `scripts/pregate-verify.sh gate2 add-web-ui` passes whitespace, strict OpenSpec validation, artifact and referenced-path checks, but its `make check` fails because this sandbox cannot access `/var/run/docker.sock`. Application/browser tests were not rerun successfully here.
 - The commit and handoff record a successful Actions run on `71f08790e8600f92cbecadda019f857e39983dfa`; the diff from that commit to the reviewed HEAD contains only `handoff.md`, resolving the earlier evidence-freshness discrepancy. The remote run result was not independently verified in this review.
 - Only `review.md` was modified; no git write commands were run.
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-14
+**Reviewed-Commit:** 9d2fa128af8558f068edd731c821bf7b8dc36d3d
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The document-preservation implementation is resolved: `LinkPages::switchView()` transfers fields through the storage mapper, parses JSON before converting it to fields, and refuses documents the fields cannot represent. Both controllers rebuild the selected view without saving; the template renders that view and its submitted mode, including the raw textarea and errors, and the switch works as a plain POST. However, the explicitly requested invalid-raw-input browser coverage remains absent, as already noted in Confirmation 1. `tests/Acceptance/rules-editor.mjs` exercises an invalid structured target and a valid variants document refused by the fields view; neither submits invalid raw JSON. The server-side `LinkEditTest` covers malformed JSON, but cannot establish the requested browser behavior. Add and record the browser case: select JSON, submit invalid raw input, verify the 422 displays the error and preserves the entered text in the active JSON view while stored rules stay unchanged, then correct and save. This remaining objection concerns the required verification, not a demonstrated failure of the new conversion logic. |
+| 2 | confirmed — The prototype uses the same fieldset, row target and remove action as existing rows. The template now initializes the counter above the maximum existing child name, and `addRow()` increments it independently of row count. Surviving indices 1 and 2 therefore allocate 3 after a validation re-render. The extended acceptance script and recorded positive/negative runs cover removal, addition, an invalid submission, correction, another addition and saving the displayed rules. |
+| 3 | confirmed — Revocation remains an owner-scoped GET confirmation page with a consequence statement and Cancel link, followed by a CSRF-protected POST through the owner-scoped revocation service. The tests cover arrival, cancellation and confirmation. The collateral link-deletion confirmation retains its voter and CSRF checks and performs no deletion on GET. |
+| 4 | confirmed — The owner-scoped total, bounded page and offset, and Previous/Next links expose every page over deterministic newest-first repository ordering. The test with 55 newer revoked keys reaches and revokes the old active key on the second page. The first-50 truncation remains resolved. |
+
+### Validation
+- Reviewed only `255037463321b36cbd8781d71fc316fd605f100e..9d2fa128af8558f068edd731c821bf7b8dc36d3d` and collateral reachable from findings 1–4. Branch and HEAD match the request; the working tree was initially clean. All four source-round majors were dispositioned as fixed; there were no blockers. No unrelated minor findings were introduced.
+- Read the affected mapping, forms, controllers, templates, browser and web tests, and related artifacts and execution evidence. Repository searches checked the affected editor, validation, switching and fallback claims.
+- Executed the current Stimulus controller in Node with stubbed targets and the template's maximum-index formula: surviving indices 1 and 2 allocate distinct indices 3 and 4. This is an isolated check, not a browser run.
+- `scripts/pregate-verify.sh gate2 add-web-ui` passes whitespace, strict OpenSpec validation, artifact and referenced-path checks. Its `make check` fails because this sandbox cannot access `/var/run/docker.sock`; application/browser tests were not rerun successfully here.
+- The handoff records successful Actions run 34819584049 on `ba246317bcc9a41594fa0eaab7c00ced28922c53`; only `handoff.md` differs between that commit and the reviewed HEAD. The remote run result was not independently verified here.
+- Finding 1 has now failed two confirmations. Per AGENTS.md, stop the confirmation loop: split or reduce the change, or ask the user to arbitrate before another review attempt.
+- Only `review.md` was modified; no git write commands were run.
