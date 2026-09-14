@@ -6,18 +6,19 @@ namespace App\Analytics\Api;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
-use App\Analytics\Cache\ReportCache;
-use App\Analytics\Query\BreakdownQuery;
-use App\Analytics\Query\GlobalStatsQuery;
-use App\Analytics\Query\TimeseriesQuery;
+use App\Analytics\Report\GlobalReports;
 use App\Analytics\Report\ReportRequest;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * The three global reports (spec analytics "Global statistics for
  * administrators"): ROLE_ADMIN is enforced by the operations and by
- * access_control on the prefix; the reports go through the cache under the
- * `global` tag.
+ * access_control on the prefix.
+ *
+ * `GlobalReports` owns the cache key, the `global` tag and the computation,
+ * and the administrative statistics page calls the same service (design
+ * decision 1 of add-web-admin-and-stats); this class only turns an operation
+ * and a query string into a report request.
  *
  * @implements ProviderInterface<object>
  */
@@ -25,10 +26,7 @@ final readonly class AdminStatsProvider implements ProviderInterface
 {
     public function __construct(
         private ReportRequestFactory $requests,
-        private ReportCache $cache,
-        private GlobalStatsQuery $totals,
-        private TimeseriesQuery $timeseries,
-        private BreakdownQuery $breakdown,
+        private GlobalReports $reports,
     ) {
     }
 
@@ -47,22 +45,19 @@ final readonly class AdminStatsProvider implements ProviderInterface
             withLimit: AdminTopLinksReport::class === $class,
             withPeriod: AdminSummaryReport::class !== $class, // the summary is all-time + today: no period, `from`/`to` ignored
         );
-        $name = 'admin-'.strtolower((string) preg_replace('/^Admin(\w+)Report$/', '$1', substr($class, strrpos($class, '\\') + 1)));
 
-        return $this->cache->remember($report->cacheKey($name), [$report->cacheTag()], fn (): object => $this->compute($class, $report));
+        return $this->report($class, $report);
     }
 
     /**
      * @param class-string $class
      */
-    private function compute(string $class, ReportRequest $report): object
+    private function report(string $class, ReportRequest $request): object
     {
-        $now = $this->requests->now();
-
         return match ($class) {
-            AdminSummaryReport::class => AdminSummaryReport::of($report, $this->totals->totals($report, $this->requests->startOfToday()), $now),
-            AdminTimeseriesReport::class => AdminTimeseriesReport::of($report, $this->timeseries->clickBuckets($report), $now),
-            AdminTopLinksReport::class => AdminTopLinksReport::of($report, $this->breakdown->topLinks($report), $now),
+            AdminSummaryReport::class => $this->reports->summary($request),
+            AdminTimeseriesReport::class => $this->reports->timeseries($request),
+            AdminTopLinksReport::class => $this->reports->topLinks($request),
             default => throw new \LogicException(\sprintf('No report for %s.', $class)),
         };
     }
