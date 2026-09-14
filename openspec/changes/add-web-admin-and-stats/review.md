@@ -56,3 +56,20 @@
 - The handoff reports 809 passing tests and a successful CI run for `a646230`; these are executor-recorded results, not independently rerun here.
 - Findings 2 and 3 follow from the shared request parser and rendered form; runtime reproduction was unavailable in this sandbox.
 - Only `review.md` was modified. No Git write commands or implementation edits were run.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-14
+**Reviewed-Commit:** 6f0daa3dc77db1f91c9e0d0a2b7b7a6323320483
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The new task/handoff text and commit `8cc990f` record both mutations, their observed failures and restoration, and both guards are present and unchanged from the reviewed baseline. However, none records the exact test commands explicitly requested by this finding, either for the failing mutations or the restored passing runs. Record the commands actually executed, including test selection and the test-container cache rebuild for the security configuration mutation, together with the failing and restored passing results. Also identify the web self-block case correctly: it is `UserBlockTest::testAnAdministratorCannotBlockTheirOwnAccount`, not a second `BlockUserTest` case as tasks 4.4 and the handoff currently claim. The observed integration refusal and web alert failure match the existing assertions; the remaining issue is completing the requested reproducible execution record, not adding another guard or test. |
+
+### Validation
+- Reviewed only the diff from `dd322c79161b7dc4478fa64f7561d87e117022d3` to `6f0daa3dc77db1f91c9e0d0a2b7b7a6323320483` for round 1's major finding 1 and its reachable collateral effects, including the commit messages, task/handoff evidence, restored guards and corresponding tests. No blocker findings existed; minor findings 2 and 3 are outside this confirmation's requested scope.
+- Branch and HEAD match the requested identifiers; the working tree was clean before this confirmation. Repository searches and the intervening commit bodies did not locate the missing mutation commands.
+- `scripts/pregate-verify.sh gate2 add-web-admin-and-stats`: whitespace, strict OpenSpec validation, tier, task-path and Markdown checks passed. `make check` could not start the PHP checks because access to `/var/run/docker.sock` was denied. No independent passing PHP test run or mutation rerun is claimed; the handoff's green CI result is executor-recorded evidence.
+- Only `review.md` was modified. No Git write commands or implementation edits were run.
