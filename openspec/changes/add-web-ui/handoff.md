@@ -1,6 +1,6 @@
 # Handoff — add-web-ui
 
-**Updated:** 2026-09-13 · claude
+**Updated:** 2026-09-14 · claude
 **State:** awaiting-gate-2
 **Branch:** change/add-web-ui
 
@@ -43,8 +43,10 @@
 
 - Browser acceptance extended to exactly what the finding asked for: two rows added, the first removed, a third added, an invalid target submitted (the 422 re-render keeps both rows and their values), corrected, a fourth row added on the re-rendered page, saved — the three rules on screen are the three stored; the switch to JSON carries all three across and the switch back rebuilds the same three rows; a variants document refuses the switch and stays stored. Negative runs: with the next index taken from the row count the save no longer lands (a new row overwrites a survivor's target), and with the switch carrying nothing the JSON view comes up empty.
 
+- Branch run on the fix head (`ba24631`) is green: run 34819584049, `make check EXEC=` native in CI (2026-09-14).
+
 ## Next step
-The user pushes the branch; the executor records the Actions run on the new head and then runs `scripts/gate-run.sh add-web-ui 2 confirm 1` — the second confirmation, on findings 1 and 2. If either fails again, stop and ask the user to arbitrate (AGENTS.md).
+`scripts/gate-run.sh add-web-ui 2 confirm 1` — the second confirmation, on findings 1 and 2. If either fails again, stop and ask the user to arbitrate (AGENTS.md).
 
 ## Blockers
 None.
