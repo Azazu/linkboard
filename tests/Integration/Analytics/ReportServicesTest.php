@@ -21,13 +21,26 @@ use Psr\Cache\CacheItemPoolInterface;
 #[CoversNothing]
 final class ReportServicesTest extends AnalyticsQueryTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // a global report's key is the same in every test and the pool outlives
+        // a run: an entry left by an earlier one would answer here
+        $this->clearReportCache();
+    }
+
     protected function tearDown(): void
+    {
+        $this->clearReportCache();
+        parent::tearDown();
+    }
+
+    private function clearReportCache(): void
     {
         $pool = self::getContainer()->get('cache.reports');
         if ($pool instanceof CacheItemPoolInterface) {
             $pool->clear();
         }
-        parent::tearDown();
     }
 
     public function testASecondCallWithinTheTimeToLiveAnswersTheSameReport(): void

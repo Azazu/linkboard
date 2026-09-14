@@ -1,0 +1,72 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Statistics · Admin · Linkboard{% endblock %}
+
+{% block body %}
+    <h1>Service statistics</h1>
+
+    {% include 'admin/_nav.html.twig' with {current: 'stats'} only %}
+
+    {% include 'stats/_controls.html.twig' with {controls: controls, action: path('app_admin_stats')} %}
+
+    {% if reports %}
+        {% set timeseries = reports.timeseries %}
+        <p>
+            <small>
+                {{ timeseries.from|date('Y-m-d H:i') }} to {{ timeseries.to|date('Y-m-d H:i') }}, counted in UTC,
+                {{ timeseries.includeBots ? 'bots included' : 'bots excluded' }}.
+                Figures generated {{ timeseries.generatedAt|date('Y-m-d H:i') }} UTC and may be up to 5 minutes old.
+                The totals below are all-time and ignore the period.
+            </small>
+        </p>
+
+        <div class="grid">
+            <article><h2>{{ reports.summary.totalUsers }}</h2><p>accounts</p></article>
+            <article><h2>{{ reports.summary.totalLinks }}</h2><p>links, {{ reports.summary.activeLinks }} active</p></article>
+            <article><h2>{{ reports.summary.totalClicks }}</h2><p>clicks, all time</p></article>
+            <article><h2>{{ reports.summary.clicksToday }}</h2><p>clicks today</p></article>
+        </div>
+
+        <h2>Clicks per {{ timeseries.granularity }}</h2>
+        <div class="lb-chart">{{ render_chart(chart) }}</div>
+        {# the chart needs JavaScript; the table below carries the same numbers.
+           The global series carries no distinct-visitor count by design (FR-ANL-4). #}
+        <div class="lb-table-scroll">
+            <table>
+                <thead><tr><th>Bucket (UTC)</th><th>Clicks</th><th>Running total</th></tr></thead>
+                <tbody>
+                    {% for bucket in timeseries.buckets %}
+                        <tr>
+                            <td>{{ bucket.bucket|date(timeseries.granularity == 'hour' ? 'Y-m-d H:i' : 'Y-m-d') }}</td>
+                            <td>{{ bucket.clicks }}</td>
+                            <td>{{ bucket.cumulativeClicks }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Most clicked links in the period</h2>
+        <p><small>{{ reports.topLinks.total }} clicks in the period over every link.</small></p>
+        {% if reports.topLinks.items is empty %}
+            <p>No link was clicked in the period.</p>
+        {% else %}
+            <div class="lb-table-scroll">
+                <table>
+                    <thead><tr><th>#</th><th>Slug</th><th>Owner</th><th>Clicks</th><th>Unique visitors</th></tr></thead>
+                    <tbody>
+                        {% for row in reports.topLinks.items %}
+                            <tr>
+                                <td>{{ row.rank }}</td>
+                                <td><a href="{{ path('app_link_show', {id: row.linkId}) }}">{{ row.slug }}</a></td>
+                                <td class="lb-monospace">{{ row.ownerId }}</td>
+                                <td>{{ row.clicks }}</td>
+                                <td>{{ row.uniqueVisitors }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

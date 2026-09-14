@@ -23,4 +23,14 @@ interface UserRepositoryInterface
     public function findPage(int $offset, int $limit): array;
 
     public function count(): int;
+
+    /**
+     * The accounts behind a set of identifiers, in one query — so a listing
+     * that names each row's owner does not look one up per row.
+     *
+     * @param list<Uuid> $ids
+     *
+     * @return array<string, User> keyed by the identifier's RFC 4122 form
+     */
+    public function findByIds(array $ids): array;
 }

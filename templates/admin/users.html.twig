@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Accounts · Admin · Linkboard{% endblock %}
+
+{% block body %}
+    <hgroup>
+        <h1>Accounts</h1>
+        <p>{{ total }} in total</p>
+    </hgroup>
+
+    {% include 'admin/_nav.html.twig' with {current: 'users'} only %}
+
+    <div class="lb-table-scroll">
+        <table>
+            <thead><tr><th>Email</th><th>Roles</th><th>State</th><th>Created</th><th>Action</th></tr></thead>
+            <tbody>
+                {% for account in users %}
+                    <tr>
+                        <td>{{ account.email }}</td>
+                        <td>{{ account.roles|join(', ') }}</td>
+                        <td>{{ account.blocked ? 'blocked' : 'active' }}</td>
+                        <td>{{ account.createdAt|date('Y-m-d') }}</td>
+                        <td>
+                            {% if account.blocked %}
+                                <a href="{{ path('app_admin_user_unblock', {id: account.id}) }}">Unblock…</a>
+                            {% else %}
+                                <a href="{{ path('app_admin_user_block', {id: account.id}) }}">Block…</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include 'admin/_pagination.html.twig' with {route: 'app_admin_users', page: page, pages: pages, params: {}} only %}
+{% endblock %}

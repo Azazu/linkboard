@@ -33,6 +33,9 @@
                         <li><a href="{{ path('app_dashboard') }}">Dashboard</a></li>
                         <li><a href="{{ path('app_links') }}">Links</a></li>
                         <li><a href="{{ path('app_api_keys') }}">API keys</a></li>
+                        {% if is_granted('ROLE_ADMIN') %}
+                            <li><a href="{{ path('app_admin_users') }}">Admin</a></li>
+                        {% endif %}
                         <li>
                             <form method="post" action="{{ path('app_logout') }}">
                                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
