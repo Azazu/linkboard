@@ -163,7 +163,7 @@ Server-rendered Twig pages using the same application services and voters as the
 
 - **FR-WEB-1** Pages: `/login`, `/register`, `/dashboard` (totals, clicks-per-day chart for the user's links, last 10 links), `/links` (paginated list with filters), `/links/new`, `/links/{id}` (details, QR, copy button), `/links/{id}/edit` (target, expiry, limit, UTM, rules as a structured form plus raw-JSON fallback with schema errors shown), `/links/{id}/stats` (all reports of 2.6 as charts and tables, period and granularity selectors, bots toggle), `/api-keys`, `/admin/users`, `/admin/links`, `/admin/stats`.
 - **FR-WEB-2** Forms are Symfony Forms with CSRF; validation messages are the same constraint violations the API returns.
-- **FR-WEB-3** The UI is responsive (usable at 375 px width), needs no JavaScript for anything but charts and convenience actions, and is styled with a small CSS framework served from `assets/` (Pico.css or equivalent, vendored via AssetMapper importmap, no CDN at runtime).
+- **FR-WEB-3** The UI is responsive (usable at 375 px width), needs no JavaScript for anything but charts and convenience actions — and every number a chart draws is also on the page as a table row, so a reader without scripting loses the picture and not the figures (added with row 11a) — and is styled with a small CSS framework served from `assets/` (Pico.css or equivalent, vendored via AssetMapper importmap, no CDN at runtime).
 - **FR-WEB-4** Swagger UI is served by API Platform at `/api/docs` and linked from the UI footer; the OpenAPI JSON is at `/api/docs.json`.
 
 ### 2.10 Administration (ADM)

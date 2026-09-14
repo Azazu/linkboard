@@ -29,6 +29,28 @@ final readonly class ReportRequest
         $granularity->assertAllowedFor($period);
     }
 
+    /**
+     * The same request reduced to the parameters one report actually uses.
+     *
+     * The cache key digests the period, the granularity and the limit for
+     * every report, so a caller with one set of controls feeding several
+     * reports — a statistics page — would otherwise write keys no other
+     * caller produces. Each report reduces the request first, which is why
+     * this sits beside `cacheKey()`: the two have to agree.
+     *
+     * @param ?Period $period the period to use instead, for a report that has none of its own
+     */
+    public function reducedTo(bool $withGranularity, bool $withLimit, ?Period $period = null): self
+    {
+        return new self(
+            $this->linkId,
+            $period ?? $this->period,
+            $withGranularity ? $this->granularity : Granularity::Day,
+            $withLimit ? $this->limit : self::DEFAULT_LIMIT,
+            $this->includeBots,
+        );
+    }
+
     /** A PSR-6 safe key: the report name and a digest of every effective parameter. */
     public function cacheKey(string $report): string
     {

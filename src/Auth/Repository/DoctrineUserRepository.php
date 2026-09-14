@@ -47,4 +47,23 @@ final readonly class DoctrineUserRepository implements UserRepositoryInterface
     {
         return (int) $this->em->createQuery('SELECT COUNT(u.id) FROM App\Auth\Entity\User u')->getSingleScalarResult();
     }
+
+    public function findByIds(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<User> $users */
+        $users = $this->em->createQuery('SELECT u FROM App\Auth\Entity\User u WHERE u.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getResult();
+
+        $byId = [];
+        foreach ($users as $user) {
+            $byId[(string) $user->getId()] = $user;
+        }
+
+        return $byId;
+    }
 }

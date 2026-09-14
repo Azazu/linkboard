@@ -1,0 +1,104 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Statistics · {{ link.slug }} · Linkboard{% endblock %}
+
+{% block body %}
+    <hgroup>
+        <h1>Statistics</h1>
+        <p><a href="{{ path('app_link_show', {id: link.id}) }}">{{ link.slug }}</a> — {{ link.targetUrl|slice(0, 80) }}{{ link.targetUrl|length > 80 ? '…' }}</p>
+    </hgroup>
+
+    {% include 'stats/_controls.html.twig' with {controls: controls, action: path('app_link_stats', {id: link.id})} %}
+
+    {% if reports %}
+        {% set summary = reports.summary %}
+        <p>
+            <small>
+                {{ summary.from|date('Y-m-d H:i') }} to {{ summary.to|date('Y-m-d H:i') }}, counted in UTC,
+                {{ summary.includeBots ? 'bots included' : 'bots excluded' }}.
+                Figures generated {{ summary.generatedAt|date('Y-m-d H:i') }} UTC and may be up to 5 minutes old.
+            </small>
+        </p>
+
+        <div class="grid">
+            <article><h2>{{ summary.totalClicks }}</h2><p>clicks, all time</p></article>
+            <article><h2>{{ summary.uniqueVisitors }}</h2><p>unique visitors</p></article>
+            <article><h2>{{ summary.clicksToday }}</h2><p>clicks today</p></article>
+            <article>
+                <h2>{{ summary.clicksInPeriod }}</h2>
+                <p>
+                    clicks in the period
+                    {% if summary.deltaPercent is not null %}
+                        ({{ summary.deltaPercent > 0 ? '+' }}{{ summary.deltaPercent|number_format(1) }}% against {{ summary.clicksInPreviousPeriod }} before)
+                    {% else %}
+                        (nothing in the period before)
+                    {% endif %}
+                </p>
+            </article>
+        </div>
+        <p>
+            <small>
+                First click {{ summary.firstClickAt ? summary.firstClickAt|date('Y-m-d H:i') ~ ' UTC' : 'none yet' }},
+                last click {{ summary.lastClickAt ? summary.lastClickAt|date('Y-m-d H:i') ~ ' UTC' : 'none yet' }}.
+            </small>
+        </p>
+
+        <h2>Clicks per {{ reports.timeseries.granularity }}</h2>
+        <div class="lb-chart">{{ render_chart(chart) }}</div>
+        {# the chart needs JavaScript; the table below carries the same numbers #}
+        <div class="lb-table-scroll">
+            <table>
+                <thead><tr><th>Bucket (UTC)</th><th>Clicks</th><th>Unique visitors</th><th>Running total</th></tr></thead>
+                <tbody>
+                    {% for bucket in reports.timeseries.buckets %}
+                        <tr>
+                            <td>{{ bucket.bucket|date(reports.timeseries.granularity == 'hour' ? 'Y-m-d H:i' : 'Y-m-d') }}</td>
+                            <td>{{ bucket.clicks }}</td>
+                            <td>{{ bucket.uniqueVisitors }}</td>
+                            <td>{{ bucket.cumulativeClicks }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Breakdowns</h2>
+        {% include 'stats/_breakdown.html.twig' with {
+            title: 'Countries', label: 'Country', key: 'country', unknown: 'Unknown',
+            rows: reports.countries.items, empty: 'No clicks in the period, so no countries to show.'
+        } only %}
+        {% include 'stats/_breakdown.html.twig' with {
+            title: 'Device types', label: 'Device', key: 'deviceType', unknown: 'Unrecognised',
+            rows: reports.devices.byDeviceType, empty: 'No clicks in the period, so no devices to show.'
+        } only %}
+        {% include 'stats/_breakdown.html.twig' with {
+            title: 'Operating systems', label: 'System', key: 'os', unknown: 'Unrecognised',
+            rows: reports.devices.byOs, empty: 'No clicks in the period, so no operating systems to show.'
+        } only %}
+        {% include 'stats/_breakdown.html.twig' with {
+            title: 'Referrers', label: 'Host', key: 'host', unknown: 'direct',
+            rows: reports.referrers.items, empty: 'No clicks in the period, so no referrers to show.'
+        } only %}
+
+        <h3>A/B variants</h3>
+        {% if reports.variants.items is empty %}
+            <p>No click in the period was resolved by a variant, so there is nothing to compare.</p>
+        {% else %}
+            <div class="lb-table-scroll">
+                <table>
+                    <thead><tr><th>Variant</th><th>Clicks</th><th>Unique visitors</th><th>Share</th></tr></thead>
+                    <tbody>
+                        {% for row in reports.variants.items %}
+                            <tr>
+                                <td>{{ row.variant }}</td>
+                                <td>{{ row.clicks }}</td>
+                                <td>{{ row.uniqueVisitors }}</td>
+                                <td>{{ row.share|number_format(1) }}%</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

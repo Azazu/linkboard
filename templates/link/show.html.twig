@@ -44,6 +44,7 @@
 
     <h2>Actions</h2>
     <p>
+        <a href="{{ path('app_link_stats', {id: link.id}) }}" role="button" class="secondary">Statistics</a>
         <a href="{{ path('app_link_edit', {id: link.id}) }}" role="button">Edit</a>
         <a href="{{ path('app_link_delete', {id: link.id}) }}" role="button" class="secondary outline">Delete {{ link.slug }}…</a>
     </p>

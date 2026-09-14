@@ -1,0 +1,34 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ blocking ? 'Block' : 'Unblock' }} {{ account.email }} · Admin · Linkboard{% endblock %}
+
+{% block body %}
+    <h1>{{ blocking ? 'Block this account?' : 'Unblock this account?' }}</h1>
+
+    <article>
+        <p><strong>{{ account.email }}</strong></p>
+        <p>
+            {{ account.roles|join(', ') }} ·
+            registered {{ account.createdAt|date('Y-m-d') }} ·
+            currently {{ account.blocked ? 'blocked' : 'active' }}
+        </p>
+    </article>
+
+    <p role="alert">
+        {% if blocking %}
+            A blocked account cannot sign in, and every request made with its
+            credentials — session, token or API key — is refused from the next
+            one on. Its links keep redirecting and its data is kept; blocking
+            is reversible from this same page.
+        {% else %}
+            Unblocking lets the account sign in again and its credentials
+            authenticate from the next request on.
+        {% endif %}
+    </p>
+
+    <form method="post" action="{{ path(blocking ? 'app_admin_user_block' : 'app_admin_user_unblock', {id: account.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('submit') }}">
+        <button type="submit">{{ blocking ? 'Block' : 'Unblock' }} {{ account.email }}</button>
+        <a href="{{ path('app_admin_users') }}" role="button" class="secondary outline">Cancel</a>
+    </form>
+{% endblock %}

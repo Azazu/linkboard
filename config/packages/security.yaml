@@ -73,7 +73,10 @@ security:
         # an access-control pattern is an unanchored regular expression and
         # ReservedSlugs reserves exact strings, so without it the public short
         # links /dashboard-sale, /links-promo and /api-keys-promo would be sent
-        # to the login page instead of redirecting.
+        # to the login page instead of redirecting. The same holds for the
+        # administrative pages (change add-web-admin-and-stats): `admin` is a
+        # reserved slug, `admin-sale` is a valid one.
+        - { path: ^/admin(/|$), roles: ROLE_ADMIN }
         - { path: ^/(dashboard|links|api-keys)(/|$), roles: ROLE_USER }
         - { path: ^/(login|register)$, roles: PUBLIC_ACCESS }
         - { path: ^/health$, roles: PUBLIC_ACCESS }

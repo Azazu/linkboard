@@ -15,7 +15,18 @@
     <h2>Clicks per day</h2>
     <p><small>{{ period.from|date('Y-m-d') }} to {{ period.to|date('Y-m-d') }}, UTC, bots excluded.</small></p>
     <div class="lb-chart">{{ render_chart(chart) }}</div>
-    {# the chart needs JavaScript; the numbers above and the table below do not #}
+    {# the chart needs JavaScript, so every bucket it draws is a row here too:
+       a reader without scripting loses the picture, not the figures #}
+    <div class="lb-table-scroll">
+        <table>
+            <thead><tr><th>Day (UTC)</th><th>Clicks</th></tr></thead>
+            <tbody>
+                {% for day in days %}
+                    <tr><td>{{ day.bucket|date('Y-m-d') }}</td><td>{{ day.clicks }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
     <h2>Recent links</h2>
     {% if recent is empty %}

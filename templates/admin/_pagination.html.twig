@@ -1,0 +1,14 @@
+{# Previous/Next over a deterministic ordering, so every row is reachable. #}
+{% if pages > 1 %}
+    <nav>
+        <ul>
+            {% if page > 1 %}
+                <li><a href="{{ path(route, params|merge({page: page - 1})) }}">Previous</a></li>
+            {% endif %}
+            <li>Page {{ page }} of {{ pages }}</li>
+            {% if page < pages %}
+                <li><a href="{{ path(route, params|merge({page: page + 1})) }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endif %}

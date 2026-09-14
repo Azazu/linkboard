@@ -6,10 +6,7 @@ namespace App\Analytics\Api;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
-use App\Analytics\Cache\ReportCache;
-use App\Analytics\Query\BreakdownQuery;
-use App\Analytics\Query\LinkSummaryQuery;
-use App\Analytics\Query\TimeseriesQuery;
+use App\Analytics\Report\LinkReports;
 use App\Analytics\Report\ReportRequest;
 use App\Link\Api\PublicUrl;
 use App\Link\LinkRepositoryInterface;
@@ -21,10 +18,15 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * The six per-link reports (design decisions 5–7): 404 for a malformed or
- * unknown id before any authorization check, the existing LinkVoter's
- * LINK_VIEW on the link — the permission matrix's "view a link's analytics" —
- * then the report through the cache, tagged with the link.
+ * The six per-link reports (design decisions 5–7 of add-analytics-read-model):
+ * 404 for a malformed or unknown id before any authorization check, the
+ * existing LinkVoter's LINK_VIEW on the link — the permission matrix's "view a
+ * link's analytics" — then the report.
+ *
+ * Computing it is not this class's job: `LinkReports` owns the cache key, the
+ * tag and the computation, and the statistics page calls the same service
+ * (design decision 1 of add-web-admin-and-stats). What is left here is what
+ * belongs to API Platform: an operation and a query string in, a report out.
  *
  * @implements ProviderInterface<object>
  */
@@ -35,10 +37,7 @@ final readonly class LinkReportProvider implements ProviderInterface
         private PublicUrl $publicUrl,
         private Security $security,
         private ReportRequestFactory $requests,
-        private ReportCache $cache,
-        private LinkSummaryQuery $summary,
-        private TimeseriesQuery $timeseries,
-        private BreakdownQuery $breakdown,
+        private LinkReports $reports,
     ) {
     }
 
@@ -65,25 +64,22 @@ final readonly class LinkReportProvider implements ProviderInterface
             withGranularity: LinkTimeseriesReport::class === $class,
             withLimit: \in_array($class, [LinkCountriesReport::class, LinkReferrersReport::class], true),
         );
-        $name = strtolower((string) preg_replace('/^Link(\w+)Report$/', '$1', substr($class, strrpos($class, '\\') + 1)));
 
-        return $this->cache->remember($report->cacheKey($name), [$report->cacheTag()], fn (): object => $this->compute($class, $report));
+        return $this->report($class, $report);
     }
 
     /**
      * @param class-string $class
      */
-    private function compute(string $class, ReportRequest $report): object
+    private function report(string $class, ReportRequest $request): object
     {
-        $now = $this->requests->now();
-
         return match ($class) {
-            LinkSummaryReport::class => LinkSummaryReport::of($report, $this->summary->figures($report, $this->requests->startOfToday()), $now),
-            LinkTimeseriesReport::class => LinkTimeseriesReport::of($report, $this->timeseries->buckets($report), $now),
-            LinkCountriesReport::class => LinkCountriesReport::of($report, $this->breakdown->countries($report), $now),
-            LinkDevicesReport::class => LinkDevicesReport::of($report, $this->breakdown->devices($report), $now),
-            LinkReferrersReport::class => LinkReferrersReport::of($report, $this->breakdown->referrers($report), $now),
-            LinkVariantsReport::class => LinkVariantsReport::of($report, $this->breakdown->variants($report), $now),
+            LinkSummaryReport::class => $this->reports->summary($request),
+            LinkTimeseriesReport::class => $this->reports->timeseries($request),
+            LinkCountriesReport::class => $this->reports->countries($request),
+            LinkDevicesReport::class => $this->reports->devices($request),
+            LinkReferrersReport::class => $this->reports->referrers($request),
+            LinkVariantsReport::class => $this->reports->variants($request),
             default => throw new \LogicException(\sprintf('No report for %s.', $class)),
         };
     }

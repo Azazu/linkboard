@@ -1,0 +1,8 @@
+{# The three administrative pages, reachable from each other. #}
+<nav>
+    <ul>
+        <li>{% if current == 'users' %}<strong>Accounts</strong>{% else %}<a href="{{ path('app_admin_users') }}">Accounts</a>{% endif %}</li>
+        <li>{% if current == 'links' %}<strong>Links</strong>{% else %}<a href="{{ path('app_admin_links') }}">Links</a>{% endif %}</li>
+        <li>{% if current == 'stats' %}<strong>Statistics</strong>{% else %}<a href="{{ path('app_admin_stats') }}">Statistics</a>{% endif %}</li>
+    </ul>
+</nav>
