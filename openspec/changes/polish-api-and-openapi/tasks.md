@@ -1,8 +1,15 @@
 # Tasks — polish-api-and-openapi
 
-Tier `medium`: Gate 2 on the code diff before merge; no Gate 1. If any task
-turns out to need a change to what an operation answers, stop, raise the
-tier in `proposal.md` and request Gate 1 before making it.
+Tier `high` (raised on 2026-09-14 by the user, after Gate 2 round 1 found
+that the implementation had moved firewall configuration while the proposal
+claimed authentication was untouched): Gate 1 on the artifacts, Gate 2 on the
+code diff, and a demonstrated failing input for every boundary the change
+touches. Sections 1–4 are implemented; sections 0, 6 and 7 are what the
+raised tier and round 1's findings add, and section 8 closes the change.
+
+## 0. Gate 1
+
+- [ ] 0.1 Request Gate 1 on the corrected artifacts (`scripts/gate-run.sh polish-api-and-openapi 1 full`) and disposition every finding before the remaining implementation tasks start. Verify: the last Gate 1 record reads `confirmed` or `approved` with no finding row left `open`.
 
 ## 1. The document tells the truth about errors
 
@@ -28,8 +35,21 @@ tier in `proposal.md` and request Gate 1 before making it.
 - [x] 4.1 Write `docs/reference/api-errors.md` (design decision 5): every `type` the API can produce, what the condition means, which operations raise it, and the client's recovery — naming `Retry-After` for the rate-limit refusal and the `violations` array for a validation failure. Verify: the file is re-read whole after the last edit and every documented command in it was run in its exact form.
 - [x] 4.2 A test keeps the catalogue complete. Verify: it enumerates the types the code can produce — the statuses the document declares plus what `src/Shared/Api/ProblemDetails.php` can emit — and fails naming any that the catalogue does not list; a demonstrated failing input, executed: with the **/errors/409** row removed the test fails naming `/errors/409 (declared by an operation)`, and it passes again once the row is back.
 
-## 5. Wrap-up
+## 6. What Gate 2 round 1 found
 
-- [x] 5.1 `make check` green (cs, stan level 8, all suites); `openspec validate polish-api-and-openapi --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated to `awaiting-gate-2`, naming for the reviewer what the decorator reads from configuration and what the contract tests do and do not prove.
-- [x] 5.2 Green Actions run on the exact branch head before Gate 2: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/polish-api-and-openapi` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
-- [x] 5.3 `scripts/pregate-verify.sh gate2 polish-api-and-openapi` passes and `scripts/gate-run.sh polish-api-and-openapi 2 full` is run; findings fixed and re-reviewed with `scripts/gate-run.sh polish-api-and-openapi 2 confirm <round>`. Verify: the change's review record carries a Gate 2 round bound to the requested commit, and its last decision reads `approved`/`confirmed` with no finding row left `open`. (The record is written by the runner, so this task is ticked as the gate is requested — the floor requires every task checked by then.)
+- [ ] 6.1 **Finding 2** — an unsupported request media type answers 415 and nothing documented it. Declare 415 on the operations that accept a body, correct the catalogue's 400 row (it described media-type failures that are in fact 415), and add the row for 415. Verify: a contract case posts `Content-Type: text/plain` to an operation with a body and asserts the observed status is declared for it; `ErrorCatalogueTest` covers the new type.
+- [ ] 6.2 **Finding 3** — the token operation's statuses come from `json_login`, not from an operation: it answers 400 for a malformed or incomplete credential payload and 403 for a blocked account, and cannot answer 406 because it replies before content negotiation. Declare its statuses from that path and stop adding 406 to it (design decision 2a). Verify: contract cases send a malformed credential payload, a blocked account's credentials and an incompatible `Accept`, each asserting the observed status against the document; the catalogue's blanket "every operation" claim for 406 is corrected.
+- [ ] 6.3 **Finding 4** — the JWT bundle generates that operation's request and response schemas inline, without examples, and its success response actually carries `expiresAt`, which the schema omits. Describe the payload with examples and the missing member. Verify: the example test walks inline request and response schemas as well as `components.schemas`, and a demonstrated failing input: removing one inline example fails it.
+- [ ] 6.4 **Finding 5** — `AuthRateLimitSubscriber` still holds its own hard-coded rule, method included, so the documented 429 set and the limiter's real coverage are two definitions. Make the subscriber read the same parameter, model the method in the decorator, and derive the documented-401 set from the access rules rather than from a separate list. Verify: a test reads `config/packages/security.yaml` and asserts the documented-401 operations are exactly those its rules cover and the documented-429 operations exactly those the two limiters cover, method included; demonstrated failing inputs: changing one access-control pattern, and changing the subscriber's method, each fail that test.
+- [ ] 6.5 **Finding 6** — contract cases carried no expected status, so a refusal case that returned a documented 200 passed. Give every case the status it expects, add the missing cases (the API-key cap's 409, the admin collection's filters, `order[createdAt]`), and check `format` as well as type in the example validator. Verify: the suite asserts the expected status per case; a demonstrated failing input: pointing a refusal case at a request that succeeds fails it.
+
+## 7. Evidence for the raised tier
+
+- [ ] 7.1 Every moved firewall value is identical to the literal it replaced. Verify: a test resolves each parameter and asserts it equals the value `config/packages/security.yaml`, `config/routes.yaml` and the limiter classes used before this change, with the before-values written in the test; and the existing authentication, authorization and rate-limit suites pass unedited.
+- [ ] 7.2 A demonstrated failing input per moved boundary, executed and recorded with its command and output: changing the public-path parameter, the check-path parameter, the identity limiter's exemption and the per-IP rule each fail a named test; each guard restored and the test shown passing again.
+
+## 8. Wrap-up
+
+- [ ] 8.1 `make check` green (cs, stan level 8, all suites); `openspec validate polish-api-and-openapi --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated to `awaiting-gate-2`, naming for the reviewer what the decorator reads from configuration and what the contract tests do and do not prove.
+- [ ] 8.2 Green Actions run on the exact branch head before Gate 2: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/polish-api-and-openapi` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
+- [ ] 8.3 `scripts/pregate-verify.sh gate2 polish-api-and-openapi` passes and `scripts/gate-run.sh polish-api-and-openapi 2 full` is run; findings fixed and re-reviewed with `scripts/gate-run.sh polish-api-and-openapi 2 confirm <round>`. Verify: the change's review record carries a Gate 2 round bound to the requested commit, and its last decision reads `approved`/`confirmed` with no finding row left `open`. (The record is written by the runner, so this task is ticked as the gate is requested — the floor requires every task checked by then.)

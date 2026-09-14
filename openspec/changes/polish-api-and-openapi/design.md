@@ -32,17 +32,31 @@ A decorator over `OpenApiFactoryInterface` walks the generated document and adds
 
 *What this does not guarantee:* the decorator adds what the *path* implies. A refusal specific to one operation — the 409 when an account is at its active-key cap — is declared on that operation, because only it knows.
 
-### 2. The rules the decorator applies are read from configuration, not copied into it
+### 2. One definition of the path policy, referenced by the runtime and by the document
 
-Which paths are public and which are rate-limited already exists — in `config/packages/security.yaml`'s access control and in the limiter's own configuration. The decorator takes the same patterns as parameters from the service container rather than repeating them as literals.
+Which paths are public, which the identity limiter exempts and which the per-IP limiter guards — with the method it guards them on — are declared once in `config/services.yaml`. `security.yaml`'s access control and `json_login` check path, `config/routes.yaml`, `ApiRateLimitListener` and `AuthRateLimitSubscriber` reference those definitions, and the decorator reads the same ones. The runtime is the authority; the document is derived from what the runtime is configured with, never from a second copy.
 
-*Why:* a rule repeated is a rule that drifts. This is the defect class row 11's Gate 1 found in a path pattern, and the process's own "fix the claim, not the line".
+*Why:* a rule repeated is a rule that drifts. This is the defect class row 11's Gate 1 found in a path pattern. Gate 2 round 1 of this change found the half-done version of it: the per-IP rule lived in the decorator's parameter *and* in a hard-coded list in the subscriber, including a POST-only restriction the decorator did not model — so the document claimed 429 on a GET the limiter never counts.
 
-*What this does not guarantee:* the decorator matches paths; it does not evaluate the security expression of an operation. An operation that is public but sits under a guarded prefix would be documented as refusable — there is none today, and a test names the public paths so that a future one is caught rather than silently mis-documented.
+*This is why the change is `high` tier.* Nothing about the policy changes; the values move. The evidence therefore has to be about identity: every parameter resolves to the literal it replaced, and removing or changing one fails a test that reads the runtime configuration.
 
-### 3. Examples are declared per property, once
+*Alternatives.* (a) Leave the runtime alone and give the decorator its own copies, with a test comparing them: the copies can still drift between test runs and the test becomes the only thing standing between the document and a lie; it was offered to the user and not chosen. (b) Read the compiled access map at runtime: it is a private service whose rules are already reduced to matchers, so nothing readable survives.
+
+*What this does not guarantee:* the decorator matches a path and a method; it does not evaluate an operation's `security` expression. An operation that is public while sitting under a guarded prefix would be documented as refusable — there is none, and a test asserts the set of operations documenting 401 against the paths the access rules cover, so a future one fails rather than being mis-documented.
+
+### 2a. Statuses the framework answers, which no operation declares
+
+An unsupported request media type is refused by API Platform's content negotiation with **415** before any operation runs, and the token endpoint's statuses come from `json_login` rather than from a state processor: it answers 400 for a malformed or incomplete credential payload and 403 for a blocked account, and it never performs content negotiation, so it cannot answer 406.
+
+These are properties of the path's *handler*, not of its URI, so the decorator is told about them explicitly rather than inferring them: the operations that accept a body document 415, and the authentication operation's statuses are declared from its own path.
+
+*What this does not guarantee:* it is a list, and a list can fall behind the framework. The contract tests are what keep it honest — each of these statuses is exercised by a real request, so a status that stops being reachable, or starts being, shows up as a contract failure rather than as prose.
+
+### 3. Examples are declared per property, once — including the schemas that are not ours
 
 Representative values go on `ApiProperty(example: …)` on the resources and input DTOs; API Platform composes them into the schemas, which every operation using that resource then shows. No operation carries a hand-written example body.
+
+One operation has no resource of ours behind it: the JWT bundle generates the token endpoint's request and response schemas inline, and Gate 2 round 1 found them empty of examples — and missing the `expiresAt` the success response actually sends. The decorator describes that operation's payloads, because there is no property to annotate; and the example check walks inline schemas as well as `components.schemas`, which is why it did not catch this by itself.
 
 *Why:* an example that lives beside the property it illustrates is checked by the same schema the property is checked by, and one field's example is written once no matter how many operations expose it.
 
@@ -54,6 +68,8 @@ Representative values go on `ApiProperty(example: …)` on the resources and inp
 
 *Why:* this is the only assertion that makes the document worth trusting. Reading the document and asserting things about its own shape proves nothing an integrator cares about.
 
+Each case names the status it expects as well. Round 1 of Gate 2 found the version without it: a case called "stranger" that returned a documented 200 would have passed, because the assertion only asked whether the observed status was documented *somewhere* for that operation. A case that does not produce the refusal it is named for is a case that proves nothing.
+
 *What this does not guarantee:* it is a representative sample, not an exhaustive one — it cannot prove the API never answers an undocumented status, only that the answers it was asked for are documented. The rate-limit case is exercised where the limiter can be driven within a test; where it cannot, the test says so rather than pretending.
 
 ### 5. The catalogue is prose, its completeness is a test
@@ -62,8 +78,21 @@ Representative values go on `ApiProperty(example: …)` on the resources and inp
 
 *Why:* the risk with a hand-written catalogue is not that it is wrong on the day it is written but that it is incomplete a change later. The test is what makes it stay true.
 
+## Applicability
+
+| Question | Answer |
+|---|---|
+| Authorization boundary | The firewall's public-path patterns, its `json_login` check path and both limiters' path rules move from literals to shared parameters. No rule changes: the evidence is identity — each parameter resolves to the exact literal it replaced, asserted against `config/packages/security.yaml` as the runtime reads it, and a demonstrated failing input per boundary shows the test catching a changed value. The document's 401/429 sets are asserted against those same rules, so a policy change that is not mirrored in the document fails rather than being published wrong. |
+| Empty / zero / null inputs | A parameter that is missing or empty must fail loudly: an empty public-path list would document 401 on the authentication endpoints, and an empty guarded list would document no 429 at all. Tests assert the resolved sets, not just that the container booted. |
+| Crash before/after an external effect | n/a — the decorator runs when the document is generated and writes nothing; no external effect exists on this path. |
+| Concurrent writers | n/a — nothing here writes. |
+| Deletion / expiry | n/a — nothing is deleted. A revoked or expired credential is an existing 401, now documented. |
+| Idempotency of retries | n/a — the change adds no operation. The retry advice the catalogue gives for 429 names the header the limiter already sends. |
+| Money rounding | n/a — no monetary value exists in this project. |
+
 ## Risks / Trade-offs
 
+- **A transcription error while moving a firewall pattern** → the one way this change could refuse or admit a request differently. Every moved value is asserted equal to what it replaced, each with a failing input that changes one side; and the existing authentication, authorization and rate-limit suites run unedited as the behavioural net.
 - **A decorator that rewrites responses could hide a real response** → it only adds statuses and narrows error media types; a test asserts that every response the ungenerated document carried is still present, so nothing is lost by the rewrite.
 - **Documented-but-unreachable statuses** → the opposite error of today's, and equally a lie. The path rules are narrow (a firewall, a limiter, content negotiation), and the contract tests exercise each added status at least once somewhere in the suite.
 - **The examples become stale** → they live on the property whose schema constrains them, and a changed type or constraint puts the example next to the change.
