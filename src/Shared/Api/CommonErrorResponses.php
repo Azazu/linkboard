@@ -65,10 +65,10 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
     ];
 
     /**
-     * @param list<string> $publicPaths      anchored patterns of paths that need no credential
-     * @param list<string> $unlimitedPaths   anchored patterns the API identity limiter does not count
-     * @param list<string> $ipLimitedPaths   anchored patterns the per-IP auth limiter guards instead
-     * @param string       $authenticatePath the one public path that authenticates, so it answers 401 itself
+     * @param list<string>                                 $publicPaths      anchored patterns of paths that need no credential
+     * @param list<string>                                 $unlimitedPaths   anchored patterns the API identity limiter does not count
+     * @param list<array{method: string, pattern: string}> $ipLimitedRules   what the per-IP auth limiter guards, method included
+     * @param string                                       $authenticatePath the one public path that authenticates, so it answers 401 itself
      */
     public function __construct(
         private OpenApiFactoryInterface $inner,
@@ -76,8 +76,8 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
         private array $publicPaths = [],
         #[Autowire('%app.api.unlimited_paths%')]
         private array $unlimitedPaths = [],
-        #[Autowire('%app.api.ip_limited_paths%')]
-        private array $ipLimitedPaths = [],
+        #[Autowire('%app.api.ip_limited_rules%')]
+        private array $ipLimitedRules = [],
         #[Autowire('%app.api.path.token%')]
         private string $authenticatePath = '',
     ) {
@@ -103,14 +103,14 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
         foreach (self::METHODS as $method) {
             $operation = $item->{'get'.ucfirst($method)}();
             if ($operation instanceof Operation) {
-                $item = $item->{'with'.ucfirst($method)}($this->decorateOperation($path, $operation));
+                $item = $item->{'with'.ucfirst($method)}($this->decorateOperation($path, strtoupper($method), $operation));
             }
         }
 
         return $item;
     }
 
-    private function decorateOperation(string $path, Operation $operation): Operation
+    private function decorateOperation(string $path, string $method, Operation $operation): Operation
     {
         $responses = $operation->getResponses() ?? [];
 
@@ -137,8 +137,8 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
         }
         // both limiters name a delay when they refuse; only the per-identity
         // one reports the remaining allowance on the responses it lets through
-        if ($this->isLimited($path)) {
-            $perIdentity = !self::matches($path, $this->ipLimitedPaths);
+        if ($this->isLimited($path, $method)) {
+            $perIdentity = !$this->isIpLimited($path, $method);
             $responses[429] ??= self::problem(
                 $perIdentity
                     ? 'The rate limit for this credential is exhausted. Retry after the delay the header names.'
@@ -156,11 +156,77 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
                 }
             }
         }
-        $responses[406] ??= self::problem('The requested media type is not one this operation produces.', 406);
+        if ($path === $this->authenticatePath) {
+            $operation = self::withCredentialBody($operation);
+            $responses[200] = self::tokenResponse($responses[200] ?? null);
+            // what json_login answers, which no state processor declares
+            // (design decision 2a): a payload it cannot read, and an account
+            // the user checker refuses
+            $responses[400] ??= self::problem('The credential payload is not valid JSON, or does not carry both members.', 400);
+            $responses[403] ??= self::problem('The account is blocked.', 403);
+        }
+        if ($path !== $this->authenticatePath) {
+            // the authentication endpoint replies before content negotiation
+            // runs, so it cannot refuse an Accept header (Gate 2 round 1,
+            // finding 3); every other operation can
+            $responses[406] ??= self::problem('The requested media type is not one this operation produces.', 406);
+        }
+        if (null !== $operation->getRequestBody()) {
+            $responses[415] ??= self::problem('The request body is not in a media type this operation accepts.', 415);
+        }
 
         ksort($responses);
 
         return $operation->withResponses($responses);
+    }
+
+    /**
+     * The authentication operation's payloads come from the JWT bundle, which
+     * generates them inline: there is no property of ours to annotate, so the
+     * examples — and the `expiresAt` the success response actually sends —
+     * are described here (Gate 2 round 1, finding 4).
+     */
+    private static function withCredentialBody(Operation $operation): Operation
+    {
+        $body = $operation->getRequestBody();
+        if (null !== $body) {
+            $operation = $operation->withRequestBody($body->withContent(new \ArrayObject([
+                'application/json' => [
+                    'schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'email' => ['type' => 'string', 'format' => 'email', 'description' => 'The account\'s address.', 'example' => 'ada@example.com'],
+                            'password' => ['type' => 'string', 'format' => 'password', 'description' => 'Its password.', 'example' => 'correct-horse-battery-staple'],
+                        ],
+                        'required' => ['email', 'password'],
+                    ],
+                    'example' => ['email' => 'ada@example.com', 'password' => 'correct-horse-battery-staple'],
+                ],
+            ])));
+        }
+
+        return $operation;
+    }
+
+    private static function tokenResponse(mixed $success): Response
+    {
+        return new Response(
+            $success instanceof Response ? ($success->getDescription() ?? 'A token for the account.') : 'A token for the account.',
+            new \ArrayObject([
+                'application/json' => [
+                    'schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'token' => ['type' => 'string', 'description' => 'The bearer token to present on later requests.', 'example' => 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZGFAZXhhbXBsZS5jb20ifQ.signature'],
+                            'expiresAt' => ['type' => 'string', 'format' => 'date-time', 'description' => 'When it stops being accepted.', 'example' => '2026-09-14T10:30:00+00:00'],
+                        ],
+                        'required' => ['token', 'expiresAt'],
+                    ],
+                    'example' => ['token' => 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZGFAZXhhbXBsZS5jb20ifQ.signature', 'expiresAt' => '2026-09-14T10:30:00+00:00'],
+                ],
+            ]),
+            $success instanceof Response ? $success->getHeaders() : null,
+        );
     }
 
     private function isPublic(string $path): bool
@@ -179,16 +245,27 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
 
     /**
      * Either limiter can refuse: the per-identity one on the authenticated
-     * operations, the per-IP one on the authentication endpoints. Only the
-     * documentation is covered by neither.
+     * operations, the per-IP one on the authentication endpoints — and that
+     * one only on the method it guards.
      */
-    private function isLimited(string $path): bool
+    private function isLimited(string $path, string $method): bool
     {
-        if (self::matches($path, $this->ipLimitedPaths)) {
+        if ($this->isIpLimited($path, $method)) {
             return true;
         }
 
         return !$this->isPublic($path) && !self::matches($path, $this->unlimitedPaths);
+    }
+
+    private function isIpLimited(string $path, string $method): bool
+    {
+        foreach ($this->ipLimitedRules as $rule) {
+            if ($method === $rule['method'] && 1 === preg_match('#'.$rule['pattern'].'#', $path)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

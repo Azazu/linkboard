@@ -1,7 +1,7 @@
 # Handoff — polish-api-and-openapi
 
 **Updated:** 2026-09-14 · claude
-**State:** awaiting-gate-1
+**State:** awaiting-gate-2
 **Branch:** change/polish-api-and-openapi
 
 ## Done this session
@@ -40,8 +40,19 @@
 
 - Artifacts corrected for the raised tier: the proposal states `high` with what is and is not security-sensitive and records the user's decision; the design gains decision 2a (statuses the framework answers), rewrites decision 2 around one definition the runtime references, says why the change is `high`, and carries the applicability table; the tasks gain Gate 1, one task per finding, and a section for the identity evidence the tier requires. `scripts/pregate-verify.sh gate1` passes.
 
+- Gate 1 round 1 (`b3bf227`, Reviewed-Commit `97e82ee`): **approved**, with one minor — the scenario promised allowance headers on every rate-limited operation's success, which the per-address limiter never sends. The requirement now says each operation documents the headers *its* limiter sends and no others, with a scenario per limiter; task 1.3 says the same. The reviewer noted explicitly that this approves the revised plan, not the existing implementation, and that the round-1 Gate 2 findings remain to be reconciled.
+
+- Round 1's findings fixed (tasks 6.1–6.5), `make check` green (840 tests, 10921 assertions):
+  - **415** declared on every operation with a request body, with its own catalogue row; the 400 row no longer claims media-type failures and the 406 row names its one exception. Verified against the running stack before coding: `POST /api/v1/auth/register` with `Content-Type: text/plain` answers `415 application/problem+json`.
+  - **The token operation** is described from its own path: 400 for a payload `json_login` cannot read, 403 for a blocked account, no 406 at all — a probe with `Accept: text/csv` answered 401, not 406, so it never refuses on `Accept`. Its request and response schemas are described with examples and with the `expiresAt` the success response actually sends.
+  - **The example checks** now walk inline request and response schemas as well as `components.schemas`, and check `format` beside type. That found the `violations` array had no example of its own.
+  - **`AuthRateLimitSubscriber`** reads the API rule, method included, from the same parameter the decorator does; `DocumentedPolicyTest` derives the documented 401 and 429 sets from `config/packages/security.yaml` and the parameters as the container resolves them, so a policy change that the document does not follow fails.
+  - **Every contract case names the status it expects.** That immediately caught one of my own: the QR case had been asking for JSON and receiving 406, which the old assertion accepted because 406 is documented. Added: the key cap's 409, the unsupported media type, the unacceptable one, the token's three refusals, the administrative collection's filters and `order[createdAt]` on both collections.
+
+- **Evidence for the raised tier** (tasks 7.1–7.2): `MovedPathPolicyTest` asserts every moved value equals the literal it replaced — the parameters, the whole ordered access-control list as the firewall resolves it, the check path, the token route — and that the decorator holds those very parameters rather than copies. Four mutations executed and recorded in task 7.2 with their commands and failures, each restored.
+
 ## Next step
-`scripts/gate-run.sh polish-api-and-openapi 1 full` (task 0.1). The remaining implementation — findings 2–6 and the identity evidence — starts only after Gate 1 reads `confirmed`/`approved`.
+The user pushes the branch; the executor records the Actions run on the exact head (task 8.2) and then requests Gate 2 again, `scripts/gate-run.sh polish-api-and-openapi 2 full` (task 8.3).
 
 ## Blockers
 None.

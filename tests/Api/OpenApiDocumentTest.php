@@ -104,20 +104,27 @@ final class OpenApiDocumentTest extends WebTestCase
 
     public function testEveryPropertyOfEverySchemaCarriesAnExample(): void
     {
-        $document = self::document();
         $without = [];
-        foreach ($document['components']['schemas'] ?? [] as $schema => $definition) {
-            if (\in_array($schema, self::FRAMEWORK_SCHEMAS, true)) {
-                continue;
-            }
+        foreach (self::schemas() as $name => $definition) {
             foreach ($definition['properties'] ?? [] as $property => $shape) {
                 if (!\array_key_exists('example', $shape)) {
-                    $without[] = "$schema.$property";
+                    $without[] = "$name.$property";
                 }
             }
         }
 
         self::assertSame([], $without, 'every property is shown with a value');
+    }
+
+    public function testTheInlineSchemasAreCoveredToo(): void
+    {
+        // the JWT bundle generates the token operation's payloads inline, with
+        // no property of ours to annotate: the walk above must reach them, or
+        // it reports success over an empty skeleton (Gate 2 round 1, finding 4)
+        $names = array_keys(self::schemas());
+
+        self::assertContains('POST /api/v1/auth/token requestBody application/json', $names);
+        self::assertContains('POST /api/v1/auth/token 200 application/json', $names);
     }
 
     public function testTheFrameworksOwnErrorSchemasAreUnreferenced(): void
@@ -134,9 +141,8 @@ final class OpenApiDocumentTest extends WebTestCase
 
     public function testEveryExampleIsAValueItsOwnSchemaAccepts(): void
     {
-        $document = self::document();
         $wrong = [];
-        foreach ($document['components']['schemas'] ?? [] as $schema => $definition) {
+        foreach (self::schemas() as $name => $definition) {
             foreach ($definition['properties'] ?? [] as $property => $shape) {
                 if (!\array_key_exists('example', $shape)) {
                     continue;
@@ -145,15 +151,64 @@ final class OpenApiDocumentTest extends WebTestCase
                 /** @var list<string> $types */
                 $types = array_values((array) ($shape['type'] ?? []));
                 if ([] !== $types && !self::accepts($types, $example)) {
-                    $wrong[] = "$schema.$property is ".get_debug_type($example).', declared '.implode('|', $types);
+                    $wrong[] = "$name.$property is ".get_debug_type($example).', declared '.implode('|', $types);
                 }
                 if (isset($shape['enum']) && !\in_array($example, $shape['enum'], true)) {
-                    $wrong[] = "$schema.$property is not one of its enum values";
+                    $wrong[] = "$name.$property is not one of its enum values";
+                }
+                $format = \is_string($shape['format'] ?? null) ? $shape['format'] : null;
+                if (null !== $format && \is_string($example) && !self::matchesFormat($format, $example)) {
+                    $wrong[] = "$name.$property is not a $format";
                 }
             }
         }
 
         self::assertSame([], $wrong);
+    }
+
+    private static function matchesFormat(string $format, string $example): bool
+    {
+        return match ($format) {
+            'date-time' => false !== \DateTimeImmutable::createFromFormat(\DateTimeInterface::RFC3339, $example),
+            'date' => 1 === preg_match('/^\d{4}-\d\d-\d\d$/', $example),
+            'email' => false !== filter_var($example, \FILTER_VALIDATE_EMAIL),
+            'uri', 'iri-reference' => false !== filter_var($example, \FILTER_VALIDATE_URL),
+            'uuid' => 1 === preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $example),
+            default => true,
+        };
+    }
+
+    /**
+     * Every schema the document defines: the named ones, and the ones written
+     * inline on an operation's request body or response.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function schemas(): array
+    {
+        $document = self::document();
+        $schemas = [];
+        foreach ($document['components']['schemas'] ?? [] as $name => $definition) {
+            if (!\in_array($name, self::FRAMEWORK_SCHEMAS, true) && \is_array($definition)) {
+                $schemas[$name] = $definition;
+            }
+        }
+        foreach (self::operations() as $name => $operation) {
+            foreach ($operation['requestBody']['content'] ?? [] as $type => $media) {
+                if (isset($media['schema']['properties'])) {
+                    $schemas["$name requestBody $type"] = $media['schema'];
+                }
+            }
+            foreach ($operation['responses'] ?? [] as $status => $response) {
+                foreach ($response['content'] ?? [] as $type => $media) {
+                    if (isset($media['schema']['properties'])) {
+                        $schemas["$name $status $type"] = $media['schema'];
+                    }
+                }
+            }
+        }
+
+        return $schemas;
     }
 
     public function testTheDecoratorOnlyAddsAndNarrows(): void

@@ -32,6 +32,7 @@ final class ProblemDetailsSchema
             $schema['properties']['violations'] = [
                 'type' => 'array',
                 'description' => 'One element per rejected value.',
+                'example' => [['propertyPath' => 'targetUrl', 'message' => 'The target must be an absolute http(s) URL.']],
                 'items' => [
                     'type' => 'object',
                     'properties' => [

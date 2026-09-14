@@ -37,9 +37,13 @@ Every operation SHALL show an example of what it accepts and what it returns: ea
 - **WHEN** a client reads the operations that accept a body
 - **THEN** each input property carries an example, and no example contradicts the constraints documented for its property
 
-### Requirement: The rate-limited operations document their headers
-An operation the rate limiter covers SHALL document the headers that limiter sets — the remaining allowance on a successful response, and the retry delay on a refusal — so a client can honour them without reading the implementation.
+### Requirement: The rate-limited operations document the headers their limiter sends
+An operation a rate limiter covers SHALL document the headers **that limiter** sets, and no others: the retry delay on every refusal, and the remaining allowance on successful responses only where the limiter reports one. A header the operation never sends SHALL NOT be documented for it.
 
-#### Scenario: The allowance is documented where it is sent
-- **WHEN** a client reads an operation the limiter covers
-- **THEN** its success responses document the rate-limit headers and its 429 response documents `Retry-After`
+#### Scenario: The delay is documented wherever a limiter can refuse
+- **WHEN** a client reads any operation a limiter covers
+- **THEN** its 429 response documents the header carrying the retry delay
+
+#### Scenario: The allowance is documented only where it is sent
+- **WHEN** a client reads an operation limited per credential, and one limited per client address
+- **THEN** the first documents the remaining-allowance headers on its successful responses and the second does not, because its limiter sends none

@@ -36,9 +36,13 @@ parameters:
     # can still answer 429.
     app.api.unlimited_paths:
         - '%app.api.path.auth%'
-    # Paths the per-IP auth limiter guards (FR-AUTH-4).
-    app.api.ip_limited_paths:
-        - '%app.api.path.auth%'
+    # Paths the per-IP auth limiter guards (FR-AUTH-4), with the method it
+    # guards them on: AuthRateLimitSubscriber consumes a token for these, and
+    # the OpenAPI decorator documents 429 for exactly the same set. Without the
+    # method the document would claim a refusal on requests the limiter never
+    # counts (Gate 2 round 1, finding 5).
+    app.api.ip_limited_rules:
+        - { method: 'POST', pattern: '%app.api.path.auth%' }
 
 services:
     # default configuration for services in *this* file

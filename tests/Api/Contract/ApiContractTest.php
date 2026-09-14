@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Api\Contract;
 
+use App\Auth\Entity\ApiKey;
 use App\Tests\Api\Link\LinkApiTestCase;
 use App\Tests\Factory\ApiKeyFactory;
 use App\Tests\Factory\LinkFactory;
@@ -55,9 +56,13 @@ final class ApiContractTest extends LinkApiTestCase
         foreach ($this->cases() as $case) {
             $uri = strtr($case['uri'], $world['tokens']);
             $token = null === $case['as'] ? null : $world['tokens'][$case['as']];
-            $this->send($client, $case['method'], $uri, $token, $case['body'] ?? null);
+            $this->send($client, $case['method'], $uri, $token, $case['body'] ?? null, $case['contentType'] ?? null, $case['accept'] ?? null);
 
             $status = (string) $client->getResponse()->getStatusCode();
+            // the expected status first: a refusal case that quietly succeeded
+            // would otherwise pass, because its 200 is documented too (Gate 2
+            // round 1, finding 6)
+            self::assertSame((string) $case['expect'], $status, "{$case['name']}: expected {$case['expect']}");
             $declared = $operations[$case['operation']]['responses'] ?? [];
             self::assertArrayHasKey($status, $declared, "{$case['name']}: {$case['operation']} answered $status, which the document does not declare for it");
 
@@ -120,6 +125,55 @@ final class ApiContractTest extends LinkApiTestCase
         }
     }
 
+    public function testTheKeyCapRefusalIsWhatTheDocumentDeclares(): void
+    {
+        $client = self::createClient();
+        $operations = self::operations($client);
+        UserFactory::createOne(['email' => 'owner@example.com']);
+        $token = $this->token($client, 'owner@example.com');
+
+        for ($i = 0; $i < ApiKey::MAX_ACTIVE_PER_USER; ++$i) {
+            $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'key '.$i]);
+            self::assertResponseStatusCodeSame(201);
+        }
+        $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'one too many']);
+
+        self::assertResponseStatusCodeSame(409);
+        self::assertArrayHasKey('409', $operations['POST /api/v1/api-keys']['responses'], 'the operation declares the refusal it just made');
+        self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
+    }
+
+    public function testTheAdministrativeCollectionFiltersTheSameWay(): void
+    {
+        $client = self::createClient();
+        $world = $this->world($client);
+        $admin = $world['tokens']['{admin}'];
+
+        $this->api($client, $admin, 'GET', '/api/v1/admin/links?slug=contract');
+        self::assertSame(['contract-off', 'contract-one', 'contract-two'], self::sorted(self::slugs($this->decode($client))), 'every owner’s links, filtered');
+
+        $this->api($client, $admin, 'GET', '/api/v1/admin/links?slug=contract&isActive=true&order[clickCount]=desc');
+        self::assertSame(['contract-two', 'contract-one'], self::slugs($this->decode($client)));
+
+        $this->api($client, $admin, 'GET', '/api/v1/admin/links?slug=contract&order[createdAt]=asc');
+        $ascending = self::slugs($this->decode($client));
+        $this->api($client, $admin, 'GET', '/api/v1/admin/links?slug=contract&order[createdAt]=desc');
+        self::assertSame(array_reverse($ascending), self::slugs($this->decode($client)), 'the creation order reverses');
+    }
+
+    public function testTheOwnerCollectionOrdersByCreationToo(): void
+    {
+        $client = self::createClient();
+        $world = $this->world($client);
+        $token = $world['tokens']['{owner}'];
+
+        $this->api($client, $token, 'GET', '/api/v1/links?slug=contract&order[createdAt]=asc');
+        $ascending = self::slugs($this->decode($client));
+        $this->api($client, $token, 'GET', '/api/v1/links?slug=contract&order[createdAt]=desc');
+
+        self::assertSame(array_reverse($ascending), self::slugs($this->decode($client)));
+    }
+
     public function testTheRateLimitRefusalIsWhatTheDocumentDeclares(): void
     {
         // the limiter is drivable here: its factory is swapped for one with a
@@ -159,42 +213,52 @@ final class ApiContractTest extends LinkApiTestCase
      * One case per documented operation, then the refusals. `{owner}` and its
      * siblings are replaced with what the fixtures made.
      *
-     * @return iterable<array{name: string, operation: string, method: string, uri: string, as: ?string, body?: array<string, mixed>}>
+     * @return iterable<array{name: string, expect: int, operation: string, method: string, uri: string, as: ?string, body?: array<string, mixed>|string, contentType?: string, accept?: string}>
      */
     private function cases(): iterable
     {
         // the happy path of every operation
-        yield ['name' => 'register', 'operation' => 'POST /api/v1/auth/register', 'method' => 'POST', 'uri' => '/api/v1/auth/register', 'as' => null, 'body' => ['email' => 'fresh@example.com', 'password' => 'correct-horse-battery-staple']];
-        yield ['name' => 'token', 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => ['email' => 'owner@example.com', 'password' => UserFactory::PASSWORD]];
-        yield ['name' => 'me', 'operation' => 'GET /api/v1/me', 'method' => 'GET', 'uri' => '/api/v1/me', 'as' => '{owner}'];
-        yield ['name' => 'links', 'operation' => 'GET /api/v1/links', 'method' => 'GET', 'uri' => '/api/v1/links', 'as' => '{owner}'];
-        yield ['name' => 'create link', 'operation' => 'POST /api/v1/links', 'method' => 'POST', 'uri' => '/api/v1/links', 'as' => '{owner}', 'body' => ['targetUrl' => 'https://example.com/new']];
-        yield ['name' => 'link', 'operation' => 'GET /api/v1/links/{id}', 'method' => 'GET', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}'];
-        yield ['name' => 'patch link', 'operation' => 'PATCH /api/v1/links/{id}', 'method' => 'PATCH', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}', 'body' => ['isActive' => true]];
-        yield ['name' => 'qr', 'operation' => 'GET /api/v1/links/{id}/qr', 'method' => 'GET', 'uri' => '/api/v1/links/{link}/qr', 'as' => '{owner}'];
+        yield ['name' => 'register', 'expect' => 201, 'operation' => 'POST /api/v1/auth/register', 'method' => 'POST', 'uri' => '/api/v1/auth/register', 'as' => null, 'body' => ['email' => 'fresh@example.com', 'password' => 'correct-horse-battery-staple']];
+        yield ['name' => 'token', 'expect' => 200, 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => ['email' => 'owner@example.com', 'password' => UserFactory::PASSWORD]];
+        yield ['name' => 'me', 'expect' => 200, 'operation' => 'GET /api/v1/me', 'method' => 'GET', 'uri' => '/api/v1/me', 'as' => '{owner}'];
+        yield ['name' => 'links', 'expect' => 200, 'operation' => 'GET /api/v1/links', 'method' => 'GET', 'uri' => '/api/v1/links', 'as' => '{owner}'];
+        yield ['name' => 'create link', 'expect' => 201, 'operation' => 'POST /api/v1/links', 'method' => 'POST', 'uri' => '/api/v1/links', 'as' => '{owner}', 'body' => ['targetUrl' => 'https://example.com/new']];
+        yield ['name' => 'link', 'expect' => 200, 'operation' => 'GET /api/v1/links/{id}', 'method' => 'GET', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}'];
+        yield ['name' => 'patch link', 'expect' => 200, 'operation' => 'PATCH /api/v1/links/{id}', 'method' => 'PATCH', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}', 'body' => ['isActive' => true]];
+        // the QR operation produces images, so the case has to ask for one —
+        // with the JSON default it answered 406, and before every case named
+        // its expected status that passed as documented (round 1, finding 6)
+        yield ['name' => 'qr', 'expect' => 200, 'operation' => 'GET /api/v1/links/{id}/qr', 'method' => 'GET', 'uri' => '/api/v1/links/{link}/qr', 'as' => '{owner}', 'accept' => 'image/svg+xml'];
         foreach (['summary', 'timeseries', 'countries', 'devices', 'referrers', 'variants'] as $report) {
-            yield ['name' => "link $report", 'operation' => "GET /api/v1/links/{id}/stats/$report", 'method' => 'GET', 'uri' => "/api/v1/links/{link}/stats/$report", 'as' => '{owner}'];
+            yield ['name' => "link $report", 'expect' => 200, 'operation' => "GET /api/v1/links/{id}/stats/$report", 'method' => 'GET', 'uri' => "/api/v1/links/{link}/stats/$report", 'as' => '{owner}'];
         }
-        yield ['name' => 'keys', 'operation' => 'GET /api/v1/api-keys', 'method' => 'GET', 'uri' => '/api/v1/api-keys', 'as' => '{owner}'];
-        yield ['name' => 'create key', 'operation' => 'POST /api/v1/api-keys', 'method' => 'POST', 'uri' => '/api/v1/api-keys', 'as' => '{owner}', 'body' => ['name' => 'contract']];
-        yield ['name' => 'revoke key', 'operation' => 'DELETE /api/v1/api-keys/{id}', 'method' => 'DELETE', 'uri' => '/api/v1/api-keys/{key}', 'as' => '{owner}'];
-        yield ['name' => 'admin users', 'operation' => 'GET /api/v1/admin/users', 'method' => 'GET', 'uri' => '/api/v1/admin/users', 'as' => '{admin}'];
-        yield ['name' => 'block', 'operation' => 'POST /api/v1/admin/users/{id}/block', 'method' => 'POST', 'uri' => '/api/v1/admin/users/{stranger-id}/block', 'as' => '{admin}'];
-        yield ['name' => 'unblock', 'operation' => 'POST /api/v1/admin/users/{id}/unblock', 'method' => 'POST', 'uri' => '/api/v1/admin/users/{stranger-id}/unblock', 'as' => '{admin}'];
-        yield ['name' => 'admin links', 'operation' => 'GET /api/v1/admin/links', 'method' => 'GET', 'uri' => '/api/v1/admin/links', 'as' => '{admin}'];
+        yield ['name' => 'keys', 'expect' => 200, 'operation' => 'GET /api/v1/api-keys', 'method' => 'GET', 'uri' => '/api/v1/api-keys', 'as' => '{owner}'];
+        yield ['name' => 'create key', 'expect' => 201, 'operation' => 'POST /api/v1/api-keys', 'method' => 'POST', 'uri' => '/api/v1/api-keys', 'as' => '{owner}', 'body' => ['name' => 'contract']];
+        yield ['name' => 'revoke key', 'expect' => 204, 'operation' => 'DELETE /api/v1/api-keys/{id}', 'method' => 'DELETE', 'uri' => '/api/v1/api-keys/{key}', 'as' => '{owner}'];
+        yield ['name' => 'admin users', 'expect' => 200, 'operation' => 'GET /api/v1/admin/users', 'method' => 'GET', 'uri' => '/api/v1/admin/users', 'as' => '{admin}'];
+        yield ['name' => 'block', 'expect' => 200, 'operation' => 'POST /api/v1/admin/users/{id}/block', 'method' => 'POST', 'uri' => '/api/v1/admin/users/{stranger-id}/block', 'as' => '{admin}'];
+        yield ['name' => 'unblock', 'expect' => 200, 'operation' => 'POST /api/v1/admin/users/{id}/unblock', 'method' => 'POST', 'uri' => '/api/v1/admin/users/{stranger-id}/unblock', 'as' => '{admin}'];
+        yield ['name' => 'admin links', 'expect' => 200, 'operation' => 'GET /api/v1/admin/links', 'method' => 'GET', 'uri' => '/api/v1/admin/links', 'as' => '{admin}'];
         foreach (['summary', 'timeseries', 'top-links'] as $report) {
-            yield ['name' => "admin $report", 'operation' => "GET /api/v1/admin/stats/$report", 'method' => 'GET', 'uri' => "/api/v1/admin/stats/$report", 'as' => '{admin}'];
+            yield ['name' => "admin $report", 'expect' => 200, 'operation' => "GET /api/v1/admin/stats/$report", 'method' => 'GET', 'uri' => "/api/v1/admin/stats/$report", 'as' => '{admin}'];
         }
         // the delete goes last: the link the other cases use
-        yield ['name' => 'delete link', 'operation' => 'DELETE /api/v1/links/{id}', 'method' => 'DELETE', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}'];
+        yield ['name' => 'delete link', 'expect' => 204, 'operation' => 'DELETE /api/v1/links/{id}', 'method' => 'DELETE', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}'];
 
         // and the refusals
-        yield ['name' => 'anonymous', 'operation' => 'GET /api/v1/links', 'method' => 'GET', 'uri' => '/api/v1/links', 'as' => null];
-        yield ['name' => 'stranger', 'operation' => 'GET /api/v1/links/{id}', 'method' => 'GET', 'uri' => '/api/v1/links/{other-link}', 'as' => '{owner}'];
-        yield ['name' => 'not an admin', 'operation' => 'GET /api/v1/admin/users', 'method' => 'GET', 'uri' => '/api/v1/admin/users', 'as' => '{owner}'];
-        yield ['name' => 'unknown id', 'operation' => 'GET /api/v1/links/{id}', 'method' => 'GET', 'uri' => '/api/v1/links/{nothing}', 'as' => '{owner}'];
-        yield ['name' => 'invalid body', 'operation' => 'POST /api/v1/links', 'method' => 'POST', 'uri' => '/api/v1/links', 'as' => '{owner}', 'body' => ['targetUrl' => 'not-a-url']];
-        yield ['name' => 'bad credentials', 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => ['email' => 'owner@example.com', 'password' => 'wrong']];
+        yield ['name' => 'anonymous', 'expect' => 401, 'operation' => 'GET /api/v1/links', 'method' => 'GET', 'uri' => '/api/v1/links', 'as' => null];
+        yield ['name' => 'stranger', 'expect' => 403, 'operation' => 'GET /api/v1/links/{id}', 'method' => 'GET', 'uri' => '/api/v1/links/{other-link}', 'as' => '{owner}'];
+        yield ['name' => 'not an admin', 'expect' => 403, 'operation' => 'GET /api/v1/admin/users', 'method' => 'GET', 'uri' => '/api/v1/admin/users', 'as' => '{owner}'];
+        yield ['name' => 'unknown id', 'expect' => 404, 'operation' => 'GET /api/v1/links/{id}', 'method' => 'GET', 'uri' => '/api/v1/links/{nothing}', 'as' => '{owner}'];
+        yield ['name' => 'invalid body', 'expect' => 422, 'operation' => 'POST /api/v1/links', 'method' => 'POST', 'uri' => '/api/v1/links', 'as' => '{owner}', 'body' => ['targetUrl' => 'not-a-url']];
+        yield ['name' => 'bad credentials', 'expect' => 401, 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => ['email' => 'owner@example.com', 'password' => 'wrong']];
+        yield ['name' => 'unreadable credentials', 'expect' => 400, 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => '{'];
+        yield ['name' => 'blocked account', 'expect' => 403, 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => ['email' => 'blocked@example.com', 'password' => UserFactory::PASSWORD]];
+        // json_login answers before content negotiation, so an Accept it cannot
+        // satisfy is not refused — the document says so (Gate 2 round 1, finding 3)
+        yield ['name' => 'token with an incompatible Accept', 'expect' => 200, 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => ['email' => 'owner@example.com', 'password' => UserFactory::PASSWORD], 'accept' => 'text/csv'];
+        yield ['name' => 'unsupported media type', 'expect' => 415, 'operation' => 'POST /api/v1/links', 'method' => 'POST', 'uri' => '/api/v1/links', 'as' => '{owner}', 'body' => 'targetUrl=https://example.com', 'contentType' => 'text/plain'];
+        yield ['name' => 'unacceptable media type', 'expect' => 406, 'operation' => 'GET /api/v1/me', 'method' => 'GET', 'uri' => '/api/v1/me', 'as' => '{owner}', 'accept' => 'text/csv'];
     }
 
     /**
@@ -204,6 +268,7 @@ final class ApiContractTest extends LinkApiTestCase
     {
         $owner = UserFactory::createOne(['email' => 'owner@example.com']);
         $stranger = UserFactory::createOne(['email' => 'stranger@example.com']);
+        UserFactory::new()->blocked()->create(['email' => 'blocked@example.com']);
         UserFactory::new()->admin()->create(['email' => 'root@example.com']);
         $link = LinkFactory::new()->limited(100, 3)->create(['owner' => $owner, 'slug' => 'contract-one']);
         LinkFactory::new()->limited(100, 9)->create(['owner' => $owner, 'slug' => 'contract-two']);
@@ -226,20 +291,19 @@ final class ApiContractTest extends LinkApiTestCase
     }
 
     /**
-     * @param array<string, mixed>|null $body
+     * @param array<string, mixed>|string|null $body
      */
-    private function send(KernelBrowser $client, string $method, string $uri, ?string $token, ?array $body): void
+    private function send(KernelBrowser $client, string $method, string $uri, ?string $token, array|string|null $body, ?string $contentType = null, ?string $accept = null): void
     {
-        if (null === $token) {
-            $server = ['HTTP_ACCEPT' => 'application/json'];
-            if (null !== $body) {
-                $server['CONTENT_TYPE'] = 'application/json';
-            }
-            $client->request($method, $uri, server: $server, content: null === $body ? null : json_encode($body, \JSON_THROW_ON_ERROR));
-
-            return;
+        $server = ['HTTP_ACCEPT' => $accept ?? 'application/json'];
+        if (null !== $token) {
+            $server['HTTP_AUTHORIZATION'] = 'Bearer '.$token;
         }
-        $this->api($client, $token, $method, $uri, $body);
+        if (null !== $body) {
+            $server['CONTENT_TYPE'] = $contentType ?? ('PATCH' === $method ? 'application/merge-patch+json' : 'application/json');
+        }
+        $content = \is_array($body) ? json_encode($body, \JSON_THROW_ON_ERROR) : $body;
+        $client->request($method, $uri, server: $server, content: $content);
     }
 
     /**
