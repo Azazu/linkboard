@@ -116,9 +116,34 @@ It prints one line, and exits non-zero if the value came back:
 
 `exercised` says whether the browser really restored the document rather
 than refetching it; a case that was not exercised has not proven anything.
+
+The same directory holds the editor's run, for the other claim a
+`WebTestCase` cannot make: that the controls a person operates produce the
+document that gets stored.
+
+```bash
+NODE_PATH=/tmp/lb-acceptance/node_modules \
+  node tests/Acceptance/rules-editor.mjs --base=http://localhost:8082
+```
+
+It prints what each case observed. The rules on the screen must be the
+rules under `stored`; the switch between the two views must carry the
+document across; a document the fields cannot hold must refuse the switch;
+and invalid JSON must come back in the JSON view — an excerpt of the
+output:
+
+```text
+"invalidRaw": {
+  "stillJson": true,
+  "keptText": true,
+  "alerts": ["The document is not valid JSON: Syntax error"],
+  "stored": { "version": 1, "variants": [ … ] }
+}
+```
+
 `/login` and `/register` are rate limited to ten requests a minute per IP,
-so give the run a minute between attempts — it says so when the limiter is
-what refused it.
+so give either run a minute between attempts — it says so when the limiter
+is what refused it.
 
 ## Monitoring the deep probe
 

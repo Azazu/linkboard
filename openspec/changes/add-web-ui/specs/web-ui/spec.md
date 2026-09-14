@@ -79,11 +79,15 @@ The system SHALL let an owner create a link with a generated or a custom slug, c
 - **THEN** the deletion happens only on a confirmed, CSRF-protected submission, after which the link is gone from the list and its page is 404
 
 ### Requirement: The routing-rules editor accepts a document and shows its violations
-The system SHALL let an owner edit a link's routing rules both as a structured editor and as the raw JSON document, SHALL validate the document against exactly the limits the `routing-rules` capability states, and SHALL show each violation next to the part of the document it concerns, identifying that part by its path. An invalid document SHALL leave the stored rules untouched.
+The system SHALL let an owner edit a link's routing rules both as a structured editor and as the raw JSON document, SHALL validate the document against exactly the limits the `routing-rules` capability states, and SHALL show each violation next to the part of the document it concerns, identifying that part by its path. An invalid document SHALL leave the stored rules untouched, and the refused submission SHALL come back in the view it was made in, still carrying what was entered, so a correction is made on that page rather than typed again.
 
 #### Scenario: An invalid rules document is refused with its paths
 - **WHEN** an owner submits a rules document whose first rule has an unknown match key and whose variants' weights do not sum to 100
 - **THEN** the response is 422, the stored rules are unchanged, and the page shows a message for each violation naming the path inside the document
+
+#### Scenario: A document that is not JSON is refused in the view it was typed in
+- **WHEN** an owner chooses the JSON view and submits text that is not valid JSON
+- **THEN** the response is 422 in that same view, showing the parse error and the text that was entered, the stored rules are unchanged, and correcting the text on that page saves it
 
 #### Scenario: A valid document replaces the stored rules
 - **WHEN** an owner submits a valid rules document

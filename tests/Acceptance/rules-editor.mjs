@@ -4,13 +4,19 @@
  * browser can say whether the controls a person actually operates produce the
  * document that gets stored.
  *
- * Three things are checked, each end to end:
+ * Four things are checked, each end to end:
  *   rows   — add two rules, remove the first, add a third, save: exactly the
  *            rules still on the screen are the rules stored, with no index
  *            collision between the survivors and the new row;
  *   json   — switch to the JSON view, type a document, save: that document is
  *            stored (with the fields view chosen it must not be);
- *   reopen — a stored document the rows cannot hold comes back as JSON.
+ *   reopen — a stored document the rows cannot hold comes back as JSON;
+ *   invalid — invalid JSON typed into the JSON view is refused in that view,
+ *            with the error and the typed text still there and nothing stored,
+ *            and a correction on that same page saves.
+ *
+ * Every case reports what it observed; the run's output is recorded with the
+ * commit, because CI has no browser and cannot repeat it.
  *
  * Run it against the dev stack, like the other acceptance script:
  *
@@ -112,6 +118,11 @@ async function save(expect = 'saved') {
         });
     } else {
         await page.waitForSelector('[role=alert]', { timeout: 15000 });
+        // the link page carries flash alerts of its own, so an alert alone does
+        // not mean the submission was refused — staying on the form does
+        if (new URL(page.url()).pathname === linkPath) {
+            throw new Error('the save was accepted: it landed on the link page, where a refusal was expected');
+        }
     }
     await settle();
 }
@@ -188,6 +199,39 @@ async function save(expect = 'saved') {
         stillJson: await page.$('#link_rules_raw') !== null,
         stored: await stored(),
     };
+}
+
+// 4. invalid JSON in the JSON view: the refusal stays in that view, shows the
+//    parse error, keeps what was typed, and stores nothing (finding 1 named
+//    this case; only a browser can say which view comes back and with what in
+//    it). The link still holds the variants document from case 3.
+{
+    const invalid = '{"version":1,"rules":[{"match":{"country":["DE"]},"target":"https://example.com/de"}';
+
+    await openEditor();
+    await page.waitForSelector('#link_rules_raw');
+    await page.$eval('#link_rules_raw', (field, document) => { field.value = document; }, invalid);
+    await save('refused');
+
+    // read what is stored without leaving the refused page — a second tab
+    // shares the session, so the page under test keeps its state
+    const inspector = await browser.newPage();
+    await inspector.goto(`${base}${linkPath}`, { waitUntil: 'load' });
+    const storedWhileRefused = await inspector.$eval('pre code', (node) => JSON.parse(node.textContent)).catch(() => null);
+    await inspector.close();
+
+    results.invalidRaw = {
+        url: new URL(page.url()).pathname,
+        stillJson: (await page.$('#link_rules_raw')) !== null,
+        keptText: (await page.$eval('#link_rules_raw', (field) => field.value)) === invalid,
+        alerts: await page.$$eval('[role=alert]', (nodes) => nodes.map((node) => node.textContent.trim())),
+        stored: storedWhileRefused,
+    };
+
+    // correct it on the page that came back, and save
+    await page.$eval('#link_rules_raw', (field, document) => { field.value = document; }, `${invalid}]}`);
+    await save();
+    results.afterCorrection = await stored();
 }
 
 await browser.close();

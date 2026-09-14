@@ -101,9 +101,12 @@ final class LinkEditTest extends WebPageTestCase
 
     public function testTextThatIsNotJsonIsReportedOnTheDocumentField(): void
     {
+        // the link holds a document, so "the stored rules survive" is a claim
+        // this test can actually fail on
+        $stored = ['version' => 1, 'rules' => [['match' => ['country' => ['DE']], 'target' => 'https://example.com/de']]];
         $client = self::createClient();
         $ann = $this->user('ann@example.com');
-        $link = LinkFactory::createOne(['owner' => $ann]);
+        $link = LinkFactory::new()->withRules($stored)->create(['owner' => $ann]);
         $this->signIn($client, 'ann@example.com');
 
         $client->request('GET', '/links/'.$link->getId().'/edit');
@@ -115,6 +118,9 @@ final class LinkEditTest extends WebPageTestCase
 
         self::assertResponseStatusCodeSame(422);
         self::assertSelectorTextContains('[role=alert]', 'not valid JSON');
+        self::assertSelectorExists('#link_rules_raw', 'the document view is the one that comes back');
+        self::assertSame('not json at all', $client->getCrawler()->filter('#link_rules_raw')->text(), 'the text that was typed is still there');
+        self::assertEquals($stored, $this->reload($link->getId())->getRules(), 'the stored document survives the refusal');
     }
 
     public function testSwitchingToJsonCarriesTheFieldsAcrossAndBack(): void

@@ -45,8 +45,16 @@
 
 - Branch run on the fix head (`ba24631`) is green: run 34819584049, `make check EXEC=` native in CI (2026-09-14).
 
+- Gate 2 Confirmation 2 (`8e2f7ff`, Reviewed-Commit `9d2fa12`): findings 2, 3 and 4 confirmed. Finding 1 changes-requested a second time — the conversion mechanism was accepted in full, but one case the finding had named from the start was still missing from the browser coverage: **invalid raw input**. The variants document and an invalid structured target were covered; text that is not JSON, typed into the JSON view, was not. `LinkEditTest` covered it server-side, which cannot say which view comes back or with what in it — and that is exactly where the two earlier defects lived. Two failures on one finding → the user arbitrated (2026-09-14): add the case and run a third confirmation.
+
+- Fixed in the following commit. `tests/Acceptance/rules-editor.mjs` gains the fourth case: with a variants document stored, invalid JSON is typed into the JSON view and saved — the 422 comes back in that same view (`stillJson: true`), showing `The document is not valid JSON: Syntax error`, with the typed text still in the field (`keptText: true`) and the stored variants document untouched (read from a second tab so the refused page keeps its state); correcting the text on that page saves it (`afterCorrection` is the corrected document). The refusal branch of `save()` was tightened while writing this: it had waited for any `[role=alert]`, and the link page carries flash alerts of its own, so an accepted save could have passed as a refusal — it now also requires that the page stayed on the form. `tests/Web/Link/LinkEditTest::testTextThatIsNotJsonIsReportedOnTheDocumentField` was weak for the same reason: the link it used had no rules, so "the stored rules are untouched" could not fail. It now holds a document, and asserts the JSON view comes back, the typed text with it, and the stored document unchanged.
+
+- Negative run for the new case (the demonstrated failing input): with `LinkPages::rulesFrom()` answering `null` instead of `false` on a parse failure — a plausible implementation, and the silent-drop defect class this finding is about — the submission is accepted, lands on the link page and clears what was stored; the browser case fails with "the save was accepted: it landed on the link page, where a refusal was expected", and the web test fails on the 422 (303 observed). Source restored, `make check` green afterwards.
+
+- The claim was swept, not just the line: the spec requirement now states that a refused submission comes back in the view it was made in still carrying what was entered, with a scenario for it; task 4.9 names the four editor cases and the negative run; `docs/how-to/local-development.md` documents the editor run with its command and expected output next to the API-key one. Both documented commands were run in their exact form.
+
 ## Next step
-`scripts/gate-run.sh add-web-ui 2 confirm 1` — the second confirmation, on findings 1 and 2. If either fails again, stop and ask the user to arbitrate (AGENTS.md).
+The user pushes the branch; the executor records the Actions run on the new head and then runs `scripts/gate-run.sh add-web-ui 2 confirm 1` — the third confirmation, on finding 1 (the user's arbitration of 2026-09-14).
 
 ## Blockers
 None.
