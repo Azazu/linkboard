@@ -38,8 +38,13 @@
 
 - Branch run on the exact head (`a646230`) is green: run 34847362006, `make check EXEC=` native in CI (2026-09-14). Task 6.2 ticked.
 
+- Gate 2 round 1 (`d00a7c6`, Reviewed-Commit `dd322c7`): changes-requested — one major and two minors, all three real, all fixed in the following commit.
+  1. **The mutation evidence was incomplete while the tasks claimed it.** Five demonstrated failing inputs had been executed and recorded; two that the tasks promised — the moved self-block guard and the `(/|$)` boundary — had not. Both are now executed and recorded. With the guard removed from `BlockUser`, `BlockUserTest::testAnAdministratorCannotBlockTheirOwnAccount` fails in both suites (the integration one on "blocking one's own account must be refused", the page one on an empty `[role=alert]` list); with the pattern reduced to `^/admin`, `AdminAccessTest::testAShortLinkWhoseSlugBeginsWithAdminStillRedirects` fails, `/admin-sale` answering a redirect to `http://localhost/login` instead of the target. Both guards restored and the tests shown passing again. The tasks now name what was observed rather than what was intended.
+  2. **`limit` was accepted but had no control**: `?limit=500` answered 422 with only the generic instruction to correct controls that could not express it, and a valid `limit=7` was dropped on the next submission. The page now has a top-N control that carries its value and its refusal, covered on both statistics pages.
+  3. **Sub-day bounds lost their time on a round trip**: a same-day hourly interval rendered into date controls and came back as one day, refused. The bounds are `datetime-local` now, carrying minute precision through the form, and a test presses Show with the controls untouched and asserts the same interval is reported.
+
 ## Next step
-`scripts/gate-run.sh add-web-admin-and-stats 2 full` (task 6.3), then fix and confirm every finding.
+The user pushes the branch; the executor records the Actions run on the new head and then runs `scripts/gate-run.sh add-web-admin-and-stats 2 confirm 1`.
 
 ## Blockers
 None.

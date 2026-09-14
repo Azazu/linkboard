@@ -23,6 +23,9 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class StatsControls
 {
+    /** What a `datetime-local` control sends and shows: minute precision, no zone. */
+    public const string MOMENT = 'Y-m-d\TH:i';
+
     /**
      * @param ?ReportRequest        $request null when a parameter was refused — there is nothing to report on
      * @param array<string, string> $values  what the controls should show back
@@ -41,20 +44,17 @@ final readonly class StatsControls
             'from' => trim((string) $http->query->get('from', '')),
             'to' => trim((string) $http->query->get('to', '')),
             'granularity' => (string) $http->query->get('granularity', 'day'),
+            'limit' => trim((string) $http->query->get('limit', '')),
             'includeBots' => $http->query->has('includeBots') ? '1' : '',
         ];
 
-        // a date control sends a day, the capability speaks RFC 3339: widen the
-        // page's own shorthand, and leave anything else for the report layer to
-        // refuse in its own words
         $query = $http->query->all();
         foreach (['from', 'to'] as $bound) {
-            if (1 === preg_match('/^\d{4}-\d\d-\d\d$/', $values[$bound])) {
-                $query[$bound] = $values[$bound].'T00:00:00Z';
-            }
             if ('' === $values[$bound]) {
                 unset($query[$bound]);
+                continue;
             }
+            $query[$bound] = self::asMoment($values[$bound]);
         }
 
         try {
@@ -68,13 +68,33 @@ final readonly class StatsControls
             return new self(null, $e->parameter, $e->getMessage(), $values);
         }
 
-        // the effective period, so the controls show what is actually reported
-        $values['from'] = $request->period->from->format('Y-m-d');
-        $values['to'] = $request->period->to->format('Y-m-d');
+        // the effective parameters, so the controls show what is actually
+        // reported — and keep the precision the request was made with, rather
+        // than truncating it to a day and reporting something else next time
+        $values['from'] = $request->period->from->format(self::MOMENT);
+        $values['to'] = $request->period->to->format(self::MOMENT);
         $values['granularity'] = $request->granularity->value;
+        $values['limit'] = (string) $request->limit;
         $values['includeBots'] = $request->includeBots ? '1' : '';
 
         return new self($request, null, null, $values);
+    }
+
+    /**
+     * The page's own shorthands widened to the RFC 3339 the `analytics`
+     * capability speaks: a day from a date control, a minute from a
+     * `datetime-local` one, both read as UTC because that is what the page
+     * says they are. Anything else passes through for the report layer to
+     * refuse in its own words.
+     */
+    private static function asMoment(string $value): string
+    {
+        return match (true) {
+            1 === preg_match('/^\d{4}-\d\d-\d\d$/', $value) => $value.'T00:00:00Z',
+            1 === preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d$/', $value) => $value.':00Z',
+            1 === preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/', $value) => $value.'Z',
+            default => $value,
+        };
     }
 
     public function refused(): bool

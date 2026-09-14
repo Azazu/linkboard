@@ -63,11 +63,54 @@ final class LinkStatsParametersTest extends WebPageTestCase
         $crawler = $client->request('GET', $address);
 
         self::assertResponseIsSuccessful();
-        self::assertSame('2026-09-01', $crawler->filter('input[name=from]')->attr('value'));
-        self::assertSame('2026-09-08', $crawler->filter('input[name=to]')->attr('value'));
+        self::assertSame('2026-09-01T00:00', $crawler->filter('input[name=from]')->attr('value'));
+        self::assertSame('2026-09-08T00:00', $crawler->filter('input[name=to]')->attr('value'));
         self::assertSame('hour', $crawler->filter('select[name=granularity] option[selected]')->attr('value'));
         self::assertNotNull($crawler->filter('input[name=includeBots]')->attr('checked'));
         self::assertCount(7 * 24, self::bucketRows($crawler), 'hourly buckets over seven days');
+    }
+
+    public function testSubmittingTheFormUnchangedReportsTheSameInterval(): void
+    {
+        // the controls carry minute precision, so a same-day hourly interval
+        // survives a round trip instead of collapsing to a whole day (Gate 2
+        // round 1, finding 3)
+        $client = self::createClient();
+        $ann = $this->user('ann@example.com');
+        $link = LinkFactory::createOne(['owner' => $ann]);
+        ClickRows::many(self::connection(), $link->getId(), 2, '2026-09-01T10:30:00Z');
+
+        $this->signIn($client, 'ann@example.com');
+        $first = $client->request('GET', '/links/'.$link->getId().'/stats?from=2026-09-01T10:00:00Z&to=2026-09-01T12:00:00Z&granularity=hour');
+        self::assertResponseIsSuccessful();
+        self::assertCount(2, self::bucketRows($first), 'two hourly buckets');
+
+        $again = $client->submit($first->selectButton('Show')->form());
+
+        self::assertResponseIsSuccessful('pressing Show with the controls untouched must not refuse the period');
+        self::assertSame('2026-09-01T10:00', $again->filter('input[name=from]')->attr('value'));
+        self::assertSame('2026-09-01T12:00', $again->filter('input[name=to]')->attr('value'));
+        self::assertCount(2, self::bucketRows($again), 'and it reports the same interval');
+    }
+
+    public function testTheTopNControlCarriesItsValueAndItsRefusal(): void
+    {
+        // every parameter the page accepts has a control, so a refusal has
+        // somewhere to be shown and can be corrected from the page itself
+        // (Gate 2 round 1, finding 2)
+        $client = self::createClient();
+        $ann = $this->user('ann@example.com');
+        $link = LinkFactory::createOne(['owner' => $ann]);
+
+        $this->signIn($client, 'ann@example.com');
+        $chosen = $client->request('GET', '/links/'.$link->getId().'/stats?limit=25');
+        self::assertResponseIsSuccessful();
+        self::assertSame('25', $chosen->filter('select[name=limit] option[selected]')->attr('value'), 'the chosen size is kept');
+
+        $refused = $client->request('GET', '/links/'.$link->getId().'/stats?limit=500');
+        self::assertResponseStatusCodeSame(422);
+        self::assertGreaterThan(0, $refused->filter('select[name=limit][aria-invalid="true"]')->count());
+        self::assertStringContainsString('between 1 and 50', $refused->filter('[role=alert]')->text());
     }
 
     public function testTheBotsToggleChangesTheFigures(): void

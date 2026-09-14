@@ -1,16 +1,19 @@
-{# The period, granularity and bots controls, shared by the link page and the
-   global one. A plain GET form: the address describes what is shown, so it can
-   be bookmarked and shared, and nothing here needs JavaScript. A parameter the
-   report layer refused carries its message on its own control. #}
+{# The period, granularity, top-N and bots controls, shared by the link page
+   and the global one. A plain GET form: the address describes what is shown,
+   so it can be bookmarked and shared, and nothing here needs JavaScript. Every
+   parameter the page accepts has a control, so a refusal always has somewhere
+   to be shown and a correction is always possible from the page itself. The
+   bounds carry minute precision, which is what makes hourly buckets over a
+   same-day interval expressible. #}
 <form method="get" action="{{ action }}">
     <div class="grid">
         <label>From (inclusive, UTC)
-            <input type="date" name="from" value="{{ controls.values.from }}"
+            <input type="datetime-local" name="from" value="{{ controls.values.from }}"
                    {{ controls.messageFor('from') ? 'aria-invalid="true"' }}>
             {% if controls.messageFor('from') %}<small role="alert">{{ controls.messageFor('from') }}</small>{% endif %}
         </label>
         <label>To (exclusive, UTC)
-            <input type="date" name="to" value="{{ controls.values.to }}"
+            <input type="datetime-local" name="to" value="{{ controls.values.to }}"
                    {{ controls.messageFor('to') ? 'aria-invalid="true"' }}>
             {% if controls.messageFor('to') %}<small role="alert">{{ controls.messageFor('to') }}</small>{% endif %}
         </label>
@@ -20,6 +23,14 @@
                 <option value="hour" {{ controls.values.granularity == 'hour' ? 'selected' }}>One an hour</option>
             </select>
             {% if controls.messageFor('granularity') %}<small role="alert">{{ controls.messageFor('granularity') }}</small>{% endif %}
+        </label>
+        <label>Rows per breakdown
+            <select name="limit" {{ controls.messageFor('limit') ? 'aria-invalid="true"' }}>
+                {% for size in [10, 25, 50] %}
+                    <option value="{{ size }}" {{ controls.values.limit == size ~ '' ? 'selected' }}>Top {{ size }}</option>
+                {% endfor %}
+            </select>
+            {% if controls.messageFor('limit') %}<small role="alert">{{ controls.messageFor('limit') }}</small>{% endif %}
         </label>
     </div>
     <label>

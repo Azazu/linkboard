@@ -51,15 +51,18 @@ carries the pages an owner uses:
 | `/links/{id}/stats` | every report of that link: the summary, the timeseries as a chart and a table, and the breakdowns by country, device, operating system, referrer and A/B variant |
 | `/api-keys` | create a key — its value is shown once — list your keys and revoke one |
 
-The statistics page carries the period, the bucket size and the bots
-toggle as a plain form, and the address describes what is shown, so a view
-can be bookmarked or shared. The bounds are UTC and half-open, as the API's
-are: **from** is included, **to** is not. A value the analytics capability
-refuses — a period whose end is not after its start, one longer than 366
-days, hourly buckets over more than 14 days — comes back on the control
-that carried it, and no figures are shown until it is corrected. The
-numbers are the ones the API answers for the same parameters, from the same
-cache entry, and the page says how old they may be.
+The statistics page carries the period, the bucket size, how many rows each
+breakdown shows and the bots toggle as a plain form, and the address
+describes what is shown, so a view can be bookmarked or shared. The bounds
+are UTC and half-open, as the API's are: **from** is included, **to** is
+not, and both carry minute precision — which is what makes hourly buckets
+over a same-day interval expressible. Every parameter the page accepts has
+a control, so a value the analytics capability refuses — a period whose end
+is not after its start, one longer than 366 days, hourly buckets over more
+than 14 days, a top-N outside 1–50 — comes back on the control that carried
+it, and no figures are shown until it is corrected there. The numbers are
+the ones the API answers for the same parameters, from the same cache
+entry, and the page says how old they may be.
 
 Two things behave the way they do on purpose:
 

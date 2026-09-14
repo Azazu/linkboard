@@ -122,6 +122,29 @@ final class AdminStatsTest extends WebPageTestCase
         self::assertCount(0, $crawler->filter('table'), 'no figures are computed from a refused parameter');
     }
 
+    public function testTheTopNControlCarriesItsValueAndItsRefusal(): void
+    {
+        $client = self::createClient();
+        $this->user('root@example.com', admin: true);
+        $ann = $this->user('ann@example.com');
+        foreach (range(1, 12) as $i) {
+            $link = LinkFactory::createOne(['owner' => $ann, 'slug' => 'top-'.$i]);
+            ClickRows::many(self::connection(), $link->getId(), 13 - $i, '2026-09-02T10:00:00Z');
+        }
+
+        $this->signIn($client, 'root@example.com');
+        $ten = $client->request('GET', '/admin/stats?'.self::PERIOD);
+        self::assertCount(10, self::rows($ten, 1), 'the default top-N');
+
+        $more = $client->request('GET', '/admin/stats?'.self::PERIOD.'&limit=25');
+        self::assertSame('25', $more->filter('select[name=limit] option[selected]')->attr('value'));
+        self::assertCount(12, self::rows($more, 1), 'every link that was clicked');
+
+        $refused = $client->request('GET', '/admin/stats?'.self::PERIOD.'&limit=500');
+        self::assertResponseStatusCodeSame(422);
+        self::assertGreaterThan(0, $refused->filter('select[name=limit][aria-invalid="true"]')->count());
+    }
+
     public function testThePageIsReachableFromTheOtherAdministrativePages(): void
     {
         $client = self::createClient();
