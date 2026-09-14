@@ -18,3 +18,21 @@
 - Branch and HEAD match the requested identifiers; the working tree was clean before review.
 - `scripts/pregate-verify.sh gate1 add-web-admin-and-stats` passed, including strict OpenSpec validation, with zero warnings.
 - Reviewed the proposal, design, tasks and delta specification against the current analytics contracts, providers, request/cache-key construction, security configuration and dashboard template. No implementation or Git write commands were run.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-14
+**Reviewed-Commit:** 64764ab792923b4d6bcd6fc0af65ae00f4cb0bfb
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Task 3.3 now covers implementing the dashboard's daily table and verifying every bucket against the chart's figures. Proposal scope and impact, design decision 7, and both no-JavaScript scenarios explicitly include the dashboard. The existing controller already supplies `days` to its template, so the planned correction is feasible without a new report path. |
+| 2 | confirmed — Task 4.4 explicitly covers guest and non-admin access to both block/unblock confirmation pages and submissions, unchanged target state, and non-admin POSTs with a token accepted by their own session. It plans demonstrated failing inputs for the role boundary (removing both redundant role enforcement points), CSRF check, and moved self-block guard; task 4.3 supplies the authorized action cases. The administrative requirement and design applicability/risk discussion now distinguish role denial from CSRF denial. |
+
+### Validation
+- Reviewed the diff from `562ff2452c9c8daa0f940db9493c2d679429a836` to `64764ab792923b4d6bcd6fc0af65ae00f4cb0bfb` for round 1's major findings 1 and 2 and their reachable collateral effects. No blocker findings existed in that round; minor findings 3 and 4 are outside this confirmation's requested scope.
+- Branch and HEAD match the requested identifiers; the working tree was clean before this confirmation.
+- `scripts/pregate-verify.sh gate1 add-web-admin-and-stats` passed, including strict OpenSpec validation, with zero warnings.
+- This confirms the Gate 1 planning corrections; implementation and the planned test/mutation evidence remain for Gate 2. Only `review.md` was modified; no Git write commands were run.
