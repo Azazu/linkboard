@@ -15,7 +15,6 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 11a | `add-web-admin-and-stats` | the rest of FR-WEB-1: `/links/{id}/stats` with every report of 2.6 as charts and tables (period, granularity, bots toggle) and the admin pages `/admin/users`, `/admin/links`, `/admin/stats` (split out of row 11 by user arbitration, 2026-09-13) | high |
 | 12 | `polish-api-and-openapi` | OpenAPI descriptions and examples for every operation, filters and ordering, `ApiTestCase` contract tests, error catalogue in `docs/reference/` | medium |
 | 13 | `harden-quality-and-docs` | README with screenshots, architecture diagram and benchmarks; PHPStan strictness sweep; migration down/up in CI; architecture tests; ADR index | low |
 

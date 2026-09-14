@@ -1,7 +1,7 @@
 # Handoff — add-web-admin-and-stats
 
 **Updated:** 2026-09-14 · claude
-**State:** ready-to-merge
+**State:** archived
 **Branch:** change/add-web-admin-and-stats
 
 ## Done this session
@@ -51,8 +51,12 @@
 
 - Gate 2 Confirmation 2 (`11d4556`, Reviewed-Commit `314fe31`): finding 1 confirmed — **Gate 2 passed**. The reviewer states its own limits: it read the code, the artifacts, the commit bodies and the recorded runs, and ran the mechanical floor, but could not reach Docker, so neither `make check` nor the mutations were reproduced there. Both stand on this side: `make check` green locally (813 tests, 9665 assertions) and natively in CI on `c76a76e` (run 34871984825), and the mutations recorded with the commands that produce them.
 
+- Merged into `main` as `d23cab9` (`--no-ff`, "gate 2 approved") after `openspec validate --strict` and `make check` on the branch; the user pushed `main` and its run 34875409920 on `d23cab9` is green.
+
+- Archived on 2026-09-14: the delta is applied to `openspec/specs/web-ui/spec.md` — the two MODIFIED requirements replaced in place and the six ADDED appended, each verbatim (checked block by block against the delta), leaving the capability with 16 requirements; roadmap row 11a removed. `docs/explanation/requirements.md` §7 keeps its row, as it keeps every shipped one.
+
 ## Next step
-`/git:merge add-web-admin-and-stats` — the user's action. Then the user pushes `main`, the executor verifies the run on it and archives the change (sync the `web-ui` delta into the capability, remove roadmap row 11a).
+Stage 4 continues with row 12 `polish-api-and-openapi` (tier `medium`), then row 13 `harden-quality-and-docs` (tier `low`). Start with `/workflow:start polish-api-and-openapi`.
 
 ## Blockers
 None.
