@@ -40,7 +40,7 @@
 - Browser acceptance now covers the editor as well (`tests/Acceptance/rules-editor.mjs`), because the findings were exactly about controls a `WebTestCase` cannot operate. Recorded runs: adding two rules, removing the first and adding another stores exactly the two rules still on screen (`country`, `os`) with no index collision; choosing the JSON view stores the typed document and hides the fields view; a document with variants reopens as JSON. Negative runs: with the chosen view ignored the typed document is dropped and the page reopens as fields; with the index derived from the row count the save no longer lands, because the new row overwrites a survivor.
 
 ## Next step
-The user pushes the branch; the executor records the Actions run on the new head (the reviewer noted, rightly, that the recorded run was older than the reviewed commit) and then runs `scripts/gate-run.sh add-web-ui 2 confirm 1`.
+`scripts/gate-run.sh add-web-ui 2 confirm 1` — the confirmation on findings 1–4, all `fixed`. Green Actions run on the fixed code: `71f08790e8600f92cbecadda019f857e39983dfa` — https://github.com/Azazu/linkboard/actions/runs/34779052898 (completed/success). Only this file changes after it, which the Gate 2 freshness rule allows. Then `/git:merge`.
 
 ## Blockers
 None.
