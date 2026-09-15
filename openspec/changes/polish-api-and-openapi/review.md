@@ -77,3 +77,22 @@
 - The requested range passes git diff --check; openspec validate polish-api-and-openapi --strict passes.
 - Runtime tests were not independently rerun: make ps failed with permission denied on /var/run/docker.sock, and local PHP is unavailable. The executor's reported green checks were not independently reproduced.
 - Only review.md was modified; no git write commands were run.
+
+## Confirmation 2 · Gate 2 · Round 2
+**Reviewer:** codex
+**Date:** 2026-09-15
+**Reviewed-Commit:** 9b162e3516f9a63cdbdbf2585183514baf4960f8
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — All nine report operations declare 422, which CommonErrorResponses renders as application/problem+json with required violations. Expected-422 contract cases cover individual parameter failures (malformed timestamp and out-of-range limit), cross-parameter failures (inverted period and excessive hourly duration), and an administrative report. Reachable collection and QR documentation changes declare their respective 400 and 422 responses; the shared link fixture is deleted only after the refusal cases. |
+| 2 | confirmed — The token operation now declares 404 and is excluded from the request-body 415 rule; its text/plain contract case explicitly expects 404 and checks the documented status and media type. The catalogue's 400 and 415 rows, design decision 2a, proposal and task 6.1 now qualify 415 as applying to API Platform body operations and identify the token exception. The catalogue explicitly distinguishes unsupported Content-Type from malformed application/json, which remains 400. This closes the claim-reconciliation issue retained in Confirmation 1 without changing runtime authentication behavior. |
+
+### Review evidence and limitations
+- Verified the requested branch, an initially clean worktree and HEAD equal to the Reviewed-Commit above. Reviewed only a0f8edf54b5e4c550a125844f8e1743ecab99d57..9b162e3516f9a63cdbdbf2585183514baf4960f8 and collateral effects reachable from the two named major findings; both source rows are dispositioned fixed. No unrelated findings were introduced.
+- Inspected report metadata, report request validation, problem-details schema construction, contract assertions and the installed Symfony authenticator, API Platform format listener and HttpKernel controller resolution. Searched repository source, tests and documentation for the affected media-type claims; the handoff's earlier implementation history is superseded by its explicit round-2 and confirmation corrections.
+- The requested range passes git diff --check; openspec validate polish-api-and-openapi --strict passes.
+- Runtime tests were not independently rerun: make ps failed with permission denied on /var/run/docker.sock, and local PHP is unavailable. The executor's reported green checks were not independently reproduced.
+- Only review.md was modified; no git write commands were run.
