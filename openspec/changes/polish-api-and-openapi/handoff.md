@@ -51,8 +51,10 @@
 
 - **Evidence for the raised tier** (tasks 7.1–7.2): `MovedPathPolicyTest` asserts every moved value equals the literal it replaced — the parameters, the whole ordered access-control list as the firewall resolves it, the check path, the token route — and that the decorator holds those very parameters rather than copies. Four mutations executed and recorded in task 7.2 with their commands and failures, each restored.
 
+- Branch run on the exact head (`0180c10`) is green: run 34885879408, `make check EXEC=` native in CI (2026-09-15).
+
 ## Next step
-The user pushes the branch; the executor records the Actions run on the exact head (task 8.2) and then requests Gate 2 again, `scripts/gate-run.sh polish-api-and-openapi 2 full` (task 8.3).
+`scripts/gate-run.sh polish-api-and-openapi 2 full` — the second Gate 2 round, on the implementation as corrected.
 
 ## Blockers
 None.

@@ -9,7 +9,7 @@ raised tier and round 1's findings add, and section 8 closes the change.
 
 ## 0. Gate 1
 
-- [ ] 0.1 Request Gate 1 on the corrected artifacts (`scripts/gate-run.sh polish-api-and-openapi 1 full`) and disposition every finding before the remaining implementation tasks start. Verify: the last Gate 1 record reads `confirmed` or `approved` with no finding row left `open`.
+- [x] 0.1 Request Gate 1 on the corrected artifacts (`scripts/gate-run.sh polish-api-and-openapi 1 full`) and disposition every finding before the remaining implementation tasks start. Verify: the last Gate 1 record reads `confirmed` or `approved` with no finding row left `open`.
 
 ## 1. The document tells the truth about errors
 
@@ -57,6 +57,6 @@ raised tier and round 1's findings add, and section 8 closes the change.
 
 ## 8. Wrap-up
 
-- [ ] 8.1 `make check` green (cs, stan level 8, all suites); `openspec validate polish-api-and-openapi --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated to `awaiting-gate-2`, naming for the reviewer what the decorator reads from configuration and what the contract tests do and do not prove.
-- [ ] 8.2 Green Actions run on the exact branch head before Gate 2: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/polish-api-and-openapi` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
-- [ ] 8.3 `scripts/pregate-verify.sh gate2 polish-api-and-openapi` passes and `scripts/gate-run.sh polish-api-and-openapi 2 full` is run; findings fixed and re-reviewed with `scripts/gate-run.sh polish-api-and-openapi 2 confirm <round>`. Verify: the change's review record carries a Gate 2 round bound to the requested commit, and its last decision reads `approved`/`confirmed` with no finding row left `open`. (The record is written by the runner, so this task is ticked as the gate is requested — the floor requires every task checked by then.)
+- [x] 8.1 `make check` green (cs, stan level 8, all suites); `openspec validate polish-api-and-openapi --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated to `awaiting-gate-2`, naming for the reviewer what the decorator reads from configuration and what the contract tests do and do not prove.
+- [x] 8.2 Green Actions run on the exact branch head before Gate 2: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/polish-api-and-openapi` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
+- [x] 8.3 `scripts/pregate-verify.sh gate2 polish-api-and-openapi` passes and `scripts/gate-run.sh polish-api-and-openapi 2 full` is run; findings fixed and re-reviewed with `scripts/gate-run.sh polish-api-and-openapi 2 confirm <round>`. Verify: the change's review record carries a Gate 2 round bound to the requested commit, and its last decision reads `approved`/`confirmed` with no finding row left `open`. (The record is written by the runner, so this task is ticked as the gate is requested — the floor requires every task checked by then.)
