@@ -164,6 +164,10 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
             // the user checker refuses
             $responses[400] ??= self::problem('The credential payload is not valid JSON, or does not carry both members.', 400);
             $responses[403] ??= self::problem('The account is blocked.', 403);
+            // the authenticator declines a body it cannot read, no controller
+            // runs, and the kernel answers as it does for a route that is not
+            // there — measured, not assumed (Gate 2 round 2, finding 2)
+            $responses[404] ??= self::problem('The request body is not JSON this endpoint can read, so nothing handled it.', 404);
         }
         if ($path !== $this->authenticatePath) {
             // the authentication endpoint replies before content negotiation
@@ -171,7 +175,7 @@ final readonly class CommonErrorResponses implements OpenApiFactoryInterface
             // finding 3); every other operation can
             $responses[406] ??= self::problem('The requested media type is not one this operation produces.', 406);
         }
-        if (null !== $operation->getRequestBody()) {
+        if (null !== $operation->getRequestBody() && $path !== $this->authenticatePath) {
             $responses[415] ??= self::problem('The request body is not in a media type this operation accepts.', 415);
         }
 

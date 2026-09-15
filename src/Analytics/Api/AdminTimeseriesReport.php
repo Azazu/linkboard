@@ -7,12 +7,15 @@ namespace App\Analytics\Api;
 use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\FromParameter;
 use App\Analytics\Api\Parameter\GranularityParameter;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
 use App\Analytics\Api\Parameter\ToParameter;
 use App\Analytics\Dto\ClickBucket;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Api\RefusedParameters;
 
 /** GET /api/v1/admin/stats/timeseries — clicks per bucket over every link (no distinct visitors). */
 #[ApiResource(
@@ -24,6 +27,8 @@ use App\Analytics\Report\ReportRequest;
             provider: AdminStatsProvider::class,
             parameters: ['from' => new FromParameter(), 'to' => new ToParameter(), 'granularity' => new GranularityParameter(), 'includeBots' => new IncludeBotsParameter()],
             description: 'Clicks per UTC bucket over every link with the running total — same parameters and rules as a link\'s timeseries, without unique visitors. Admin only.',
+            // the report's own parameter rules answer this, not a path rule
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse(RefusedParameters::UNPROCESSABLE)]),
         ),
     ],
 )]

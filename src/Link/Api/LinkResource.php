@@ -14,8 +14,10 @@ use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
 use ApiPlatform\OpenApi\Model\Parameter;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Link\Entity\Link;
 use App\Link\Qr\LinkQrProcessor;
+use App\Shared\Api\RefusedParameters;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -43,7 +45,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             paginationMaximumItemsPerPage: 100,
             paginationClientItemsPerPage: true,
             description: 'The caller\'s links, newest first.',
-            openapi: new OpenApiOperation(parameters: [
+            openapi: new OpenApiOperation(responses: [400 => new OpenApiResponse(RefusedParameters::BAD_REQUEST)], parameters: [
                 new Parameter(name: 'isActive', in: 'query', description: 'true or false', schema: ['type' => 'boolean']),
                 new Parameter(name: 'slug', in: 'query', description: 'case-sensitive substring', schema: ['type' => 'string']),
                 new Parameter(name: 'order[createdAt]', in: 'query', schema: ['type' => 'string', 'enum' => ['asc', 'desc']]),
@@ -92,6 +94,9 @@ use Symfony\Component\Validator\Constraints as Assert;
                 ),
             ],
             description: 'The QR code of the link\'s short URL as SVG (default) or PNG (`?format=png`, 512 × 512 px); `Content-Disposition: inline; filename="<slug>.svg|png"`, `Cache-Control: private, max-age=86400`. Owner or admin.',
+            // `format` is constrained, so a value outside it is a violation
+            // (spec qr-codes), not the framework's 400
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse('`format` is neither `svg` nor `png`.')]),
         ),
         new GetCollection(
             uriTemplate: '/admin/links',
@@ -101,7 +106,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             paginationMaximumItemsPerPage: 100,
             paginationClientItemsPerPage: true,
             description: 'Every user\'s links (admin).',
-            openapi: new OpenApiOperation(parameters: [
+            openapi: new OpenApiOperation(responses: [400 => new OpenApiResponse(RefusedParameters::BAD_REQUEST)], parameters: [
                 new Parameter(name: 'isActive', in: 'query', schema: ['type' => 'boolean']),
                 new Parameter(name: 'slug', in: 'query', schema: ['type' => 'string']),
                 new Parameter(name: 'order[createdAt]', in: 'query', schema: ['type' => 'string', 'enum' => ['asc', 'desc']]),

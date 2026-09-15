@@ -90,6 +90,29 @@ final class OpenApiDocumentTest extends WebTestCase
         }
     }
 
+    public function testAnOperationThatTakesQueryParametersSaysHowItRefusesOne(): void
+    {
+        // an operation with parameters can be given a value it will not take;
+        // which status it answers with is its own (the framework's 400 for a
+        // collection, the analytics rules' 422 for a report), but it must say
+        // one of them (Gate 2 round 2, finding 1)
+        $silent = [];
+        foreach (self::operations() as $name => $operation) {
+            $parameters = array_filter(
+                $operation['parameters'] ?? [],
+                static fn (array $parameter): bool => 'query' === ($parameter['in'] ?? null),
+            );
+            if ([] === $parameters) {
+                continue;
+            }
+            if (!isset($operation['responses']['400']) && !isset($operation['responses']['422'])) {
+                $silent[] = $name;
+            }
+        }
+
+        self::assertSame([], $silent, 'every operation taking a query parameter declares how it refuses one');
+    }
+
     public function testTheKeyCapIsDeclaredOnTheOneOperationThatAnswersIt(): void
     {
         $with = [];

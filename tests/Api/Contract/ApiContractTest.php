@@ -242,9 +242,6 @@ final class ApiContractTest extends LinkApiTestCase
         foreach (['summary', 'timeseries', 'top-links'] as $report) {
             yield ['name' => "admin $report", 'expect' => 200, 'operation' => "GET /api/v1/admin/stats/$report", 'method' => 'GET', 'uri' => "/api/v1/admin/stats/$report", 'as' => '{admin}'];
         }
-        // the delete goes last: the link the other cases use
-        yield ['name' => 'delete link', 'expect' => 204, 'operation' => 'DELETE /api/v1/links/{id}', 'method' => 'DELETE', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}'];
-
         // and the refusals
         yield ['name' => 'anonymous', 'expect' => 401, 'operation' => 'GET /api/v1/links', 'method' => 'GET', 'uri' => '/api/v1/links', 'as' => null];
         yield ['name' => 'stranger', 'expect' => 403, 'operation' => 'GET /api/v1/links/{id}', 'method' => 'GET', 'uri' => '/api/v1/links/{other-link}', 'as' => '{owner}'];
@@ -258,7 +255,25 @@ final class ApiContractTest extends LinkApiTestCase
         // satisfy is not refused — the document says so (Gate 2 round 1, finding 3)
         yield ['name' => 'token with an incompatible Accept', 'expect' => 200, 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => ['email' => 'owner@example.com', 'password' => UserFactory::PASSWORD], 'accept' => 'text/csv'];
         yield ['name' => 'unsupported media type', 'expect' => 415, 'operation' => 'POST /api/v1/links', 'method' => 'POST', 'uri' => '/api/v1/links', 'as' => '{owner}', 'body' => 'targetUrl=https://example.com', 'contentType' => 'text/plain'];
+        // the report parameters are refused by the analytics rules, one value
+        // at a time and across values (Gate 2 round 2, finding 1)
+        yield ['name' => 'a bound that is not a timestamp', 'expect' => 422, 'operation' => 'GET /api/v1/links/{id}/stats/summary', 'method' => 'GET', 'uri' => '/api/v1/links/{link}/stats/summary?from=yesterday', 'as' => '{owner}'];
+        yield ['name' => 'a limit out of range', 'expect' => 422, 'operation' => 'GET /api/v1/links/{id}/stats/countries', 'method' => 'GET', 'uri' => '/api/v1/links/{link}/stats/countries?limit=0', 'as' => '{owner}'];
+        yield ['name' => 'an inverted period', 'expect' => 422, 'operation' => 'GET /api/v1/links/{id}/stats/timeseries', 'method' => 'GET', 'uri' => '/api/v1/links/{link}/stats/timeseries?from=2026-09-08T00:00:00Z&to=2026-09-01T00:00:00Z', 'as' => '{owner}'];
+        yield ['name' => 'hourly over too long a period', 'expect' => 422, 'operation' => 'GET /api/v1/links/{id}/stats/timeseries', 'method' => 'GET', 'uri' => '/api/v1/links/{link}/stats/timeseries?from=2026-06-01T00:00:00Z&to=2026-09-01T00:00:00Z&granularity=hour', 'as' => '{owner}'];
+        yield ['name' => 'a global report parameter', 'expect' => 422, 'operation' => 'GET /api/v1/admin/stats/top-links', 'method' => 'GET', 'uri' => '/api/v1/admin/stats/top-links?limit=500', 'as' => '{admin}'];
+        // a collection's parameters are refused by the framework, with 400
+        yield ['name' => 'a page that is not a number', 'expect' => 400, 'operation' => 'GET /api/v1/links', 'method' => 'GET', 'uri' => '/api/v1/links?page=abc', 'as' => '{owner}'];
+        yield ['name' => 'a filter value the schema refuses', 'expect' => 400, 'operation' => 'GET /api/v1/links', 'method' => 'GET', 'uri' => '/api/v1/links?isActive=maybe', 'as' => '{owner}'];
+        yield ['name' => 'an administrative page that is not a number', 'expect' => 400, 'operation' => 'GET /api/v1/admin/users', 'method' => 'GET', 'uri' => '/api/v1/admin/users?page=abc', 'as' => '{admin}'];
+        // the authenticator declines a body it cannot read and no controller
+        // runs, so the kernel answers 404 — not the 415 an operation would
+        yield ['name' => 'the token endpoint with an unsupported media type', 'expect' => 404, 'operation' => 'POST /api/v1/auth/token', 'method' => 'POST', 'uri' => '/api/v1/auth/token', 'as' => null, 'body' => 'email=a@b.c', 'contentType' => 'text/plain'];
+        yield ['name' => 'an image format that is not one', 'expect' => 422, 'operation' => 'GET /api/v1/links/{id}/qr', 'method' => 'GET', 'uri' => '/api/v1/links/{link}/qr?format=tiff', 'as' => '{owner}', 'accept' => 'image/svg+xml'];
         yield ['name' => 'unacceptable media type', 'expect' => 406, 'operation' => 'GET /api/v1/me', 'method' => 'GET', 'uri' => '/api/v1/me', 'as' => '{owner}', 'accept' => 'text/csv'];
+
+        // last of all: it removes the link every case above needs
+        yield ['name' => 'delete link', 'expect' => 204, 'operation' => 'DELETE /api/v1/links/{id}', 'method' => 'DELETE', 'uri' => '/api/v1/links/{link}', 'as' => '{owner}'];
     }
 
     /**

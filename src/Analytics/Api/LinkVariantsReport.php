@@ -8,12 +8,15 @@ use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\Link;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\FromParameter;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
 use App\Analytics\Api\Parameter\ToParameter;
 use App\Analytics\Dto\Grouped;
 use App\Analytics\Dto\VariantRow;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Api\RefusedParameters;
 
 /** GET /api/v1/links/{id}/stats/variants (spec analytics "Variants report"). */
 #[ApiResource(
@@ -27,6 +30,8 @@ use App\Analytics\Report\ReportRequest;
             security: 'is_granted("ROLE_USER")',
             parameters: ['from' => new FromParameter(), 'to' => new ToParameter(), 'includeBots' => new IncludeBotsParameter()],
             description: 'Clicks and unique visitors per A/B variant among the period\'s clicks that were resolved by a variant (`total`); clicks resolved by a rule or the default target are not part of this report. Owner or admin.',
+            // the report's own parameter rules answer this, not a path rule
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse(RefusedParameters::UNPROCESSABLE)]),
         ),
     ],
 )]

@@ -53,8 +53,12 @@
 
 - Branch run on the exact head (`0180c10`) is green: run 34885879408, `make check EXEC=` native in CI (2026-09-15).
 
+- Gate 2 round 2 (`0ae01cb`, Reviewed-Commit `a0f8edf`): changes-requested — two majors, both real, both measured against the running stack before being fixed. Round 1's corrections were accepted.
+  1. **Refused query parameters were undocumented.** The reports answer 422 for their own rules (`from=yesterday`, `limit=0`, an inverted period, hourly over 90 days) and the collections answer 400 for a value the framework's parameter schema refuses (`page=abc`, `isActive=maybe`) — and API Platform's own default 422 goes only on POST/PATCH/PUT, so a GET's refusal was declared nowhere. Each operation now declares the status it sends, through one shared description, because which status is used is the operation's business and no path rule can tell. The new rule test — every operation taking a query parameter declares 400 or 422 — caught the QR operation while it was being written: `?format=tiff` answers 422, as the `qr-codes` capability requires.
+  2. **The 415 on the token endpoint was unreachable.** It is not an API Platform operation: the authenticator declines a body it cannot read, no controller runs, and the kernel answers as for a missing route. Measured: `Content-Type: text/plain` there answers **404**, not 415. The operation declares 404 with the reason and no 415, and the catalogue's two rows say so.
+
 ## Next step
-`scripts/gate-run.sh polish-api-and-openapi 2 full` — the second Gate 2 round, on the implementation as corrected.
+The user pushes the branch; the executor records the Actions run on the exact head (task 8.2) and then runs `scripts/gate-run.sh polish-api-and-openapi 2 confirm 2` — the confirmation on round 2's two findings.
 
 ## Blockers
 None.

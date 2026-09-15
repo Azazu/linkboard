@@ -7,9 +7,12 @@ namespace App\Analytics\Api;
 use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
 use App\Analytics\Dto\GlobalTotals;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Api\RefusedParameters;
 
 /** GET /api/v1/admin/stats/summary (spec analytics "Global statistics for administrators"). */
 #[ApiResource(
@@ -21,6 +24,8 @@ use App\Analytics\Report\ReportRequest;
             provider: AdminStatsProvider::class,
             parameters: ['includeBots' => new IncludeBotsParameter()],
             description: 'Instance totals: users, links, active links, clicks and clicks today (UTC). No period: `from`/`to` are not part of this report and are ignored. Admin only. Cached 300 s (`generatedAt`).',
+            // the report's own parameter rules answer this, not a path rule
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse(RefusedParameters::UNPROCESSABLE)]),
         ),
     ],
 )]

@@ -8,6 +8,8 @@ use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\Link;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\FromParameter;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
 use App\Analytics\Api\Parameter\ToParameter;
@@ -15,6 +17,7 @@ use App\Analytics\Dto\Devices;
 use App\Analytics\Dto\DeviceTypeRow;
 use App\Analytics\Dto\OsRow;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Api\RefusedParameters;
 
 /** GET /api/v1/links/{id}/stats/devices (spec analytics "Devices report"). */
 #[ApiResource(
@@ -28,6 +31,8 @@ use App\Analytics\Report\ReportRequest;
             security: 'is_granted("ROLE_USER")',
             parameters: ['from' => new FromParameter(), 'to' => new ToParameter(), 'includeBots' => new IncludeBotsParameter()],
             description: 'The period\'s clicks broken down by device type and, separately, by operating system, each with share of the total; null groups clicks detection did not recognise. Owner or admin.',
+            // the report's own parameter rules answer this, not a path rule
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse(RefusedParameters::UNPROCESSABLE)]),
         ),
     ],
 )]

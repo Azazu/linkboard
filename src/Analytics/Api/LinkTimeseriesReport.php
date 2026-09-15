@@ -8,12 +8,15 @@ use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\Link;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\FromParameter;
 use App\Analytics\Api\Parameter\GranularityParameter;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
 use App\Analytics\Api\Parameter\ToParameter;
 use App\Analytics\Dto\TimeBucket;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Api\RefusedParameters;
 
 /**
  * GET /api/v1/links/{id}/stats/timeseries (spec analytics "Timeseries report"):
@@ -30,6 +33,8 @@ use App\Analytics\Report\ReportRequest;
             security: 'is_granted("ROLE_USER")',
             parameters: ['from' => new FromParameter(), 'to' => new ToParameter(), 'granularity' => new GranularityParameter(), 'includeBots' => new IncludeBotsParameter()],
             description: 'Clicks and unique visitors per UTC bucket (`hour` for periods of at most 14 days, or `day`), every bucket of the period present with zeros where nothing happened, plus the running total. Owner or admin.',
+            // the report's own parameter rules answer this, not a path rule
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse(RefusedParameters::UNPROCESSABLE)]),
         ),
     ],
 )]

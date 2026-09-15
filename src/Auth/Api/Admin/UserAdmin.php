@@ -8,7 +8,10 @@ use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Auth\Entity\User;
+use App\Shared\Api\RefusedParameters;
 
 /**
  * Admin view of accounts (spec user-administration): list, block, unblock.
@@ -26,6 +29,8 @@ use App\Auth\Entity\User;
             paginationMaximumItemsPerPage: 100,
             paginationClientItemsPerPage: true,
             description: 'All accounts, newest first.',
+            // the pagination parameters can carry a value the framework refuses
+            openapi: new OpenApiOperation(responses: [400 => new OpenApiResponse(RefusedParameters::BAD_REQUEST)]),
         ),
         new Post(
             uriTemplate: '/admin/users/{id}/block',

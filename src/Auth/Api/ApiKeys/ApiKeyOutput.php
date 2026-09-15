@@ -12,6 +12,7 @@ use ApiPlatform\Metadata\Post;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
 use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Auth\Entity\ApiKey;
+use App\Shared\Api\RefusedParameters;
 
 /**
  * A user's API key as the API shows it (spec api-keys): never the plaintext,
@@ -31,6 +32,8 @@ use App\Auth\Entity\ApiKey;
             paginationMaximumItemsPerPage: 100,
             paginationClientItemsPerPage: true,
             description: 'The caller\'s API keys, newest first — including revoked and expired ones. The plaintext is never shown again.',
+            // the pagination parameters can carry a value the framework refuses
+            openapi: new OpenApiOperation(responses: [400 => new OpenApiResponse(RefusedParameters::BAD_REQUEST)]),
         ),
         new Post(
             uriTemplate: '/api-keys',
