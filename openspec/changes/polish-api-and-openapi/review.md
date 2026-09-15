@@ -58,3 +58,22 @@
 - `git diff --check main...HEAD` and `openspec validate polish-api-and-openapi --strict` passed.
 - Runtime suites and mutation demonstrations were not independently rerun: `make ps` failed with permission denied on /var/run/docker.sock, and local PHP is unavailable. Findings are based on current source and existing behavioral tests; the executor's reported green checks were not independently reproduced.
 - Only review.md was modified; no git write commands were run.
+
+## Confirmation 1 · Gate 2 · Round 2
+**Reviewer:** codex
+**Date:** 2026-09-15
+**Reviewed-Commit:** 07fd0b3e73721dfe26d6ff820e29a92ca9590947
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — All nine report operations explicitly declare 422. The decorator converts these responses to application/problem+json with the required violations schema. Expected-422 contract cases cover malformed bounds, an out-of-range limit, an inverted period, excessive hourly duration and an administrative report. Related collection and QR metadata now declare their respective 400 and 422 refusals, with contract coverage; deletion of the shared link fixture is moved after these requests. |
+| 2 | changes-requested — The code and token-specific expected-404 contract case resolve the runtime/document mismatch without changing authentication behavior: the decorator adds 404 and excludes the token handler from 415. However, the requested reconciliation of the catalogue and planning claims is incomplete. docs/reference/api-errors.md:25 still states unconditionally that a wrong media type is 415, while its 404/415 rows now specify the token exception. design.md:51 still says operations accepting a body document 415, and tasks.md:40 retains the same blanket instruction. Qualify those surviving claims with the token exception (and distinguish unsupported Content-Type from malformed application/json, which remains 400). This is the unresolved claim-reconciliation portion of source finding 2, under AGENTS.md's “Fix the CLAIM, not the line” rule, not a new unrelated finding. |
+
+### Review evidence and limitations
+- Verified the requested branch, an initially clean worktree and HEAD equal to the Reviewed-Commit. Reviewed only a0f8edf54b5e4c550a125844f8e1743ecab99d57..07fd0b3e73721dfe26d6ff820e29a92ca9590947 and collateral source, schemas, tests and documentation reachable from the two named findings; both source rows are dispositioned fixed.
+- Inspected report request validation, problem-details schema construction and installed API Platform/Symfony source. Searched repository documentation and planning artifacts for the affected 415/media-type claims.
+- The requested range passes git diff --check; openspec validate polish-api-and-openapi --strict passes.
+- Runtime tests were not independently rerun: make ps failed with permission denied on /var/run/docker.sock, and local PHP is unavailable. The executor's reported green checks were not independently reproduced.
+- Only review.md was modified; no git write commands were run.
