@@ -7,8 +7,11 @@ may also describe decided design, citing the ADR that decided it.
 
 ## Explanation (understanding-oriented)
 
-_(architecture and domain model pages arrive with the first
-implementing change)_
+- [`explanation/architecture.md`](explanation/architecture.md) — the
+  contexts, the click write path and the analytics read path, and where
+  the boundaries between them are enforced
+- [`explanation/requirements.md`](explanation/requirements.md) — the
+  original brief with its requirement ids
 
 ## How-to (task recipes)
 
@@ -16,6 +19,8 @@ implementing change)_
   project locally (setup, daily commands, reset, troubleshooting)
 - [`how-to/local-mcp.md`](how-to/local-mcp.md) — wire the IDE's MCP
   endpoint for Claude Code
+- [`how-to/benchmarks.md`](how-to/benchmarks.md) — the three performance
+  targets, the commands that measure them and what they measured
 
 ## Reference (facts)
 
