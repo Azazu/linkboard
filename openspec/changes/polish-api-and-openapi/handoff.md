@@ -1,7 +1,7 @@
 # Handoff — polish-api-and-openapi
 
 **Updated:** 2026-09-14 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/polish-api-and-openapi
 
 ## Done this session
@@ -63,8 +63,10 @@
 
 - Branch run on the sweep head (`832ee05`) is green: run 34955082004 (2026-09-15).
 
+- Gate 2 Confirmation 2 of round 2 (`fe58549`, Reviewed-Commit `9b162e3`): both findings confirmed — **Gate 2 passed**. The reviewer states its limits as before: it read the source, the metadata, the contract assertions and the installed Symfony, API Platform and JWT-bundle code, and swept the repository for the media-type claims, but could not reach Docker, so the suite was not rerun there. On this side `make check` is green (841 tests, 11052 assertions) and CI is green on `832ee05` (run 34955082004).
+
 ## Next step
-`scripts/gate-run.sh polish-api-and-openapi 2 confirm 2` — the second confirmation on finding 2. If it fails again, stop and ask the user to arbitrate (AGENTS.md).
+`/git:merge polish-api-and-openapi` — the user's action. Then the user pushes `main`, the executor verifies the run on it and archives the change (apply the `api-docs` and `api-error-format` deltas, remove roadmap row 12).
 
 ## Blockers
 None.
