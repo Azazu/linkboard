@@ -77,16 +77,24 @@ Four records, each for a decision this project actually turned on and weighed al
 
 *What this does not guarantee.* It makes a test process resolve what `.env.test` declares; it does not make the application do so, and it does not stop a future variable from being added to `.env` alone. The guard against that is a test: the four variables are asserted to hold their `.env.test` values, so a divergence fails rather than being discovered by ten confusing failures a month later.
 
+### 6a. The test keypair is generated with the passphrase its environment declares
+
+`make jwt-keys` keeps generating the development keypair from `.env` and gains one change for the test one: the passphrase comes from `.env.test`, read in the recipe, so the value still lives in exactly one file. The target also stops trusting `--skip-if-exists` alone for the test key — it checks that the existing private key opens with the declared passphrase and regenerates it when it does not, because the keys on every machine that ran the old target are already wrong and silently skipping them is what made this defect survive.
+
+*Why in the target and not in the console command.* A console process has the same problem as a test process had, and for the same reason — compose's environment beats the file — but unlike `tests/bootstrap.php` there is no place in the application that knows "this is a test-environment invocation" and may override. The recipe that already says `--env=test` is that place.
+
+*What this does not guarantee.* It fixes the two entry points that exist today. A third way of generating keys — someone running the console command by hand — has the old behaviour, and nothing here can stop that; what changes is that `make init` and `make jwt-keys`, the documented paths, produce a keypair the suite can use.
+
 ## Applicability
 
 | Question | Answer |
 |---|---|
-| Authorization boundary | None is added or moved. The fix changes which values a *test* process reads for `APP_SECRET`, `JWT_PASSPHRASE`, `VISITOR_HASH_SALT` and `COUNTRY_RESOLVERS` — from the development values it has been silently using to the test values `.env.test` declares. The application's own resolution is untouched, and the evidence is a test that asserts each of the four. |
+| Authorization boundary | None is added or moved. The fixes change which values a *test* process reads, and which passphrase a *test* keypair is generated with for `APP_SECRET`, `JWT_PASSPHRASE`, `VISITOR_HASH_SALT` and `COUNTRY_RESOLVERS` — from the development values it has been silently using to the test values `.env.test` declares. The application's own resolution is untouched, and the evidence is a test that asserts each of the four. |
 | Empty / zero / null inputs | A missing `.env.test`, or a variable it does not define, must leave the process environment alone rather than setting an empty value — asserted, because an empty `APP_SECRET` or salt would be worse than the defect being fixed. |
 | Crash before/after an external effect | n/a — the bootstrap reads files and sets variables; there is no external effect to be half-done. |
 | Concurrent writers | n/a — nothing writes. |
 | Deletion / expiry | n/a. |
-| Idempotency of retries | The bootstrap runs once per test process and is idempotent by construction: it assigns values, it does not accumulate. |
+| Idempotency of retries | The bootstrap runs once per test process and is idempotent by construction: it assigns values, it does not accumulate. `make jwt-keys` is idempotent in a stronger sense than before — it now leaves a matching key alone and replaces a mismatched one, so running it twice converges instead of preserving a broken key forever. |
 | Money rounding | n/a — no monetary value exists in this project. |
 
 ## Risks / Trade-offs

@@ -51,6 +51,7 @@ not started until Gate 1 passes.
 ## 7. Gate 1
 
 - [x] 7.1 Request Gate 1 on the corrected artifacts (`scripts/gate-run.sh harden-quality-and-docs 1 full`) and disposition every finding before section 8 starts. Verify: the last Gate 1 record reads `confirmed` or `approved` with no finding row left `open`.
+- [ ] 7.2 Request Gate 1 again for the scope change of section 9 — the `Makefile` leaves the untouched list (proposal, "User decisions", 2026-09-15). Verify: a second Gate 1 record bound to the commit that carries the corrected artifacts reads `approved`/`confirmed` before section 9 is written; AGENTS.md reopens Gate 1 for a change of scope, and this is one.
 
 ## 8. The test environment resolves what it declares
 
@@ -67,14 +68,21 @@ not started until Gate 1 passes.
   fails seven: both environment assertions and the five routing tests that need the fixed country map — the container's `.env` values win again. Restored and re-run: `OK (16 tests, 154 assertions)`. The whole suite then passes **with no `-e` override**: `OK (848 tests, 11090 assertions)`.
 - [x] 8.4 The claim sweep: `docs/how-to/local-development.md` says nothing that implies a local run needs an environment override, and no document tells a reader to pass one. Verify: `rg -n 'COUNTRY_RESOLVERS' docs/ README.md` reviewed — the how-to's note now says the test map holds inside the container as well, and why; nothing anywhere tells a reader to pass an override.
 
-## 9. Wrap-up
+## 9. Key generation declares the same authority
 
-- [x] 9.1 `make check` green **inside the container without any `-e` override** (848 tests, 11 090 assertions); `openspec validate harden-quality-and-docs --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the benchmark numbers and the demonstrated failing inputs.
-- [ ] 9.2 Green Actions run on the exact branch head: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-quality-and-docs` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
+- [ ] 9.1 `make jwt-keys` generates the **test** keypair with the passphrase `.env.test` declares, read in the recipe so the value stays in one file (design decision 6a); the development keypair keeps coming from `.env`. Verify: the recipe run in its exact form on a machine with no `config/jwt/test/`, and the resulting private key opens with the declared passphrase (`openssl rsa -in config/jwt/test/private.pem -passin pass:<declared> -noout -check`).
+- [ ] 9.2 A test key that does not match the declared passphrase is replaced, not skipped. Verify: with a deliberately mismatched key in place, the target regenerates it and the suite passes afterwards — the state every machine that ran the old target is already in; recorded with the command and the output.
+- [ ] 9.3 `make init` end to end produces a working test setup. Verify: `make jwt-keys` followed by `make test` with no override, from a state where `config/jwt/test/` was removed first.
+- [ ] 9.4 The claim sweep: `docs/how-to/local-development.md` and `docs/reference/commands.md` describe what the target now does. Verify: both re-read whole after the last edit; `rg -n 'jwt-keys' docs/ README.md Makefile` reviewed.
+
+## 10. Wrap-up
+
+- [ ] 10.1 `make check` green **inside the container without any `-e` override** (848 tests, 11 090 assertions before section 10; re-run after it); `openspec validate harden-quality-and-docs --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the benchmark numbers and the demonstrated failing inputs.
+- [ ] 10.2 Green Actions run on the exact branch head: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-quality-and-docs` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
 
 ## After every task above is complete — the gate, not a task
 
-Gate 2 is requested once section 9 is done, and it is deliberately not a
+Gate 2 is requested once section 10 is done, and it is deliberately not a
 checkbox: `scripts/gate-run.sh` runs `scripts/pregate-verify.sh gate2` first,
 and that floor rejects any unchecked task — so a task that included "run Gate 2
 and disposition its findings" could never be both truthful and satisfied

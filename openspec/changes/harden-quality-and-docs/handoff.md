@@ -1,7 +1,7 @@
 # Handoff — harden-quality-and-docs
 
 **Updated:** 2026-09-15 · claude
-**State:** implementing
+**State:** awaiting-gate-1
 **Branch:** change/harden-quality-and-docs
 
 ## Done this session
@@ -35,8 +35,10 @@
 
 The consequence is that a fresh `make init` on this branch still produces a test keypair the suite cannot use. Fixing it is one line in the `Makefile` — which this change's proposal names as untouched and row 13a owns — so it is a scope question for the user rather than something to absorb quietly.
 
+- The user chose to fix the key-generation half here and re-request Gate 1, rather than hand it to row 13a or strip the overlapping keys out of `.env`. Artifacts updated before any code: the proposal records the decision and takes the `Makefile` off the untouched list, the design gains decision 6a (the passphrase is read from `.env.test` in the recipe, and a key that does not match it is replaced rather than skipped — every machine that ran the old target already holds a wrong one), and the tasks gain section 9 plus a second Gate 1 task. `scripts/pregate-verify.sh gate1` passes.
+
 ## Next step
-Ask the user where the `make jwt-keys` line belongs (this change, with a Gate 1 re-request for the scope change, or row 13a). Then task 9.2: the user pushes, the executor records the Actions run on the exact head, and Gate 2 is requested per the lifecycle section at the end of `tasks.md`.
+`scripts/gate-run.sh harden-quality-and-docs 1 full` — the second Gate 1, on the widened scope. Section 9 is not written until it reads `approved`/`confirmed`.
 
 ## Blockers
 None.
