@@ -46,9 +46,9 @@ Which paths are public, which the identity limiter exempts and which the per-IP 
 
 ### 2a. Statuses the framework answers, which no operation declares
 
-An unsupported request media type is refused by API Platform's content negotiation with **415** before any operation runs, and the token endpoint's statuses come from `json_login` rather than from a state processor: it answers 400 for a malformed or incomplete credential payload and 403 for a blocked account, and it never performs content negotiation, so it cannot answer 406.
+An unsupported request media type is refused by API Platform's content negotiation with **415** before any operation runs — on the paths API Platform serves. The token endpoint is not one of them: its statuses come from `json_login`, which answers 400 for a credential payload it can parse but not use, 403 for a blocked account, and — for a body it cannot read at all — nothing, so the authenticator declines, no controller runs and the kernel answers **404** as for a route that is not there. It never performs content negotiation either, so it cannot answer 406.
 
-These are properties of the path's *handler*, not of its URI, so the decorator is told about them explicitly rather than inferring them: the operations that accept a body document 415, and the authentication operation's statuses are declared from its own path.
+These are properties of the path's *handler*, not of its URI, so the decorator is told about them explicitly rather than inferring them: the operations API Platform serves with a request body document 415, and the authentication operation's statuses — 400, 401, 403, 404, no 406 and no 415 — are declared from its own path. Every one of them was measured against the running stack before being written down.
 
 *What this does not guarantee:* it is a list, and a list can fall behind the framework. The contract tests are what keep it honest — each of these statuses is exercised by a real request, so a status that stops being reachable, or starts being, shows up as a contract failure rather than as prose.
 

@@ -59,8 +59,10 @@
 
 - Branch run on the fix head (`6b7cd5c`) is green: run 34951710811 (2026-09-15).
 
+- Gate 2 Confirmation 1 of round 2 (`1e34f7b`, Reviewed-Commit `07fd0b3`): finding 1 confirmed; finding 2 changes-requested, correctly. The code and the two catalogue rows were fixed, but the *claim* was not swept: the catalogue's 400 row still said a wrong media type is 415 without qualification, and `design.md` and `tasks.md` still said the operations that accept a body document 415. That is the rule AGENTS.md states — fix the claim, not the line — and I had not applied it. All four places now say that 415 belongs to the operations API Platform serves, that the token endpoint answers 404 for a body it cannot read, and that a body announced as JSON but malformed stays 400 (measured: `POST /api/v1/links` with `{` answers 400).
+
 ## Next step
-`scripts/gate-run.sh polish-api-and-openapi 2 confirm 2` — the confirmation on round 2's two findings.
+The user pushes the branch; the executor records the Actions run on the exact head and then runs `scripts/gate-run.sh polish-api-and-openapi 2 confirm 2` again — the second confirmation on finding 2. If it fails again, stop and ask the user to arbitrate (AGENTS.md).
 
 ## Blockers
 None.
