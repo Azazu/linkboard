@@ -39,3 +39,22 @@
 - `openspec validate polish-api-and-openapi --strict`, `git diff --check main...HEAD` and `scripts/pregate-verify.sh gate1 polish-api-and-openapi` passed; the pre-gate floor reported zero warnings.
 - This is approval of the revised plan, not confirmation of the existing implementation or closure of Gate 2 round 1. Previously checked implementation claims must be reconciled with the pending corrective tasks and demonstrated evidence before Gate 2. Runtime suites were not rerun for this artifact review.
 - Only this review record was written; no git write commands were run.
+
+## Round 2 · Gate 2
+**Reviewer:** codex
+**Date:** 2026-09-15
+**Reviewed-Commit:** a0f8edf54b5e4c550a125844f8e1743ecab99d57
+**Verdict:** changes-requested
+
+### Findings
+| # | Severity | Location | Finding | Status |
+|---|----------|----------|---------|--------|
+| 1 | major | src/Shared/Api/CommonErrorResponses.php:119–180; src/Analytics/Api/LinkSummaryReport.php:25–32; tests/Api/Contract/ApiContractTest.php | Report query validation still produces an undocumented 422. For example, an owner's GET /api/v1/links/{id}/stats/summary?from=yesterday, or countries?limit=0, is rejected with violations (already exercised in LinkReportsTest::testMalformedAndOutOfRangeParameters); cross-parameter failures also throw ValidationException from ReportRequestFactory::fromRequest(). The installed OpenApiFactory adds its default 422 for POST/PATCH/PUT, not GET, the report metadata declares no error override, and this decorator only rewrites existing 422 responses without adding the missing ones. The new contract suite checks report success and parameter names but never their refusals. Declare 422 with the violations schema on the report operations that validate query input, and add expected-422 contract cases covering both individual and cross-parameter validation. | open |
+| 2 | major | src/Shared/Api/CommonErrorResponses.php:174–175; docs/reference/api-errors.md — /errors/415; tests/Api/Contract/ApiContractTest.php | The unconditional request-body rule incorrectly declares 415 for POST /api/v1/auth/token. This route has no API Platform operation/controller at runtime: JsonLoginAuthenticator::supports() declines a text/plain request, AddFormatListener skips a route without API operation metadata, and HttpKernel then reports a missing controller as 404; no input-format provider produces the advertised 415. JSON requests are handled directly by json_login. The correction already exempts this handler from 406 but overlooks the same distinction for 415, and the only unsupported-content-type contract case targets links. Model the token handler's actual unsupported-content-type outcome, remove its unreachable 415, qualify the catalogue and planning claims, and add a token-specific contract case with an expected status. Preserve the stated no-runtime-behavior-change scope. | open |
+
+### Review evidence and limitations
+- Verified branch change/polish-api-and-openapi, an initially clean worktree and HEAD equal to the Reviewed-Commit above. Reviewed the diff against main, AGENTS.md, openspec/config.yaml, change artifacts and prior decisions, shared policy configuration, runtime authentication/limiter handlers, report validation, new documentation and tests, and installed Symfony/API Platform source.
+- The previous round's corrections are present: high-tier Gate 1 approval, shared per-IP method/path policy, identity checks and recorded mutation evidence, token 400/403 and inline examples including expiresAt, expected contract statuses, key-cap coverage, collection ordering/filter cases and example format checks. The findings above identify remaining contract mismatches.
+- `git diff --check main...HEAD` and `openspec validate polish-api-and-openapi --strict` passed.
+- Runtime suites and mutation demonstrations were not independently rerun: `make ps` failed with permission denied on /var/run/docker.sock, and local PHP is unavailable. Findings are based on current source and existing behavioral tests; the executor's reported green checks were not independently reproduced.
+- Only review.md was modified; no git write commands were run.
