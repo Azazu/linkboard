@@ -503,7 +503,12 @@ docker compose exec -T -e COUNTRY_RESOLVERS=bogus php bin/console about
   missing the resolver disables itself with one `warning` and the country is
   unknown; an address that is not in the database is unknown too.
 - In the test environment `COUNTRY_RESOLVERS=fixed` uses a constant map
-  (`tests/Fixture/FixedMapCountryResolver.php`).
+  (`tests/Fixture/FixedMapCountryResolver.php`). That holds inside the
+  container too: compose passes `.env` into the process environment and
+  Symfony's `Dotenv` will not override a real variable with a file's, so
+  `tests/bootstrap.php` re-applies the variables `.env.test` declares — and
+  only those, leaving the connection settings CI provides alone. No local run
+  needs an environment override to behave like CI.
 
 Device, OS, browser and bot detection use `matomo/device-detector`; its regex
 database is parsed once per deploy into the filesystem pool

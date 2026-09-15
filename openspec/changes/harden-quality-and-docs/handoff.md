@@ -1,7 +1,7 @@
 # Handoff — harden-quality-and-docs
 
 **Updated:** 2026-09-15 · claude
-**State:** awaiting-gate-1
+**State:** implementing
 **Branch:** change/harden-quality-and-docs
 
 ## Done this session
@@ -27,8 +27,16 @@
 
 - Gate 1 round 1 (`746efe4`, Reviewed-Commit `e5a7964`): changes-requested — one major, and a real process defect. A task that said "run Gate 2 and disposition its findings" can never be both truthful and satisfied, because `gate-run.sh` runs the floor first and the floor rejects an unchecked task. Fixed: the checkbox now covers only the pre-review CI evidence, and the gate invocation is an un-checkboxed lifecycle section at the end of `tasks.md`. **Worth noting for the process:** the three previous changes worked around this by ticking the gate task as it was run, which is the same false claim in a quieter form — evidence that `AGENTS.md`'s task rules and the floor disagree, and a candidate for a rule change once a fourth change hits it.
 
+- Gate 1 Confirmation 1 (`8d23281`, Reviewed-Commit `cb1e666`): confirmed — **Gate 1 passed**. The reviewer checked the task lifecycle against `gate-run.sh` and `pregate-verify.sh` and states no such circular dependency remains in the change.
+
+- Section 8 implemented after the gate, not before. `tests/bootstrap.php` re-applies the variables `.env.test` and `.env.test.local` declare and nothing else; `tests/Integration/TestEnvironmentTest.php` asserts both halves — every declared variable in force, and the four connection variables CI owns untouched. Demonstrated failing input executed and recorded in task 8.3: with the re-application removed, seven tests fail (both environment assertions and the five routing tests needing the fixed country map); restored, `OK (16 tests, 154 assertions)`, and the whole suite is green **with no `-e` override**: 848 tests, 11 090 assertions.
+
+**One consequence of the fix that is not fixed, and needs a decision.** The same divergence exists one layer down, in key generation. `make jwt-keys` runs `lexik:jwt:generate-keypair --env=test` *inside the container*, where `.env`'s empty `JWT_PASSPHRASE` wins — so it writes a test private key with no passphrase, while `.env.test` (and now the suite) declares `test-only-jwt-passphrase-not-a-secret`. My own `config/jwt/test/` keypair was in exactly that state and had to be regenerated with the passphrase passed explicitly before the suite would pass; the keys are gitignored local artifacts, so nothing in the repository changed. CI is unaffected: it runs `make jwt-keys` natively, where `.env.test` applies.
+
+The consequence is that a fresh `make init` on this branch still produces a test keypair the suite cannot use. Fixing it is one line in the `Makefile` — which this change's proposal names as untouched and row 13a owns — so it is a scope question for the user rather than something to absorb quietly.
+
 ## Next step
-Gate 1 confirmation: `scripts/gate-run.sh harden-quality-and-docs 1 confirm 1`. Section 8 — the environment fix — starts only after Gate 1 reads `confirmed`.
+Ask the user where the `make jwt-keys` line belongs (this change, with a Gate 1 re-request for the scope change, or row 13a). Then task 9.2: the user pushes, the executor records the Actions run on the exact head, and Gate 2 is requested per the lifecycle section at the end of `tasks.md`.
 
 ## Blockers
 None.

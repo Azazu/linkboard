@@ -50,18 +50,26 @@ not started until Gate 1 passes.
 
 ## 7. Gate 1
 
-- [ ] 7.1 Request Gate 1 on the corrected artifacts (`scripts/gate-run.sh harden-quality-and-docs 1 full`) and disposition every finding before section 8 starts. Verify: the last Gate 1 record reads `confirmed` or `approved` with no finding row left `open`.
+- [x] 7.1 Request Gate 1 on the corrected artifacts (`scripts/gate-run.sh harden-quality-and-docs 1 full`) and disposition every finding before section 8 starts. Verify: the last Gate 1 record reads `confirmed` or `approved` with no finding row left `open`.
 
 ## 8. The test environment resolves what it declares
 
-- [ ] 8.1 `tests/bootstrap.php` re-applies the variables `.env.test` and `.env.test.local` define, and only those (design decision 6). Verify: a test asserts that `APP_SECRET`, `JWT_PASSPHRASE`, `VISITOR_HASH_SALT` and `COUNTRY_RESOLVERS` hold their `.env.test` values inside a test process, and that a variable those files do not define — `DATABASE_URL` — is left exactly as the process received it, so CI keeps its own connection settings.
-- [ ] 8.2 A missing file or an undefined variable sets nothing. Verify: the test asserts that no variable is set to an empty string by the mechanism, because an empty `APP_SECRET` or an empty salt would be worse than the defect being fixed.
-- [ ] 8.3 The demonstrated failing input, executed and recorded with its command and output: with the re-application removed, the container's `.env` values win and the redirect suite fails exactly as it did when the defect was found (ten failures, `COUNTRY_RESOLVERS=header,geolite2` in force); restored, the whole suite passes without `-e COUNTRY_RESOLVERS=fixed`.
-- [ ] 8.4 The claim sweep: `docs/how-to/local-development.md` says nothing that implies a local run needs an environment override, and no document tells a reader to pass one. Verify: `rg -n 'COUNTRY_RESOLVERS' docs/ README.md` reviewed.
+- [x] 8.1 `tests/bootstrap.php` re-applies the variables `.env.test` and `.env.test.local` define, and only those (design decision 6). Verify: `tests/Integration/TestEnvironmentTest.php` asserts every declared variable is in force in both `$_ENV` and the process environment, names the four that used to lose so dropping one from `.env.test` fails rather than shrinking the set quietly, and asserts the four connection variables are **not** declared there and that `DATABASE_URL` still reaches the suite from wherever it was set.
+- [x] 8.2 A missing file or an undefined variable sets nothing. Verify: the same test asserts no declared variable carries an empty value, and the bootstrap skips a file that does not exist, so a repository without `.env.test.local` is unaffected.
+- [x] 8.3 The demonstrated failing input, executed and recorded:
+
+  ```
+  # with the re-application removed from tests/bootstrap.php
+  docker compose exec -T php sh -c 'rm -rf var/cache/test'
+  docker compose exec -T php vendor/bin/phpunit tests/Integration/TestEnvironmentTest.php tests/Web/Redirect/RoutingRulesTest.php
+  ```
+
+  fails seven: both environment assertions and the five routing tests that need the fixed country map — the container's `.env` values win again. Restored and re-run: `OK (16 tests, 154 assertions)`. The whole suite then passes **with no `-e` override**: `OK (848 tests, 11090 assertions)`.
+- [x] 8.4 The claim sweep: `docs/how-to/local-development.md` says nothing that implies a local run needs an environment override, and no document tells a reader to pass one. Verify: `rg -n 'COUNTRY_RESOLVERS' docs/ README.md` reviewed — the how-to's note now says the test map holds inside the container as well, and why; nothing anywhere tells a reader to pass an override.
 
 ## 9. Wrap-up
 
-- [ ] 9.1 `make check` green **inside the container without any `-e` override**; `openspec validate harden-quality-and-docs --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the benchmark numbers and the demonstrated failing inputs.
+- [x] 9.1 `make check` green **inside the container without any `-e` override** (848 tests, 11 090 assertions); `openspec validate harden-quality-and-docs --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the benchmark numbers and the demonstrated failing inputs.
 - [ ] 9.2 Green Actions run on the exact branch head: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-quality-and-docs` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
 
 ## After every task above is complete — the gate, not a task
