@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Analytics\Api;
 
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\FromParameter;
 use App\Analytics\Api\Parameter\GranularityParameter;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
 use App\Analytics\Api\Parameter\ToParameter;
 use App\Analytics\Dto\ClickBucket;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Api\RefusedParameters;
 
 /** GET /api/v1/admin/stats/timeseries — clicks per bucket over every link (no distinct visitors). */
 #[ApiResource(
@@ -23,6 +27,8 @@ use App\Analytics\Report\ReportRequest;
             provider: AdminStatsProvider::class,
             parameters: ['from' => new FromParameter(), 'to' => new ToParameter(), 'granularity' => new GranularityParameter(), 'includeBots' => new IncludeBotsParameter()],
             description: 'Clicks per UTC bucket over every link with the running total — same parameters and rules as a link\'s timeseries, without unique visitors. Admin only.',
+            // the report's own parameter rules answer this, not a path rule
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse(RefusedParameters::UNPROCESSABLE)]),
         ),
     ],
 )]
@@ -32,11 +38,17 @@ final readonly class AdminTimeseriesReport
      * @param list<ClickBucket> $buckets
      */
     public function __construct(
+        #[ApiProperty(example: '2026-09-01T00:00:00+00:00')]
         public \DateTimeImmutable $from,
+        #[ApiProperty(example: '2026-10-01T00:00:00+00:00')]
         public \DateTimeImmutable $to,
+        #[ApiProperty(example: 'day')]
         public string $granularity,
+        #[ApiProperty(example: false)]
         public bool $includeBots,
+        #[ApiProperty(example: [['bucket' => '2026-09-01T00:00:00+00:00', 'clicks' => 4210, 'cumulativeClicks' => 4210]])]
         public array $buckets,
+        #[ApiProperty(example: '2026-09-14T09:30:00+00:00')]
         public \DateTimeImmutable $generatedAt,
     ) {
     }

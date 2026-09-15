@@ -8,6 +8,8 @@ use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\Link;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\FromParameter;
 use App\Analytics\Api\Parameter\IncludeBotsParameter;
 use App\Analytics\Api\Parameter\LimitParameter;
@@ -15,6 +17,7 @@ use App\Analytics\Api\Parameter\ToParameter;
 use App\Analytics\Dto\Grouped;
 use App\Analytics\Dto\RefererRow;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Api\RefusedParameters;
 
 /** GET /api/v1/links/{id}/stats/referrers (spec analytics "Referrers report"). */
 #[ApiResource(
@@ -28,6 +31,8 @@ use App\Analytics\Report\ReportRequest;
             security: 'is_granted("ROLE_USER")',
             parameters: ['from' => new FromParameter(), 'to' => new ToParameter(), 'limit' => new LimitParameter(), 'includeBots' => new IncludeBotsParameter()],
             description: 'The `limit` referrer hosts with the most clicks in the period, with share and rank; clicks without a referrer form the `direct` group. Owner or admin.',
+            // the report's own parameter rules answer this, not a path rule
+            openapi: new OpenApiOperation(responses: [422 => new OpenApiResponse(RefusedParameters::UNPROCESSABLE)]),
         ),
     ],
 )]
@@ -37,14 +42,21 @@ final readonly class LinkReferrersReport
      * @param list<RefererRow> $items
      */
     public function __construct(
-        #[ApiProperty(identifier: true)]
+        #[ApiProperty(identifier: true, example: '01920f3a-6f2e-7a1c-9c0d-2b4e8a1d3f57')]
         public string $linkId,
+        #[ApiProperty(example: '2026-09-01T00:00:00+00:00')]
         public \DateTimeImmutable $from,
+        #[ApiProperty(example: '2026-10-01T00:00:00+00:00')]
         public \DateTimeImmutable $to,
+        #[ApiProperty(example: 10)]
         public int $limit,
+        #[ApiProperty(example: false)]
         public bool $includeBots,
+        #[ApiProperty(example: 1842)]
         public int $total,
+        #[ApiProperty(example: [['host' => 'news.example.com', 'clicks' => 610, 'share' => 33.1, 'rank' => 1]])]
         public array $items,
+        #[ApiProperty(example: '2026-09-14T09:30:00+00:00')]
         public \DateTimeImmutable $generatedAt,
     ) {
     }

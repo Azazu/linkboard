@@ -12,6 +12,7 @@ in place; application code arrives through reviewed OpenSpec changes
 |---|---|
 | Run the project locally | [docs/how-to/local-development.md](docs/how-to/local-development.md) |
 | Look up contributor commands | [docs/reference/commands.md](docs/reference/commands.md) |
+| Understand an API error | [docs/reference/api-errors.md](docs/reference/api-errors.md) |
 | See what is planned | [openspec/ROADMAP.md](openspec/ROADMAP.md) |
 | See why any decision was made | [docs/adr/README.md](docs/adr/README.md) |
 | See how AI agents work on this repo | [AGENTS.md](AGENTS.md) |

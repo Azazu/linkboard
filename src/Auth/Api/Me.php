@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Api;
 
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use App\Auth\Entity\User;
@@ -28,9 +29,13 @@ final readonly class Me
      * @param list<string> $roles
      */
     public function __construct(
+        #[ApiProperty(example: '01920f3a-1111-7a1c-9c0d-2b4e8a1d3f57')]
         public string $id,
+        #[ApiProperty(example: 'ada@example.com')]
         public string $email,
+        #[ApiProperty(example: ['ROLE_USER'])]
         public array $roles,
+        #[ApiProperty(example: '2026-08-20T10:00:00+00:00')]
         public \DateTimeImmutable $createdAt,
     ) {
     }

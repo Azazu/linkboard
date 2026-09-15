@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Security;
 
 use App\Shared\Api\ProblemDetails;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,20 +21,38 @@ use Twig\Environment;
  * flood never reaches password hashing. The client IP is the one Symfony
  * derives through the trusted-proxy configuration (FR-KEY-5).
  */
-final readonly class AuthRateLimitSubscriber implements EventSubscriberInterface
+final class AuthRateLimitSubscriber implements EventSubscriberInterface
 {
-    /** @var list<array{method: string, pattern: string}> */
-    private const array GUARDED = [
+    /**
+     * The web pages this limiter guards. The API's own rules are injected —
+     * `config/services.yaml` holds them, and the OpenAPI decorator documents
+     * 429 for exactly the set they describe, method included (change
+     * polish-api-and-openapi, design decision 2).
+     *
+     * @var list<array{method: string, pattern: string}>
+     */
+    private const array GUARDED_PAGES = [
         ['method' => 'POST', 'pattern' => '#^/login$#'],
         ['method' => 'POST', 'pattern' => '#^/register$#'],
-        ['method' => 'POST', 'pattern' => '#^/api/v1/auth/#'],
     ];
 
+    /** @var list<array{method: string, pattern: string}> */
+    private array $guarded;
+
+    /**
+     * @param list<array{method: string, pattern: string}> $apiRules anchored patterns without delimiters
+     */
     public function __construct(
         #[Target('auth_ip')]
         private RateLimiterFactoryInterface $authIpLimiter,
         private Environment $twig,
+        #[Autowire('%app.api.ip_limited_rules%')]
+        array $apiRules = [],
     ) {
+        $this->guarded = self::GUARDED_PAGES;
+        foreach ($apiRules as $rule) {
+            $this->guarded[] = ['method' => $rule['method'], 'pattern' => '#'.$rule['pattern'].'#'];
+        }
     }
 
     public static function getSubscribedEvents(): array
@@ -47,7 +66,7 @@ final readonly class AuthRateLimitSubscriber implements EventSubscriberInterface
             return;
         }
         $request = $event->getRequest();
-        if (!self::isGuarded($request)) {
+        if (!$this->isGuarded($request)) {
             return;
         }
 
@@ -62,9 +81,9 @@ final readonly class AuthRateLimitSubscriber implements EventSubscriberInterface
             : $this->page($retryAfter));
     }
 
-    public static function isGuarded(Request $request): bool
+    public function isGuarded(Request $request): bool
     {
-        foreach (self::GUARDED as $rule) {
+        foreach ($this->guarded as $rule) {
             if ($request->isMethod($rule['method']) && 1 === preg_match($rule['pattern'], $request->getPathInfo())) {
                 return true;
             }

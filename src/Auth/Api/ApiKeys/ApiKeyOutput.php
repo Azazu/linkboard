@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Auth\Api\ApiKeys;
 
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
+use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Auth\Entity\ApiKey;
+use App\Shared\Api\RefusedParameters;
 
 /**
  * A user's API key as the API shows it (spec api-keys): never the plaintext,
@@ -28,6 +32,8 @@ use App\Auth\Entity\ApiKey;
             paginationMaximumItemsPerPage: 100,
             paginationClientItemsPerPage: true,
             description: 'The caller\'s API keys, newest first — including revoked and expired ones. The plaintext is never shown again.',
+            // the pagination parameters can carry a value the framework refuses
+            openapi: new OpenApiOperation(responses: [400 => new OpenApiResponse(RefusedParameters::BAD_REQUEST)]),
         ),
         new Post(
             uriTemplate: '/api-keys',
@@ -37,6 +43,11 @@ use App\Auth\Entity\ApiKey;
             security: 'is_granted("ROLE_USER")',
             status: 201,
             description: 'Create a named key (`name` 1–64 characters, optional future `expiresAt`). The response carries the plaintext `key` exactly once. At most 10 active keys per user (409 beyond).',
+            // the one refusal no path rule can imply: it belongs to this
+            // operation alone (change polish-api-and-openapi, decision 1)
+            openapi: new OpenApiOperation(responses: [
+                409 => new OpenApiResponse('The account already holds the maximum number of active keys; revoke one first. Nothing was created.'),
+            ]),
         ),
         new Delete(
             uriTemplate: '/api-keys/{id}',
@@ -50,12 +61,19 @@ use App\Auth\Entity\ApiKey;
 final readonly class ApiKeyOutput
 {
     public function __construct(
+        #[ApiProperty(example: '01920f3a-2222-7a1c-9c0d-2b4e8a1d3f57')]
         public string $id,
+        #[ApiProperty(example: 'deploy monitor')]
         public string $name,
+        #[ApiProperty(example: 'lb_7f3a9c')]
         public string $prefix,
+        #[ApiProperty(example: '2027-01-01T00:00:00+00:00')]
         public ?\DateTimeImmutable $expiresAt,
+        #[ApiProperty(example: '2026-09-01T08:15:00+00:00')]
         public \DateTimeImmutable $createdAt,
+        #[ApiProperty(example: '2026-09-14T06:02:00+00:00')]
         public ?\DateTimeImmutable $lastUsedAt,
+        #[ApiProperty(example: '2026-09-20T12:00:00+00:00')]
         public ?\DateTimeImmutable $revokedAt,
     ) {
     }
