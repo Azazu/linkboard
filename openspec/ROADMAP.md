@@ -15,7 +15,6 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 12 | `polish-api-and-openapi` | OpenAPI descriptions and examples for every operation, filters and ordering, `ApiTestCase` contract tests, error catalogue in `docs/reference/` | medium |
 | 13 | `harden-quality-and-docs` | README with screenshots, architecture diagram and benchmarks; PHPStan strictness sweep; migration down/up in CI; architecture tests; ADR index | low |
 
 ## Stretch — only after stages 1–4 are archived

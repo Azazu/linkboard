@@ -1,7 +1,7 @@
 # Handoff — polish-api-and-openapi
 
 **Updated:** 2026-09-14 · claude
-**State:** ready-to-merge
+**State:** archived
 **Branch:** change/polish-api-and-openapi
 
 ## Done this session
@@ -65,8 +65,12 @@
 
 - Gate 2 Confirmation 2 of round 2 (`fe58549`, Reviewed-Commit `9b162e3`): both findings confirmed — **Gate 2 passed**. The reviewer states its limits as before: it read the source, the metadata, the contract assertions and the installed Symfony, API Platform and JWT-bundle code, and swept the repository for the media-type claims, but could not reach Docker, so the suite was not rerun there. On this side `make check` is green (841 tests, 11052 assertions) and CI is green on `832ee05` (run 34955082004).
 
+- Merged into `main` as `0ece5c9` (`--no-ff`, "gate 2 approved") after `openspec validate --strict` and `make check` on the branch; the user pushed `main` and its run 34980194633 on `0ece5c9` is green.
+
+- Archived on 2026-09-15: the four `api-docs` requirements and the one `api-error-format` requirement are appended to their capabilities verbatim (checked block by block), leaving them with 7 and 4 requirements; roadmap row 12 removed. `docs/explanation/requirements.md` §7 keeps its row, as it keeps every shipped one.
+
 ## Next step
-`/git:merge polish-api-and-openapi` — the user's action. Then the user pushes `main`, the executor verifies the run on it and archives the change (apply the `api-docs` and `api-error-format` deltas, remove roadmap row 12).
+Stage 4 ends with row 13 `harden-quality-and-docs` (tier `low`): README with screenshots, an architecture diagram and benchmarks, a PHPStan strictness sweep, migration down/up in CI, architecture tests and an ADR index. Start with `/workflow:start harden-quality-and-docs`.
 
 ## Blockers
 None.
