@@ -17,7 +17,7 @@ See `proposal.md` — Why. What shapes the approach is what exists, measured bef
 
 **Non-Goals** (beyond the proposal's)
 
-- Touching the gate floor in any way — that is row 13a, and this change's tier depends on it staying true.
+- Touching the gate floor's composition — the PHPStan level, `make check`'s steps, the CI jobs. That is row 13a. The one floor-adjacent change here is decision 6, which the user's tier decision brought in deliberately.
 - Making a missed performance target pass, or tuning anything to make a number look better.
 - A generated architecture diagram. It is drawn by hand because it says what the *design* is, which no generator knows.
 
@@ -67,12 +67,36 @@ Four records, each for a decision this project actually turned on and weighed al
 
 *What this does not guarantee:* an ADR written after the fact is a record, not a diary. Each says which change decided it and on what date, so the reader can find the original argument rather than trusting the summary.
 
+### 6. The test environment is resolved from `.env.test`, in the test bootstrap
+
+`tests/bootstrap.php` re-applies, after Symfony's `bootEnv`, exactly the variables `.env.test` (and `.env.test.local`, per the same convention) defines — and nothing else. A variable that file does not name is left as the process found it.
+
+*Why here and not elsewhere.* The defect is that a real environment variable beats a dotenv file, by design, and compose puts `.env` into the process. Fixing it in `docker-compose.yml` would mean listing test variables on a service that also serves the application; fixing it in `.env` would mean deleting values the application needs. The test bootstrap is the one place that knows a test process is running and is allowed to be opinionated about it.
+
+*Why only the variables that file defines.* CI sets `DATABASE_URL`, `REDIS_URL`, `LOCK_DSN` and `MESSENGER_TRANSPORT_DSN` deliberately, and `.env.test` names none of them — so they stay CI's. Overriding everything would take CI's own configuration away from it, which is the one way this fix could break the thing it is meant to make consistent.
+
+*What this does not guarantee.* It makes a test process resolve what `.env.test` declares; it does not make the application do so, and it does not stop a future variable from being added to `.env` alone. The guard against that is a test: the four variables are asserted to hold their `.env.test` values, so a divergence fails rather than being discovered by ten confusing failures a month later.
+
+## Applicability
+
+| Question | Answer |
+|---|---|
+| Authorization boundary | None is added or moved. The fix changes which values a *test* process reads for `APP_SECRET`, `JWT_PASSPHRASE`, `VISITOR_HASH_SALT` and `COUNTRY_RESOLVERS` — from the development values it has been silently using to the test values `.env.test` declares. The application's own resolution is untouched, and the evidence is a test that asserts each of the four. |
+| Empty / zero / null inputs | A missing `.env.test`, or a variable it does not define, must leave the process environment alone rather than setting an empty value — asserted, because an empty `APP_SECRET` or salt would be worse than the defect being fixed. |
+| Crash before/after an external effect | n/a — the bootstrap reads files and sets variables; there is no external effect to be half-done. |
+| Concurrent writers | n/a — nothing writes. |
+| Deletion / expiry | n/a. |
+| Idempotency of retries | The bootstrap runs once per test process and is idempotent by construction: it assigns values, it does not accumulate. |
+| Money rounding | n/a — no monetary value exists in this project. |
+
 ## Risks / Trade-offs
 
 - **A benchmark that flatters** → every number is published with the command, the dataset size and the machine, and a missed target is stated as missed. The section is worthless if it is a sales page.
 - **The architecture rules pass vacuously** → each is demonstrated failing on a planted violation before it is believed, and each test asserts it actually scanned files (an empty file list fails).
 - **Screenshots and diagram drift** → both are regenerable from one documented command, and the diagram's elements are checked against `src/` while writing it.
-- **Scope creeping into the floor** → the one thing that would change this change's tier. `phpstan.dist.neon`, the `Makefile` and `.github/workflows/` are named in the proposal as untouched, and a task that finds itself needing them stops and raises the tier.
+- **The fix hides a real difference rather than fixing it** → the opposite risk: if a test genuinely needs a production-shaped value it now gets the test one. The four variables are named in the design and asserted in a test, so the set is visible rather than implicit.
+- **Taking CI's own configuration away from it** → only the variables `.env.test` defines are re-applied, and CI's four connection variables are not among them; the CI run on the branch head is what proves it.
+- **Scope creeping further into the floor** → the one thing that would change this change's tier again. `phpstan.dist.neon`, the `Makefile` and `.github/workflows/` are named in the proposal as untouched, and a task that finds itself needing them stops and raises the tier.
 
 ## Migration Plan
 
