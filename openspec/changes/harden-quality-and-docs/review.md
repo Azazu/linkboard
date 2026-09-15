@@ -9,7 +9,7 @@
 ### Findings
 | # | Severity | Location | Finding | Status |
 |---|----------|----------|---------|--------|
-| 1 | major | openspec/changes/harden-quality-and-docs/tasks.md · task 9.2 | Task 9.2 includes running Gate 2 and fixing/confirming its findings as part of its completion. However, `scripts/gate-run.sh` runs `scripts/pregate-verify.sh gate2` before invoking the reviewer, and that floor rejects any unchecked task. Keeping 9.2 truthful therefore prevents Gate 2 from starting; checking it beforehand would claim a review and confirmation that have not occurred. This violates the Gate 1 requirement that each task be feasible at its lifecycle point. Limit the checkbox to the pre-review CI evidence and place the Gate 2 invocation and subsequent finding disposition in an uncheckboxed lifecycle/handoff instruction, so every task can truthfully be complete before Gate 2 is requested. | open |
+| 1 | major | openspec/changes/harden-quality-and-docs/tasks.md · task 9.2 | Task 9.2 includes running Gate 2 and fixing/confirming its findings as part of its completion. However, `scripts/gate-run.sh` runs `scripts/pregate-verify.sh gate2` before invoking the reviewer, and that floor rejects any unchecked task. Keeping 9.2 truthful therefore prevents Gate 2 from starting; checking it beforehand would claim a review and confirmation that have not occurred. This violates the Gate 1 requirement that each task be feasible at its lifecycle point. Limit the checkbox to the pre-review CI evidence and place the Gate 2 invocation and subsequent finding disposition in an uncheckboxed lifecycle/handoff instruction, so every task can truthfully be complete before Gate 2 is requested. | fixed |
 
 ### Validation
 

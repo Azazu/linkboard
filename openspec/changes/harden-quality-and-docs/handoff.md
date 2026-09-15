@@ -1,7 +1,7 @@
 # Handoff — harden-quality-and-docs
 
 **Updated:** 2026-09-15 · claude
-**State:** proposing
+**State:** awaiting-gate-1
 **Branch:** change/harden-quality-and-docs
 
 ## Done this session
@@ -15,8 +15,20 @@
 
 **What the design says it cannot guarantee**, so nobody reads more into it: the architecture rules are text scans, so a violation written through a variable class name or built in a collaborator passes — each test's docblock names its own blind spot; the benchmarks are single-machine numbers published with their machine, and a missed target is published as missed; the diagram and the screenshots can drift silently, and their mitigation is that one command regenerates each.
 
+- Implemented while the tier was `low` (sections 1–6), touching only documents and tests:
+  - **The three rules of NFR-QA-2** as source-scanning tests, each shown failing on a planted violation and each naming its own blind spot. The controller rule permits `EntityManagerInterface::flush()` — a unit-of-work commit is not a query — which `RegistrationController` uses; that it flushes directly rather than through a use case is worth a later change and is recorded here rather than refactored.
+  - **Benchmarks**, all three with their commands, machine and distributions in `docs/how-to/benchmarks.md`. Redirect p50 20.4 ms / p95 ≈ 22 ms — met. Eight of nine reports 43–169 ms uncached on 1 000 005 clicks — met; **the global top-links report p95 303 ms against a 300 ms target — missed, published as missed**, and 309 ms when re-measured prod-like. Worker 10 000 messages in 15.55 s → 643/s — met. A first worker figure of 488/s came from polling the queue every two seconds and was replaced with an exact count, not kept because it was close enough.
+  - **The diagram** as Mermaid, rendered by Mermaid itself in headless Chromium (`tests/Acceptance/mermaid-check.mjs`): 13 nodes, 136 KB of SVG. The npm build needs a DOM and cannot parse headlessly, which is why the check is a browser run.
+  - **Screenshots** from the acceptance browser against a seeded stack; each was opened and looked at, not assumed.
+  - **README** rewritten, and the `scaffold` claim swept: the only remaining hits name the historical change `scaffold-symfony-app`.
+  - **ADR-002 to ADR-005**, each stating what it does not guarantee; the index lists every record.
+
+- **Then the defect that raised the tier.** Recreating the `php` container for the benchmarks made ten redirect tests fail locally while CI stayed green. Cause, verified on a clean tree: compose passes `.env` into the process environment and Symfony's `Dotenv` never overrides a real variable with a file's, so `.env.test` loses on the four variables `.env` also sets — `APP_SECRET`, `JWT_PASSPHRASE`, `VISITOR_HASH_SALT`, `COUNTRY_RESOLVERS`. The suite has been running locally with the development salt and passphrase. With `-e COUNTRY_RESOLVERS=fixed` the whole suite is green (844 tests, 11 060 assertions). The user raised the tier to `high` and chose to fix it here; artifacts were corrected and Gate 1 requested before any code.
+
+- Gate 1 round 1 (`746efe4`, Reviewed-Commit `e5a7964`): changes-requested — one major, and a real process defect. A task that said "run Gate 2 and disposition its findings" can never be both truthful and satisfied, because `gate-run.sh` runs the floor first and the floor rejects an unchecked task. Fixed: the checkbox now covers only the pre-review CI evidence, and the gate invocation is an un-checkboxed lifecycle section at the end of `tasks.md`. **Worth noting for the process:** the three previous changes worked around this by ticking the gate task as it was run, which is the same false claim in a quieter form — evidence that `AGENTS.md`'s task rules and the floor disagree, and a candidate for a rule change once a fourth change hits it.
+
 ## Next step
-`/opsx:apply harden-quality-and-docs` — implement in the task order. Tier `low`: no gate; `make check` and a green Actions run on the branch head are the floor before merge.
+Gate 1 confirmation: `scripts/gate-run.sh harden-quality-and-docs 1 confirm 1`. Section 8 — the environment fix — starts only after Gate 1 reads `confirmed`.
 
 ## Blockers
 None.

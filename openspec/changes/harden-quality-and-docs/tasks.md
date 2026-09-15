@@ -62,4 +62,19 @@ not started until Gate 1 passes.
 ## 9. Wrap-up
 
 - [ ] 9.1 `make check` green **inside the container without any `-e` override**; `openspec validate harden-quality-and-docs --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the benchmark numbers and the demonstrated failing inputs.
-- [ ] 9.2 Green Actions run on the exact branch head: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-quality-and-docs` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head. Then Gate 2 on the diff: `scripts/gate-run.sh harden-quality-and-docs 2 full`, findings fixed and confirmed.
+- [ ] 9.2 Green Actions run on the exact branch head: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-quality-and-docs` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
+
+## After every task above is complete — the gate, not a task
+
+Gate 2 is requested once section 9 is done, and it is deliberately not a
+checkbox: `scripts/gate-run.sh` runs `scripts/pregate-verify.sh gate2` first,
+and that floor rejects any unchecked task — so a task that included "run Gate 2
+and disposition its findings" could never be both truthful and satisfied
+(Gate 1 round 1, finding 1). The lifecycle step is:
+
+1. `scripts/gate-run.sh harden-quality-and-docs 2 full`.
+2. Fix every finding, update its Status in `review.md`, and re-review with
+   `scripts/gate-run.sh harden-quality-and-docs 2 confirm <round>`.
+3. The gate has passed when the last Gate 2 record reads `approved` or
+   `confirmed` with no finding row left `open`; `scripts/workflow-verify.sh
+   merge harden-quality-and-docs` is what checks that before the merge.
