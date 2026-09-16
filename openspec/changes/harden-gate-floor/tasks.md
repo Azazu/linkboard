@@ -23,7 +23,7 @@ them to make its own check pass would prove nothing.
 
 ## 3. The typed JSON accessor, and `tests` at level 9
 
-- [ ] 3.1 `tests/Support/Json.php`: decodes a response body and reads one key at a time on top of `PHPUnit\Framework\Assert`, so a missing or wrong-typed field fails as an assertion naming the field (design decision 3). Verify: `tests/Unit/Support/JsonTest.php` asserts each reader returns the typed value and that each failure is an `ExpectationFailedException` whose message names the key.
+- [x] 3.1 `tests/Support/Json.php`: `decode()`/`decodeList()` for a body and `string()`, `int()`, `float()`, `bool()`, `nullableString()`, `map()`, `items()` and `objects()` for one field, each asserting through `PHPUnit\Framework\Assert` so a missing or wrong-typed field fails naming the field (design decision 3). Verify, executed: `tests/Unit/Support/JsonTest.php` — 13 tests, 142 assertions — checks every reader's return type and nine failure modes, each asserting the message names the field (`"nope" is present`, `"tags" is an object, not a list`), plus a body that is a list, a body that is a bare string and a response with no body at all. No `assert()` and no `@phpstan-var`: the two readers that cannot be expressed as a single PHPUnit assertion narrow with `Assert::fail()`, which returns `never`.
 - [ ] 3.2 `tests/Api` converted (157 findings, 20 files). Verify: `vendor/bin/phpstan analyse --level=9 tests/Api` clean and the suite green; committed as its own commit.
 - [ ] 3.3 `tests/Integration` converted (70 findings). Verify: as above, its own commit.
 - [ ] 3.4 `tests/Unit` converted (49 findings, almost all in `tests/Unit/Link/Rules/RulesSchemaParityTest.php`). Verify: as above, its own commit.
