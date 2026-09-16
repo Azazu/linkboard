@@ -58,15 +58,17 @@ enforced.
 | Target | Measured | |
 |---|---|---|
 | Redirect p95 ≤ 50 ms server time | **p50 20.4 ms, p95 23.0 ms** | met |
-| Report p95 ≤ 300 ms uncached on 1 M clicks | **8 of 9 reports, p95 56–299 ms** | met |
-| — a link's device breakdown | **p95 324 ms** | missed |
+| Report p95 ≤ 300 ms uncached on 1 M clicks | **8 of 9 reports, p95 64–300 ms** | met |
+| — a link's device breakdown | **p95 317 ms** | missed |
 | Worker ≥ 500 clicks/s | **10 000 messages in 11.65 s → 858/s** | met |
 
 [`docs/how-to/benchmarks.md`](docs/how-to/benchmarks.md) carries the commands,
 the machine and the full distributions — including what the redirect's numbers
 look like when the PHP-FPM pool, rather than the application, is the
-bottleneck, and which report sits within five milliseconds of its target. All
-three runs are prod-like. One target is missed and is published as missed.
+bottleneck, which report sits on its target exactly, and what monthly
+partitioning did to these numbers: nothing beyond their own run-to-run spread,
+because a 60-day dataset has almost nothing to prune. All three runs are
+prod-like. One target is missed and is published as missed.
 
 ## Security notes
 

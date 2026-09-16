@@ -1,7 +1,7 @@
 # Handoff — stretch-partition-clicks
 
 **Updated:** 2026-09-16 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/stretch-partition-clicks
 
 ## Done this session
@@ -32,8 +32,18 @@
 
 - Gate 1 Confirmation 2 (`d8fef63`, Reviewed-Commit `be353c1`): **confirmed — Gate 1 passed.** All four findings closed. The reviewer notes what it has not seen: the promised tests are promises until Gate 2.
 
+- **Implemented after the gate, in the task order.**
+  - **The conversion** (`migrations/Version20260916120000.php`): rename aside, partitioned parent keyed `(id, occurred_at)`, `clicks_ensure_partition()`, partitions for the window and the horizon and the data, copy, drop, indexes, FK. On the local database: **1 030 279 rows before and after, 3.93 s**, 17 partitions from `clicks_2025_08` to `clicks_2026_12`. `make migrations-roundtrip` passes over it (388 schema objects, identical fingerprint after down and up).
+  - **A freshly migrated database accepts what the project writes**: on a scratch database created from nothing, the migrations leave 17 partitions, `app:demo:seed --days=60` succeeds, and the suite's oldest fixture date (2026-03-28) inserts. That was Gate 1's first finding and it would have failed in CI.
+  - **The command** `app:clicks:partitions` (+ `--retention`), validated before any DDL, with `ClickRetention` tagged `app.startup_check` so an unparseable window stops the boot instead of reaching the handler. 18 cases, twelve of them invalid settings asserting nothing changed.
+  - **The durable boundary**: dropping records how far data was removed, in the same transaction, never backwards; the handler's one new guard compares against the later of the window and that record. The demonstrated failing input is the replay after widening the window — without the record it counts the click twice.
+  - **What retention does to the numbers**, as API tests: the straddling month keeps its rows, the all-time figures fall to what survives, `links.click_count` keeps its value and diverges, and a returning visitor whose earlier clicks are gone counts as new.
+  - **`src/Analytics/` is untouched** (`git diff main --stat` empty) and the whole suite passes on the partitioned table.
+  - **ADR-006**, §3.4 and §9 of the brief, the how-to, the command reference.
+- **The measurement, three runs, published as it came out.** Partitioning moved **nothing** beyond each report's own run-to-run spread: the dataset's whole history is 60 days, so of seventeen partitions only three hold rows and a 30-day period touches two — there was almost nothing to prune. `link/devices` still misses (316.8 ms, was 324.3); `admin/top-links` sits on 300.0 ms and swings 251–427 across runs. The 426.8 ms run was made on partitions autovacuum had not analysed yet, which is why the published recipe now runs `ANALYZE clicks` — a partitioned table keeps statistics per partition, and measuring a bulk load without them measures the planner's ignorance. The answer to report latency remains the `click_daily` aggregate §9 names and this plan left out.
+
 ## Next step
-`/opsx:apply stretch-partition-clicks`. Section order is the task order: the migration and the fresh-database check, the entity and the handler's one guard, the maintenance command with its validation and its boundary, what retention does to the numbers, the proof that the reports did not change, the documents, and the measurement. `make check` green at each commit, and `make migrations-roundtrip` is part of section 2 rather than an afterthought.
+The user pushes the branch; the executor records the green Actions run on the new head (four jobs) and then requests Gate 2 per the lifecycle section of `tasks.md`.
 
 ## Blockers
 None.

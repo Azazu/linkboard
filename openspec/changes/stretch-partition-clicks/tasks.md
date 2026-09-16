@@ -60,12 +60,12 @@ that floor, not move it.
 
 ## 8. The measurement
 
-- [ ] 8.1 The benchmark is re-run as published, on a million clicks, after the conversion. Verify: `docs/how-to/benchmarks.md` section 2 carries the new table, and the change states what pruning did to each report — including whether the missed `devices` report (p95 324 ms) still misses.
-- [ ] 8.2 The README's benchmark rows match. Verify: the README re-read whole after the edit; a target that is still missed is still published as missed.
+- [x] 8.1 The benchmark is re-run as published, on a million clicks, after the conversion. Verify, executed three times: `docs/how-to/benchmarks.md` section 2 carries the new table and says plainly what partitioning did — **nothing beyond each report's own run-to-run spread**, because the dataset's whole history is 60 days and of seventeen partitions only three hold rows, so a 30-day period has almost nothing to prune. The missed `devices` report still misses (316.8 ms against 324.3 before); `admin/top-links` sits on 300.0 ms and is the noisy one (426.8 / 251.0 / 300.0 across the three runs). The recipe gained `ANALYZE clicks`, because a partitioned table keeps statistics per partition and the 426.8 ms run was made on empty ones — measuring the planner's ignorance rather than the schema. The section states that the answer to report latency remains the `click_daily` aggregate this plan left out.
+- [x] 8.2 The README's benchmark rows match. Verify, executed: the README re-read whole after the edit; the rows now read `8 of 9 reports, p95 64–300 ms` and `a link's device breakdown — p95 317 ms — missed`, and the paragraph beneath says what partitioning did and why a 60-day dataset cannot show it.
 
 ## 9. Wrap-up
 
-- [ ] 9.1 `make check` green inside the container with no environment override; `openspec validate stretch-partition-clicks --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the measured conversion time, the row counts and the benchmark numbers.
+- [x] 9.1 `make check` green inside the container with no environment override — **931 tests, 22 190 assertions**; `openspec validate stretch-partition-clicks --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the measured conversion time, the row counts and the benchmark numbers.
 - [ ] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/stretch-partition-clicks` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: all four jobs green, the `migrations` job among them — which is what proves the conversion and its `down` work on a database this machine did not set up.
 
 ## After every task above is complete — the gate, not a task
