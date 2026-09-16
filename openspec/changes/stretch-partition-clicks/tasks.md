@@ -66,7 +66,7 @@ that floor, not move it.
 ## 9. Wrap-up
 
 - [x] 9.1 `make check` green inside the container with no environment override — **931 tests, 22 190 assertions**; `openspec validate stretch-partition-clicks --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the measured conversion time, the row counts and the benchmark numbers.
-- [x] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/stretch-partition-clicks` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify, executed: run **35138605772** on `629ae79`, `completed`/`success`, all four jobs green — `detect`, `workflow`, `php` and `migrations`, the last being what proves the conversion **and its `down`** work on a PostgreSQL this machine did not set up.
+- [x] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/stretch-partition-clicks` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify, executed: run **35138605772** on `629ae79` before Gate 2 and run **35140323695** on `c5cfbf1` after the round 1 fixes, both `completed`/`success` with all four jobs green — `migrations` among them, which is what proves the conversion and its `down` work on a PostgreSQL this machine did not set up.
 
 ## After every task above is complete — the gate, not a task
 

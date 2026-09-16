@@ -48,8 +48,10 @@
   1. **The boundary recorded the configured cutoff, not what was actually removed.** A two-month run on the 16th drops June, keeps July, and recorded 16 July — so a later first delivery from 10 July would have been discarded for ever although its month was never touched, contradicting the scenario I had written into the spec myself. It now records the greatest upper bound among the partitions it dropped: the first day of the month it kept. Two tests assert the exact date and that a click from the surviving month is not behind the boundary; recording the cutoff again fails both.
   2. **The decision and the insert were two moments.** A handler could judge a click recordable, pause, and insert after a retention run had dropped its month and a later run re-provisioned it — the double count the boundary exists to prevent, with an in-flight handler added. The guard now runs inside the insert's own transaction, holding a SHARED advisory lock; retention takes the same lock EXCLUSIVELY across its drops. The regression is deterministic rather than a race: a second connection holds the exclusive lock, the handler gets a 250 ms `lock_timeout`, and the test asserts it fails waiting with no row written — removing the shared lock makes it insert straight through.
 
+- Branch run on the head that carries the round 1 fixes (`c5cfbf1`) is green: run 35140323695 (2026-09-16), all four jobs.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head and re-reviews round 1 with `scripts/gate-run.sh stretch-partition-clicks 2 confirm 1`.
+Re-review round 1: `scripts/gate-run.sh stretch-partition-clicks 2 confirm 1`.
 
 ## Blockers
 None.
