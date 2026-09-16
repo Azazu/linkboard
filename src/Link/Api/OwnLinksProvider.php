@@ -11,6 +11,7 @@ use ApiPlatform\State\ProviderInterface;
 use App\Auth\Entity\User;
 use App\Link\LinkRepositoryInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 /**
@@ -40,7 +41,8 @@ final readonly class OwnLinksProvider implements ProviderInterface
         if (!$user instanceof User) {
             throw new AccessDeniedException();
         }
-        $query = ListQueryFactory::fromRequest($context['request'] ?? null);
+        $request = $context['request'] ?? null;
+        $query = ListQueryFactory::fromRequest($request instanceof Request ? $request : null);
         [$page, $offset, $limit] = $this->pagination->getPagination($operation, $context);
         $items = array_map($this->publicUrl->toResource(...), $this->links->findPageForOwner($user->getId(), $query, $offset, $limit));
 

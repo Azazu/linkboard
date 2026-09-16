@@ -7,6 +7,7 @@ namespace App\Analytics\Query;
 use App\Analytics\Dto\ClickBucket;
 use App\Analytics\Dto\TimeBucket;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Db\Row;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -30,10 +31,10 @@ final readonly class TimeseriesQuery
     public function buckets(ReportRequest $request): array
     {
         return array_map(static fn (array $row): TimeBucket => new TimeBucket(
-            Sql::utc((string) $row['bucket']),
-            (int) $row['clicks'],
-            (int) $row['uniques'],
-            (int) $row['cumulative'],
+            Sql::utc(Row::string($row, 'bucket')),
+            Row::int($row, 'clicks'),
+            Row::int($row, 'uniques'),
+            Row::int($row, 'cumulative'),
         ), $this->rows($request, withUniques: true));
     }
 
@@ -45,9 +46,9 @@ final readonly class TimeseriesQuery
     public function clickBuckets(ReportRequest $request): array
     {
         return array_map(static fn (array $row): ClickBucket => new ClickBucket(
-            Sql::utc((string) $row['bucket']),
-            (int) $row['clicks'],
-            (int) $row['cumulative'],
+            Sql::utc(Row::string($row, 'bucket')),
+            Row::int($row, 'clicks'),
+            Row::int($row, 'cumulative'),
         ), $this->rows($request, withUniques: false));
     }
 

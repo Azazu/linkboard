@@ -9,6 +9,7 @@ use ApiPlatform\State\Pagination\Pagination;
 use ApiPlatform\State\Pagination\TraversablePaginator;
 use ApiPlatform\State\ProviderInterface;
 use App\Link\LinkRepositoryInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * GET /api/v1/admin/links — every user's links (ROLE_ADMIN via operation security).
@@ -32,7 +33,8 @@ final readonly class AllLinksProvider implements ProviderInterface
      */
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): TraversablePaginator
     {
-        $query = ListQueryFactory::fromRequest($context['request'] ?? null);
+        $request = $context['request'] ?? null;
+        $query = ListQueryFactory::fromRequest($request instanceof Request ? $request : null);
         [$page, $offset, $limit] = $this->pagination->getPagination($operation, $context);
         $items = array_map($this->publicUrl->toResource(...), $this->links->findPage($query, $offset, $limit));
 

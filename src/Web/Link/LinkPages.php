@@ -69,7 +69,7 @@ final readonly class LinkPages
      * rows cannot represent refuses the switch with a message instead of
      * quietly dropping what the rows cannot hold.
      *
-     * @param FormInterface<mixed> $form
+     * @param FormInterface<LinkFormData> $form
      */
     public function switchView(FormInterface $form, RulesFormData $data): RulesViewSwitch
     {
@@ -137,7 +137,7 @@ final readonly class LinkPages
      * Whether that button of the rules form was the one submitted. The
      * interface does not carry isClicked(); a submit button's form does.
      *
-     * @param FormInterface<mixed> $form
+     * @param FormInterface<LinkFormData> $form
      */
     private static function clicked(FormInterface $form, string $button): bool
     {
@@ -154,7 +154,7 @@ final readonly class LinkPages
      * belongs on the form. Returns the canonical document, or null to clear the
      * rules; false means the form has errors and nothing should be written.
      *
-     * @param FormInterface<mixed> $form
+     * @param FormInterface<LinkFormData> $form
      *
      * @return array<string, mixed>|false|null
      */

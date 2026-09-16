@@ -6,6 +6,7 @@ namespace App\Auth\Repository;
 
 use App\Auth\Entity\User;
 use App\Auth\UserRepositoryInterface;
+use App\Shared\Db\OneResult;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -17,9 +18,12 @@ final readonly class DoctrineUserRepository implements UserRepositoryInterface
 
     public function findByEmail(string $email): ?User
     {
-        return $this->em->createQuery('SELECT u FROM App\Auth\Entity\User u WHERE LOWER(u.email) = LOWER(:email)')
-            ->setParameter('email', $email)
-            ->getOneOrNullResult();
+        return OneResult::orNull(
+            $this->em->createQuery('SELECT u FROM App\Auth\Entity\User u WHERE LOWER(u.email) = LOWER(:email)')
+                ->setParameter('email', $email)
+                ->getOneOrNullResult(),
+            User::class,
+        );
     }
 
     public function findById(Uuid $id): ?User

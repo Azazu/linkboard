@@ -7,6 +7,7 @@ namespace App\Analytics\Query;
 use App\Analytics\Dto\ClickBucket;
 use App\Analytics\Dto\OwnerTotals;
 use App\Analytics\Report\Period;
+use App\Shared\Db\Row;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Types\Types;
 use Symfony\Component\Uid\Uuid;
@@ -57,11 +58,11 @@ final readonly class OwnerDashboardQuery
         }
 
         return new OwnerTotals(
-            (int) $row['links'],
-            (int) $row['active_links'],
-            (int) $row['clicks'],
-            (int) $row['uniques'],
-            (int) $row['clicks_today'],
+            Row::int($row, 'links'),
+            Row::int($row, 'active_links'),
+            Row::int($row, 'clicks'),
+            Row::int($row, 'uniques'),
+            Row::int($row, 'clicks_today'),
         );
     }
 
@@ -104,9 +105,9 @@ final readonly class OwnerDashboardQuery
         ], ['from' => Types::DATETIMETZ_IMMUTABLE, 'to' => Types::DATETIMETZ_IMMUTABLE]);
 
         return array_map(static fn (array $row): ClickBucket => new ClickBucket(
-            Sql::utc((string) $row['bucket']),
-            (int) $row['clicks'],
-            (int) $row['cumulative'],
+            Sql::utc(Row::string($row, 'bucket')),
+            Row::int($row, 'clicks'),
+            Row::int($row, 'cumulative'),
         ), $rows);
     }
 }

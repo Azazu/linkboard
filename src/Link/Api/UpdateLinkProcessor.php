@@ -51,7 +51,8 @@ final readonly class UpdateLinkProcessor implements ProcessorInterface
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): LinkResource
     {
-        $present = self::presentKeys($context['request'] ?? null);
+        $request = $context['request'] ?? null;
+        $present = self::presentKeys($request instanceof Request ? $request : null);
         $id = $uriVariables['id'] ?? null;
         $link = (\is_string($id) && Uuid::isValid($id)) ? $this->links->findById(Uuid::fromString($id)) : null;
         if (null === $link) {

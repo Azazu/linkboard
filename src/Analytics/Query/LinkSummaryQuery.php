@@ -6,6 +6,7 @@ namespace App\Analytics\Query;
 
 use App\Analytics\Dto\SummaryFigures;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Db\Row;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -48,15 +49,18 @@ final readonly class LinkSummaryQuery
             throw new \RuntimeException('The summary statement returned no row.');
         }
 
+        $firstAt = Row::nullableString($row, 'first_at');
+        $lastAt = Row::nullableString($row, 'last_at');
+
         return new SummaryFigures(
-            (int) $row['total'],
-            (int) $row['uniques'],
-            null === $row['first_at'] ? null : Sql::utc((string) $row['first_at']),
-            null === $row['last_at'] ? null : Sql::utc((string) $row['last_at']),
-            (int) $row['today'],
-            (int) $row['in_period'],
-            (int) $row['in_previous'],
-            null === $row['delta'] ? null : (float) $row['delta'],
+            Row::int($row, 'total'),
+            Row::int($row, 'uniques'),
+            null === $firstAt ? null : Sql::utc($firstAt),
+            null === $lastAt ? null : Sql::utc($lastAt),
+            Row::int($row, 'today'),
+            Row::int($row, 'in_period'),
+            Row::int($row, 'in_previous'),
+            Row::nullableFloat($row, 'delta'),
         );
     }
 

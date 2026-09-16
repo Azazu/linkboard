@@ -57,6 +57,14 @@ final class ListLinksTest extends LinkApiTestCase
         self::assertResponseStatusCodeSame(400);
         $this->api($client, $token, 'GET', '/api/v1/links?order[slug]=asc');
         self::assertResponseStatusCodeSame(400);
+
+        // an order whose key is not a field name, or whose value is not a
+        // word, is refused rather than stringified into the check above
+        // (change harden-gate-floor)
+        $this->api($client, $token, 'GET', '/api/v1/links?order[0]=desc');
+        self::assertResponseStatusCodeSame(400);
+        $this->api($client, $token, 'GET', '/api/v1/links?order[createdAt][]=desc');
+        self::assertResponseStatusCodeSame(400);
     }
 
     public function testItemReadCarriesShortUrlAndClickCount(): void

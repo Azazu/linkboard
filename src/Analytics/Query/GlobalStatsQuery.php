@@ -6,6 +6,7 @@ namespace App\Analytics\Query;
 
 use App\Analytics\Dto\GlobalTotals;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Db\Row;
 use Doctrine\DBAL\Connection;
 
 /** Spec analytics "Global statistics for administrators": the totals of the summary. */
@@ -31,7 +32,7 @@ final readonly class GlobalStatsQuery
             throw new \RuntimeException('The totals statement returned no row.');
         }
 
-        return new GlobalTotals((int) $row['users'], (int) $row['links'], (int) $row['active'], (int) $row['clicks'], (int) $row['today']);
+        return new GlobalTotals(Row::int($row, 'users'), Row::int($row, 'links'), Row::int($row, 'active'), Row::int($row, 'clicks'), Row::int($row, 'today'));
     }
 
     private function bots(ReportRequest $request): string
