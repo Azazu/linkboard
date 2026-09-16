@@ -20,3 +20,25 @@
 - Read the proposal, design, tasks, handoff, `.openspec.yaml`, `AGENTS.md` and `openspec/config.yaml`; checked the existing migration, CI, Makefile and verifier mechanisms against the plan.
 - `openspec validate harden-gate-floor --strict` passed.
 - `scripts/pregate-verify.sh gate1 harden-gate-floor` passed with zero warnings. The mechanical floor does not detect the lifecycle and isolation issues above.
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-16
+**Reviewed-Commit:** b9cf01349a9a7294e457cf856802a408e45433ba
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Task 8.4 now covers only pre-merge requirements reconciliation; roadmap removal is an un-checkboxed post-merge archive step. The named task no longer depends on passing Gate 2 or archiving first. |
+| 2 | changes-requested — Design decision 4 and task 5.2 now require successful creation before cleanup and preserve crash leftovers, resolving the destructive ownership design. The requested negative verification remains incomplete: task 7.5 covers a non-empty response, but not failed exclusive creation of an already existing empty database; task 7.6 only runs twice and compares names, without requiring overlap or proving that one run's cleanup cannot drop the other's database. Specify a create-collision failure case (including an empty existing target) with no migration or drop, and a synchronized overlapping-run case that holds one owned database live while the other finishes or fails and verifies cleanup affects only its owner. Random names reduce collisions; the exclusive-create failure path is what makes a collision safe and needs its own demonstrated failing input. |
+| 3 | confirmed — Decision 4a and tasks 5.3/7.7 share the production SQL with repeatable real-PostgreSQL fixtures for indexes, column nullability/default/type and constraints, require named differences, and require executed extraction-removal mutations to fail. Task 7.2 separately verifies the shell comparison's nonzero exit and printed diff; the former claim that stub output proves SQL coverage is removed. |
+| 4 | confirmed — Task 3.6 replaces equal assertion counts with an explained accessor-related delta, names added tests separately, and requires direct inspection of original assertions in each converted file. |
+
+### Validation
+
+- Reviewed only the diff from `d30af22939912558645ce18f4525841af033f511` to the Reviewed-Commit and context reachable from the source findings; no unrelated findings introduced.
+- Verified branch `change/harden-gate-floor`, HEAD equal to the Reviewed-Commit, and an initially clean worktree.
+- `openspec validate harden-gate-floor --strict` passed.
+- `scripts/pregate-verify.sh gate1 harden-gate-floor` passed with zero warnings; it does not establish the missing ownership-test coverage.
+- This is confirmation of planning artifacts at Gate 1; implementation and the planned database tests remain for Gate 2.
