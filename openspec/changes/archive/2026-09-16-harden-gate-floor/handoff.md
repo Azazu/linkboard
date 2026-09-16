@@ -1,7 +1,7 @@
 # Handoff — harden-gate-floor
 
 **Updated:** 2026-09-16 · claude
-**State:** ready-to-merge
+**State:** merged
 **Branch:** change/harden-gate-floor
 
 ## Done this session
@@ -47,7 +47,7 @@
 - Gate 2 Confirmation 1 (`4b96811`, Reviewed-Commit `6c75ca6`): **confirmed — Gate 2 passed.** The reviewer checked the connection-resolution fix against the installed DBAL source, and this time had a container: it ran `scripts/migrations_roundtrip_test.sh` itself (56 passed, 0 failed) and `SchemaFingerprintTest` against PostgreSQL (5 tests, 49 assertions). It notes what it did not rerun: full `make check` and remote CI.
 
 ## Next step
-The user pushes this commit and merges (`/git:merge harden-gate-floor`), then `/opsx:archive` — `skip_specs`, so the archive syncs no capability delta and only removes roadmap row 13a, which closes stage 4.
+Merged into `main` as `a9df690`; the Actions run on that commit (35128903826) is green on all four jobs. Archived from here — `skip_specs`, so no capability delta is synced and the archive commit only removes roadmap row 13a, which closes stage 4. Nothing is queued after it: what remains in `openspec/ROADMAP.md` is the stretch section.
 
 ## Blockers
 None.
