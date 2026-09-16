@@ -109,9 +109,10 @@ type-level edit — if a test was asserting nothing useful, it still is.
 1. resolve a scratch name — the configured database plus `_roundtrip_` and eight
    random hex characters — and refuse to continue if it somehow equals the
    configured one,
-2. create it, and **abort without dropping anything** if the create fails or if
-   the database that answers is not empty: a database this run did not create is
-   never dropped,
+2. create it with `CREATE DATABASE`, issued over the configured connection —
+   PostgreSQL's own uniqueness is the exclusivity, so a name that already
+   exists fails here, before any migration and before any drop, and this run
+   owns the database if and only if that statement succeeded,
 3. `doctrine:migrations:migrate latest` — every `up`,
 4. fingerprint the schema,
 5. `doctrine:migrations:migrate first` — every `down`,
@@ -131,17 +132,37 @@ failure names the line that differs.
 plus a defensive initial drop destroys an unrelated database that happens to
 carry that name, and two invocations against the same configured database — a
 developer and a CI job, or two CI jobs — would drop each other's schema
-mid-run (Gate 1 round 1, finding 2). A per-run name makes the script's target
-unshared by construction, which is what "owns" means here; the equality guard
-and the printed name stay, but they are not what provides the isolation.
+mid-run (Gate 1 round 1, finding 2). A per-run name makes a collision unlikely;
+it is not what makes one safe.
+
+*What makes a collision safe: the create is exclusive, and ownership follows
+from it.* `CREATE DATABASE` is atomic and fails on a name that exists —
+measured on 2026-09-16: the second `bin/console dbal:run-sql 'CREATE DATABASE
+…'` exits `7` with `already exists`. So the script does not check whether the
+name is free and then take it; it takes it, and a failure means the name was
+somebody else's. Nothing is migrated and nothing is dropped on that path.
+`doctrine:database:create` is deliberately not used for this: it reports an
+existing database as a notice and exits `0`, which would turn a collision into
+a silent adoption — exactly the case this has to refuse. The equality guard
+against the configured name and the printed name stay, but they are hints for a
+human, not the isolation.
 
 *What a crash leaves behind.* A `trap` covers every exit including a failed
-step; only a signal the shell cannot handle (SIGKILL, a pulled plug) leaves a
-database, and because names are never reused, that leftover is inert rather
-than something the next run silently deletes. The script prints the name it
-created before it creates it, so the leftover is identifiable, and removing it
+step, and it drops exactly one database: the one whose `CREATE DATABASE`
+returned success in this process. Only a signal the shell cannot handle
+(SIGKILL, a pulled plug) leaves a database, and because that leftover's name is
+never proposed again and would fail the exclusive create if it were, it is
+inert rather than something the next run silently deletes. The script prints
+the name before creating it, so the leftover is identifiable, and removing it
 is a deliberate human command — this design would rather leak a scratch
 database than drop one it does not own.
+
+*Two runs that overlap in time.* Each owns a different database and each
+`trap` names only its own, so the one that finishes first drops only its own
+and the other keeps running against a database the first never names. That is a
+claim with a demonstrated failing input rather than an argument: the stub suite
+holds one run live inside its migration step while a second completes, then
+asserts which databases were dropped and by which run.
 
 *Why not `doctrine:schema:validate`.* It answers a different question — does the
 mapping match the database — and it fails today for two reasons that have
@@ -243,10 +264,10 @@ possible.
 |---|---|
 | Crash before/after an external effect | The target creates a scratch database and drops it from a `trap`, so every exit path including a failed step cleans up. A signal the shell cannot handle leaves the database behind; because the name carries eight random characters and is never reused, the next run is unaffected and nothing deletes a database this run did not create. The name is always the configured one plus a suffix, and the target refuses if the two are somehow equal. |
 | Empty/zero/null inputs | The heart of decision 2. `Row::int()` on `null` must throw rather than return `0`; on an empty result set the query returns no rows and the reader is never called; a numeric string is accepted because that is what PDO returns for `bigint` and `numeric`. Each of these is a unit test. |
-| Deletion/expiry | The round trip drops a database and every table its migrations created. It drops only the database this run created and found empty — a database that already existed with tables aborts the run untouched — and it prints the name before creating it. |
+| Deletion/expiry | The round trip drops a database and every table its migrations created. It drops only the database whose `CREATE DATABASE` this run issued successfully; an existing database of that name — empty or not — fails the create and aborts the run untouched. The name is printed before creation. |
 | Idempotency of retries | `make migrations-roundtrip` must converge when run twice in a row, including after a failed run that left the scratch database behind. Verified by running it twice and by running it after an interrupted one. |
 | Authorization boundary | n/a for a decision, but named because the diff touches it: `DoctrineApiKeyRepository` and `DoctrineUserRepository` return `mixed` today and get typed returns. No lookup, no voter and no firewall rule changes; the tests that cover those boundaries are the evidence. |
-| Concurrent writers | Two invocations against the same configured database — a developer and CI, or two CI jobs — used to mean two runs dropping and recreating one `<db>_roundtrip` under each other (Gate 1 round 1, finding 2). The per-run name removes the shared object: each run creates, owns and drops a database no other run knows the name of. The stub suite asserts two invocations resolve different names. |
+| Concurrent writers | Two invocations against the same configured database — a developer and CI, or two CI jobs — used to mean two runs dropping and recreating one `<db>_roundtrip` under each other (Gate 1 round 1, finding 2). Isolation now comes from an atomic `CREATE DATABASE`: a run owns exactly the database its own create returned success for, and drops exactly that. The stub suite holds one run live while another completes and asserts each dropped only its own, and a separate case asserts a create collision aborts with no migration and no drop. |
 | Money rounding | n/a — no money in this project. |
 
 ## Risks / Trade-offs
@@ -264,10 +285,11 @@ possible.
   it runs in parallel with `php`, and it is the only evidence that the
   specification's reversibility claim is true.
 - **The scratch database could collide with one that already exists, or with
-  another run** → the name carries eight random characters, so runs do not share
-  a target; the script creates the database and aborts untouched if what answers
-  is not empty, so it never drops something it did not create; and it refuses if
-  the resolved name equals the configured one (Gate 1 round 1, finding 2).
+  another run** → the name carries eight random characters, so a collision is
+  unlikely; `CREATE DATABASE` is what makes one safe, because it fails on an
+  existing name and nothing is migrated or dropped on that path; and the script
+  refuses if the resolved name equals the configured one (Gate 1 round 1,
+  finding 2, and its confirmation).
 - **A killed run leaks a scratch database** → accepted deliberately: the
   alternative is a script that deletes a database it does not own. The name is
   printed before creation, so a leaked one is identifiable and removing it is a
