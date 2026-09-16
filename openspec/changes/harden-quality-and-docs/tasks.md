@@ -82,7 +82,7 @@ nothing else in that file.
 ## 10. Wrap-up
 
 - [x] 10.1 `make check` green **inside the container without any `-e` override** (848 tests, 11 090 assertions, re-run after section 9); `openspec validate harden-quality-and-docs --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the benchmark numbers and the demonstrated failing inputs.
-- [ ] 10.2 Green Actions run on the exact branch head: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-quality-and-docs` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head.
+- [x] 10.2 Green Actions run on the exact branch head: the user pushes the change branch; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-quality-and-docs` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head — run 35064944178 on `b33d46a`, `completed`/`success`, which is also what proves `make jwt-keys EXEC=` works natively.
 
 ## After every task above is complete — the gate, not a task
 

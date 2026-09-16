@@ -50,8 +50,10 @@ The consequence is that a fresh `make init` on this branch still produces a test
 
   Evidence, all executed and recorded in tasks 9.1–9.5: a keypair generated from nothing satisfies all three conditions; the old target's key (`b5433b69…`) and an unencrypted key (`647f5d05…`) are both replaced; a compliant pair is left byte for byte; a public key swapped for another's is detected and the pair regenerated; a `.env.test.local` override drives both the generator and the suite; and the `make init` path ends with `OK (43 tests, 359 assertions)` and no environment override anywhere. `make check` is green: 848 tests, 11 090 assertions.
 
+- Branch run on the exact head (`b33d46a`) is green: run 35064944178 (2026-09-16). It runs `make jwt-keys EXEC=` natively, so it is also the evidence that the new script works outside the container — the one thing the local runs could not show.
+
 ## Next step
-Task 10.2: the user pushes the branch, the executor records the Actions run on the exact head — which is also what proves `make jwt-keys EXEC=` still works natively — and then Gate 2 is requested per the lifecycle section at the end of `tasks.md`.
+Gate 2: `scripts/gate-run.sh harden-quality-and-docs 2 full`, per the lifecycle section at the end of `tasks.md`.
 
 ## Blockers
 None.
