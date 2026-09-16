@@ -100,11 +100,17 @@ never recreated to absorb one.
 
 The expiry boundary SHALL be the later of two things: the start of the
 configured retention window, and the point up to which click data has actually
-been dropped. The second SHALL be recorded when a partition is dropped and SHALL
-never move backwards — so lengthening the retention window later does not make
-a message whose record was already removed eligible again. Without it, widening
-the window after a month was dropped would let a replayed message be recorded a
-second time and increment the link's lifetime counter twice.
+been dropped — the **end of the last month actually removed**, not the cutoff
+the run was configured with, so a month the run kept stays recordable. That
+point SHALL be recorded when a partition is dropped and SHALL never move
+backwards — so lengthening the retention window later does not make a message
+whose record was already removed eligible again. Without it, widening the window
+after a month was dropped would let a replayed message be recorded a second time
+and increment the link's lifetime counter twice.
+
+The decision that a message is inside the boundary and the writing of its record
+SHALL be atomic with respect to a retention run: a message SHALL NOT be judged
+against one state of the data and then written against another.
 
 #### Scenario: A first delivery that arrives after its month expired
 - **WHEN** a message whose `occurred_at` is older than the retention window is handled for the first time
@@ -142,6 +148,14 @@ setting, having created and dropped nothing.
 #### Scenario: Dropping a month records how far the data has been removed
 - **WHEN** the command drops the partitions of every month up to and including 2026-07
 - **THEN** the recorded expiry boundary is the end of 2026-07 afterwards, and a later run with a longer window leaves that record where it is
+
+#### Scenario: A month the run kept stays recordable
+- **WHEN** a run's cutoff falls inside a month, so that month is kept while the earlier ones are dropped
+- **THEN** the recorded boundary is the start of the kept month, and a first delivery dated inside the kept month is still recorded rather than discarded
+
+#### Scenario: A retention run cannot land between a message's decision and its record
+- **WHEN** a message is being handled while a retention run is dropping months
+- **THEN** either the message is recorded before the run removes anything, or it is judged against the state the run left — never recorded on the strength of a decision the run has since invalidated
 
 #### Scenario: A month entirely outside the window is dropped
 - **WHEN** the retention window is 13 months and the command runs with data in a partition whose last day is older than that

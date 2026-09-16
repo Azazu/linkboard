@@ -11,6 +11,8 @@ use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -231,6 +233,36 @@ final class ClickRecordedHandlerTest extends KernelTestCase
         $this->handler()($message);
 
         self::assertTrue($this->log->hasInfoThatContains('the link no longer exists'));
+    }
+
+    public function testTheHandlerWaitsWhileRetentionIsDroppingRatherThanDecidingAgainstAStaleSchema(): void
+    {
+        // Finding 2 of Gate 2 round 1: the eligibility decision and the insert
+        // must not straddle a drop. Proven without timing or threads — a second
+        // connection holds retention's exclusive lock, and the handler is given
+        // a lock timeout, so "it waits" becomes an observable failure instead
+        // of a race nobody can reproduce.
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $message = self::messageAt((string) $link->getId(), new \DateTimeImmutable('-1 day'));
+
+        $maintenance = DriverManager::getConnection(self::connection()->getParams());
+        $maintenance->beginTransaction();
+        $maintenance->executeStatement('SELECT pg_advisory_xact_lock(?)', [ClickRetention::LOCK_KEY]);
+
+        try {
+            self::connection()->executeStatement("SET lock_timeout = '250ms'");
+            $this->handler()($message);
+            self::fail('the handler decided and inserted while retention held the lock');
+        } catch (DriverException $e) {
+            self::assertStringContainsString('lock timeout', strtolower($e->getMessage()));
+        } finally {
+            self::connection()->executeStatement('SET lock_timeout = 0');
+            $maintenance->rollBack();
+            $maintenance->close();
+        }
+
+        self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$message->linkId])));
+        self::assertSame(0, self::clickCount($link->getId()), 'and nothing was counted');
     }
 
     private static function messageAt(string $linkId, \DateTimeImmutable $at): ClickRecorded

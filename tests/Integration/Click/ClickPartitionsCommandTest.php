@@ -10,6 +10,7 @@ use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -87,19 +88,95 @@ final class ClickPartitionsCommandTest extends KernelTestCase
         self::assertSame(2, $this->clickCount($link), 'only the clicks of the dropped month are gone');
     }
 
-    public function testDroppingRecordsHowFarDataWasRemovedAndNeverMovesItBack(): void
+    public function testTheRecordedBoundaryIsTheEndOfTheLastMonthActuallyRemoved(): void
+    {
+        // not the configured cutoff: a two-month window on the 16th keeps the
+        // month the cutoff falls in, so data was removed through the START of
+        // that month, and a later first delivery from its surviving days must
+        // still be recordable (Gate 2 round 1, finding 1)
+        $link = $this->link();
+        $this->click($link, new \DateTimeImmutable('-4 months'));
+
+        $this->maintain(months: '2', horizon: '3', retention: true);
+
+        $boundary = $this->retention('2', '3')->droppedThrough();
+        self::assertNotNull($boundary, 'dropping records the point data was removed through');
+        $expected = new \DateTimeImmutable(self::monthDate('-2 months'));
+        self::assertSame(
+            $expected->format('Y-m-d'),
+            $boundary->format('Y-m-d'),
+            'the end of the last removed month, which is the first day of the month that survived',
+        );
+    }
+
+    public function testAClickInTheSurvivingStraddlingMonthIsStillRecordableAfterWidening(): void
+    {
+        $link = $this->link();
+        $this->click($link, new \DateTimeImmutable('-4 months'));
+        $this->maintain(months: '2', horizon: '3', retention: true);
+
+        // the month the cutoff fell in was never removed, so a first delivery
+        // from its days is inside the widened window and must be accepted
+        $survivor = new \DateTimeImmutable(self::monthDate('-2 months'));
+        self::assertFalse(
+            $this->retention('13', '3')->isExpired($survivor->modify('+9 days'), new \DateTimeImmutable()),
+            'a click from the month retention kept is not behind the boundary',
+        );
+    }
+
+    public function testTheBoundaryNeverMovesBackwards(): void
     {
         $link = $this->link();
         $this->click($link, new \DateTimeImmutable('-4 months'));
 
         $this->maintain(months: '2', horizon: '3', retention: true);
         $boundary = $this->retention('2', '3')->droppedThrough();
-        self::assertNotNull($boundary, 'dropping records the point data was removed through');
 
         // a longer window later must not move the record backwards: a click
         // that is gone stays gone as far as the handler is concerned
         $this->maintain(months: '13', horizon: '3', retention: true);
         self::assertEquals($boundary, $this->retention('13', '3')->droppedThrough());
+    }
+
+    public function testRetentionCannotDropWhileAHandlerHoldsItsDecision(): void
+    {
+        // the two sides of the race take one advisory lock: shared in the
+        // handler, exclusive in retention (Gate 2 round 1, finding 2). Proven
+        // deterministically with two connections rather than with timing.
+        $handler = $this->connection();
+        $maintenance = DriverManager::getConnection($handler->getParams());
+
+        $handler->beginTransaction();
+        $handler->executeStatement('SELECT pg_advisory_xact_lock_shared(?)', [ClickRetention::LOCK_KEY]);
+
+        try {
+            self::assertFalse(
+                (bool) $maintenance->fetchOne('SELECT pg_try_advisory_xact_lock(?)', [ClickRetention::LOCK_KEY]),
+                'retention cannot take the lock while a handler holds its decision',
+            );
+        } finally {
+            $handler->rollBack();
+            $maintenance->close();
+        }
+    }
+
+    public function testAHandlerCannotDecideWhileRetentionIsDropping(): void
+    {
+        $maintenance = $this->connection();
+        $handler = DriverManager::getConnection($maintenance->getParams());
+
+        $maintenance->beginTransaction();
+        $maintenance->executeStatement('SELECT pg_advisory_xact_lock(?)', [ClickRetention::LOCK_KEY]);
+
+        try {
+            self::assertFalse(
+                (bool) $handler->fetchOne('SELECT pg_try_advisory_xact_lock_shared(?)', [ClickRetention::LOCK_KEY]),
+                'a handler waits rather than deciding against a schema that is being changed',
+            );
+        } finally {
+            $maintenance->rollBack();
+            $handler->close();
+        }
     }
 
     public function testNothingIsDroppedWithoutTheRetentionOption(): void
@@ -187,6 +264,11 @@ final class ClickPartitionsCommandTest extends KernelTestCase
                 ORDER BY child.relname
                 SQL), 'partition'),
         );
+    }
+
+    private static function monthDate(string $modifier): string
+    {
+        return (new \DateTimeImmutable($modifier))->format('Y-m-01');
     }
 
     private static function month(string $modifier): string

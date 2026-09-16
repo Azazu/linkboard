@@ -69,7 +69,11 @@ final class ClickPartitionsCommand
             return Command::SUCCESS;
         }
 
-        $io->success(\sprintf('Dropped: %s. Click data is now removed through %s.', implode(', ', $dropped), $cutoff->format(\DATE_ATOM)));
+        $io->success(\sprintf(
+            'Dropped: %s. Click data is now removed through %s.',
+            implode(', ', $dropped),
+            ($this->retention->droppedThrough() ?? $cutoff)->format(\DATE_ATOM),
+        ));
 
         return Command::SUCCESS;
     }
@@ -130,22 +134,40 @@ final class ClickPartitionsCommand
      * A partition that straddles the cutoff is kept: its newer rows are inside
      * the window.
      *
+     * What is recorded is the **end of the last month actually removed**, not
+     * the configured cutoff. A two-month run on 16 September drops June and
+     * keeps July, so it removed data through 1 July, not through 16 July —
+     * recording the cutoff would have made a later first delivery from 10 July
+     * permanently undeliverable although its month was never removed (Gate 2
+     * round 1, finding 1).
+     *
+     * The exclusive advisory lock is the other half of that promise: a handler
+     * holds the shared one across its own decision and insert, so a drop cannot
+     * land between a handler deciding a click is still recordable and its
+     * insert (finding 2).
+     *
      * @return list<string>
      */
     private function dropExpired(\DateTimeImmutable $cutoff): array
     {
         /** @var list<string> $dropped */
         $dropped = $this->connection->transactional(function (Connection $connection) use ($cutoff): array {
+            $connection->executeStatement('SELECT pg_advisory_xact_lock(?)', [ClickRetention::LOCK_KEY]);
+
             $dropped = [];
+            $removedThrough = null;
             foreach ($this->partitions() as $partition => $upperBound) {
                 if ($upperBound > $cutoff) {
                     continue;
                 }
                 $connection->executeStatement(\sprintf('DROP TABLE %s', $connection->quoteSingleIdentifier($partition)));
                 $dropped[] = $partition;
+                if (null === $removedThrough || $upperBound > $removedThrough) {
+                    $removedThrough = $upperBound;
+                }
             }
-            if ([] !== $dropped) {
-                $this->retention->recordDroppedThrough($cutoff);
+            if (null !== $removedThrough) {
+                $this->retention->recordDroppedThrough($removedThrough);
             }
 
             return $dropped;

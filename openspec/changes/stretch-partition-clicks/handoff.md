@@ -1,7 +1,7 @@
 # Handoff — stretch-partition-clicks
 
 **Updated:** 2026-09-16 · claude
-**State:** awaiting-gate-2
+**State:** fixing-g2
 **Branch:** change/stretch-partition-clicks
 
 ## Done this session
@@ -44,8 +44,12 @@
 
 - Branch run on the exact head (`629ae79`) is green: run 35138605772 (2026-09-16), all four jobs — the `migrations` one is what proves the conversion and its `down` work on a database this machine did not set up.
 
+- Gate 2 round 1 (`58fa259`, Reviewed-Commit `608aa53`): changes-requested — two major, both real, and both about the same promise from two directions.
+  1. **The boundary recorded the configured cutoff, not what was actually removed.** A two-month run on the 16th drops June, keeps July, and recorded 16 July — so a later first delivery from 10 July would have been discarded for ever although its month was never touched, contradicting the scenario I had written into the spec myself. It now records the greatest upper bound among the partitions it dropped: the first day of the month it kept. Two tests assert the exact date and that a click from the surviving month is not behind the boundary; recording the cutoff again fails both.
+  2. **The decision and the insert were two moments.** A handler could judge a click recordable, pause, and insert after a retention run had dropped its month and a later run re-provisioned it — the double count the boundary exists to prevent, with an in-flight handler added. The guard now runs inside the insert's own transaction, holding a SHARED advisory lock; retention takes the same lock EXCLUSIVELY across its drops. The regression is deterministic rather than a race: a second connection holds the exclusive lock, the handler gets a 250 ms `lock_timeout`, and the test asserts it fails waiting with no row written — removing the shared lock makes it insert straight through.
+
 ## Next step
-Gate 2: `scripts/gate-run.sh stretch-partition-clicks 2 full`, per the lifecycle section at the end of `tasks.md`.
+The user pushes the branch; the executor records the green Actions run on the new head and re-reviews round 1 with `scripts/gate-run.sh stretch-partition-clicks 2 confirm 1`.
 
 ## Blockers
 None.

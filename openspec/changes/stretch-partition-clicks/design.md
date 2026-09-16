@@ -202,6 +202,21 @@ already gone.
 transaction as the drops, so a crash cannot leave data removed without the
 boundary moved, nor the boundary moved without the data removed.
 
+*What is recorded is the end of the last month actually removed*, not the
+configured cutoff. A two-month run on 16 September drops June and keeps July, so
+it removed data through 1 July; recording 16 July would have made a later first
+delivery from 10 July permanently undeliverable although its month was never
+touched (Gate 2 round 1, finding 1).
+
+*And the decision is atomic with the write.* The guard and the insert are one
+transaction holding a SHARED advisory lock; retention takes the same lock
+EXCLUSIVELY across its drops. Otherwise they are two moments: a handler could
+decide a click is still recordable, pause, and insert after retention had
+dropped the month and a later run re-provisioned it — the very double count the
+boundary exists to prevent, with an in-flight handler added (Gate 2 round 1,
+finding 2). The lock is cheap (in-memory, shared) and is taken once per message,
+inside the transaction the handler already opened.
+
 *What it does not cover.* A deployment that restores an old database dump
 restores the boundary with it, which is right; one that drops the table and
 recreates it starts from nothing, which is the same statement as "the data is

@@ -28,6 +28,18 @@ final readonly class ClickRetention implements StartupCheckInterface
     public const int DEFAULT_MONTHS = 13;
     public const int DEFAULT_HORIZON_MONTHS = 3;
 
+    /**
+     * The advisory lock both sides of the race take: the click handler holds it
+     * SHARED across its eligibility decision and its insert, retention holds it
+     * EXCLUSIVE across its drops. Without it a handler could decide a click is
+     * still recordable, pause, and insert after retention had removed the month
+     * and a later run had re-provisioned it — incrementing the link's lifetime
+     * counter a second time for a click that was already counted (Gate 2 round
+     * 1, finding 2). Session-wide advisory locks share one namespace; this
+     * number is `clicks_retention` and nothing else uses it.
+     */
+    public const int LOCK_KEY = 4_071_215_601;
+
     public function __construct(
         private Connection $connection,
         #[Autowire(env: 'CLICK_RETENTION_MONTHS')]
