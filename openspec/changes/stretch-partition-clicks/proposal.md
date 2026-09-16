@@ -40,12 +40,16 @@ improvement.
   statement that changes the schema.
 - **A declared retention window**, configured by an environment variable and
   enforced only by that command — nothing drops data on its own.
-- **A click older than the retention window is discarded rather than parked.**
+- **A click older than the expiry boundary is discarded rather than parked.**
   Retention and the transport disagree otherwise: after a month is dropped, a
   redelivery from that month would hit a missing partition and be parked,
   contradicting the promise that a redelivery is always acknowledged. The
   handler gains one guard on the message's own timestamp — its insert, its
-  transaction and its two exception guards are untouched.
+  transaction and its two exception guards are untouched. The boundary is not
+  the configured window but the later of the window and **how far the data has
+  actually been removed**, recorded when a partition is dropped and never moved
+  backwards: otherwise lengthening the window would resurrect a dropped month
+  and let a replayed message be counted twice.
 - **BREAKING for the all-time figures.** The summary report's `totalClicks`,
   `uniqueVisitors`, `firstClickAt` and `lastClickAt` are defined over *all* of a
   link's clicks. Once a partition is dropped they are over the retained history,
@@ -96,8 +100,10 @@ None.
   handler's SQL is unchanged.
 - **`src/Analytics/`**: nothing. That is a claim this change has to defend.
 - **Tests**: the redelivery guarantee under the new key, a click that lands in
-  no partition, retention dropping a month and what that does to the summary,
-  and the round trip of `harden-gate-floor` over a partitioned schema.
+  no partition, a replay after the window is widened, retention dropping a month
+  and what that does to the summary, a freshly migrated database accepting the
+  suite's own historical fixtures, and the round trip of `harden-gate-floor`
+  over a partitioned schema.
 - **Documents**: §3.4 and §9 of the brief, the ADR, `docs/how-to/` for the job
   and the window, `docs/reference/commands.md`, and the benchmark numbers.
 - **No new dependency.**

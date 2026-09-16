@@ -29,6 +29,17 @@ discarded") rather than re-recorded.
 - **WHEN** the record insert fails for a reason other than a duplicate or a missing link
 - **THEN** the link's `clickCount` is unchanged and the failure propagates to the transport's retry policy
 
+### Requirement: Messages for deleted links are discarded
+A `ClickRecorded` message whose link no longer exists SHALL be acknowledged and discarded on its first handling with an `info` log record naming the link id and the `click_id` — never retried and never moved to the failed transport. This holds whenever the record can be attempted at all: if the message's month has no partition, that operational failure takes precedence and the message is retried (see "Every month a click may legitimately fall in has a partition"), because whether the link still exists is learnt from the insert and the insert cannot run.
+
+#### Scenario: Link deleted before the message is handled
+- **WHEN** a visitor is redirected, the link is deleted through `DELETE /api/v1/links/{id}` before the worker handles the message, and a worker then consumes the transport
+- **THEN** no click record exists, the handler ran once, the message is acknowledged on that attempt — neither retried nor on the failed transport — and one `info` record names the link id and the `click_id`; no failure record is written
+
+#### Scenario: Link deleted and the month has no partition
+- **WHEN** such a message's month has no partition and its `occurred_at` is inside the retention window
+- **THEN** the handling fails and the message is retried rather than acknowledged, and once the partition exists the next attempt discards it as a deleted link
+
 ## ADDED Requirements
 
 ### Requirement: Click records are stored in monthly partitions
@@ -79,7 +90,7 @@ freshly migrated database without further preparation.
 - **THEN** the insert fails, the link's `clickCount` is unchanged, and the failure propagates to the transport's retry policy rather than being swallowed as a duplicate or a missing link
 
 ### Requirement: Clicks older than the retention window are discarded
-A message whose `occurred_at` is older than the retention window SHALL be
+A message whose `occurred_at` is older than the **expiry boundary** SHALL be
 acknowledged without a record and without an increment, and the discard SHALL be
 logged with the link id and the click id. This covers the three ways such a
 message occurs: a redelivery after its month was dropped, a first delivery
@@ -87,13 +98,25 @@ delayed past the window, and a manual retry from the failed transport long after
 the fact. A message is never parked for being too old, and a dropped month is
 never recreated to absorb one.
 
+The expiry boundary SHALL be the later of two things: the start of the
+configured retention window, and the point up to which click data has actually
+been dropped. The second SHALL be recorded when a partition is dropped and SHALL
+never move backwards — so lengthening the retention window later does not make
+a message whose record was already removed eligible again. Without it, widening
+the window after a month was dropped would let a replayed message be recorded a
+second time and increment the link's lifetime counter twice.
+
 #### Scenario: A first delivery that arrives after its month expired
 - **WHEN** a message whose `occurred_at` is older than the retention window is handled for the first time
 - **THEN** it is acknowledged, no record is written, the link's `clickCount` is unchanged, and the discard is logged
 
 #### Scenario: Too old is not the same as no horizon
-- **WHEN** one message is older than the window and another is inside the window but in a month with no partition
+- **WHEN** one message is older than the expiry boundary and another is inside the window but in a month with no partition
 - **THEN** the first is acknowledged and discarded, and the second fails and is retried
+
+#### Scenario: Widening the window does not resurrect a dropped click
+- **WHEN** a month is dropped under a short retention window, the window is then configured much longer so that the month is provisioned again, and a message from that month is replayed
+- **THEN** the message is still acknowledged and discarded, no record is written, and the link's `clickCount` is unchanged
 
 ### Requirement: Retention drops whole months, and only when asked
 Click records older than a configured retention window SHALL be removable by
@@ -115,6 +138,10 @@ setting, having created and dropped nothing.
 #### Scenario: A horizon that is not a positive whole number changes nothing
 - **WHEN** the command is run with a horizon of `0`, of `-1`, of an empty value or of a value that is not a number
 - **THEN** the command fails naming that setting, and every partition and every row is exactly as it was
+
+#### Scenario: Dropping a month records how far the data has been removed
+- **WHEN** the command drops the partitions of every month up to and including 2026-07
+- **THEN** the recorded expiry boundary is the end of 2026-07 afterwards, and a later run with a longer window leaves that record where it is
 
 #### Scenario: A month entirely outside the window is dropped
 - **WHEN** the retention window is 13 months and the command runs with data in a partition whose last day is older than that

@@ -146,11 +146,21 @@ nobody had populated first (Gate 1 round 1, finding 1; the dates are read from
 the retention window is storable" a property of a freshly migrated database, and
 that is what the spec now says.
 
-*The boundary it creates.* A fixture dated **outside** the window still fails —
-deliberately, because such a click is one retention would refuse to keep. The
-oldest click fixture in the suite is about six months old against a window of
-thirteen, and a test that reaches further is telling the truth about a click the
-system does not store.
+*The boundary it creates, and why the test suite does not sit on it.* A fixture
+dated outside the provisioned range cannot be inserted — and the suite's click
+fixtures are **fixed dates**, the oldest 2026-03-28, which a window measured
+from `now` will eventually leave behind (Gate 1 confirmation 1, finding 1). A
+suite that starts failing on a calendar date is not a suite. So the test
+database provisions its own range: `make test-db` calls the same
+`clicks_ensure_partition` function for a declared fixture range — one constant,
+named in the Makefile and documented — and every fixed-date fixture lives inside
+it by construction. Production's range stays what decision 5 says it is; the
+test database simply also carries the months its fixtures use.
+
+*Why not make the fixtures relative to `now`.* The analytics tests assert exact
+bucket boundaries, partial buckets and previous-period arithmetic against fixed
+timestamps; rewriting them onto a moving clock would change what they test in
+order to keep a schema happy. The schema is the cheaper thing to move.
 
 *What happens without it, stated because it is the failure mode:* an insert
 into a month with no partition raises `no partition of relation "clicks" found`
@@ -161,7 +171,7 @@ duplicate. That is the correct behaviour for a click inside the window, and the
 test asserts exactly it: the click is not lost silently, the counter is not
 incremented, and the message is retried.
 
-### 5a. A click older than the window is discarded, not parked
+### 5b. A click older than the expiry boundary is discarded, not parked
 
 Retention and the transport disagree unless somebody decides between them: after
 a month is dropped, a redelivery of a message from that month hits the missing
@@ -172,21 +182,47 @@ that the click was already counted, and permits a second increment of a lifetime
 counter (Gate 1 round 1, finding 2).
 
 The decision: the handler gains one guard **before** the insert — a message
-whose `occurred_at` is older than the retention window is acknowledged,
+whose `occurred_at` is older than the **expiry boundary** is acknowledged,
 discarded and logged at info, exactly as a message for a deleted link is. It
 covers the three ways such a message arrives: a redelivery after its month was
 dropped, a first delivery delayed past the window, and a manual retry from the
 failed transport long after the fact.
 
-*Why a guard and not a caught exception.* The two cases must not be confused:
+*The boundary is not the window.* A window read from configuration can move
+backwards: drop July under a one-month window, widen the window to thirteen, and
+July is provisioned again — a replayed message from July then passes an
+age guard that only knows the window, is recorded a second time, and increments
+the link's lifetime counter twice (Gate 1 confirmation 1, finding 2). So the
+retention command **records how far the data has actually been removed**, that
+record only ever moves forwards, and the guard compares against the later of the
+two. Configuration decides what may be dropped next; the record decides what has
+already gone.
+
+*Where the record lives.* A one-row table written by the command inside the same
+transaction as the drops, so a crash cannot leave data removed without the
+boundary moved, nor the boundary moved without the data removed.
+
+*What it does not cover.* A deployment that restores an old database dump
+restores the boundary with it, which is right; one that drops the table and
+recreates it starts from nothing, which is the same statement as "the data is
+gone and so is the record of it".
+
+*Why a guard and not a caught exception.* The three cases must not be confused:
 too old is expected and is acknowledged; inside the window with no partition is
-an operational failure and is retried. A caught `no partition` error cannot tell
-them apart, so the rule is stated on the message's own timestamp, before the
-statement runs.
+an operational failure and is retried; a deleted link is discarded. A caught
+`no partition` error cannot tell the first two apart, so the age rule is stated
+on the message's own timestamp, before the statement runs.
+
+*And the deleted link keeps its precedence exactly where it is.* The FK guard
+fires on the insert, so it cannot fire when there is no partition to insert
+into: a message for a deleted link whose month is missing is retried like any
+other in-window message, and is discarded on the attempt after the partition
+exists. That is stated in the requirement rather than left for someone to
+discover from a failure queue.
 
 *What this costs.* The handler is no longer literally unchanged — it gains one
-comparison and one log line, and the proposal says so. Its insert, its
-transaction and its two exception guards are untouched.
+comparison against the boundary and one log line, and the proposal says so. Its
+insert, its transaction and its two exception guards are untouched.
 
 ### 6. Retention: whole months, on demand, with a declared and validated window
 
@@ -194,6 +230,9 @@ The same command drops every partition whose **entire** range is older than
 `now - window`, default 13 months so that a year-over-year comparison is still
 possible, configured by environment variable. A partition that straddles the
 boundary is kept and named. Nothing else in the application drops click data.
+
+*Dropping records the boundary in the same transaction* (decision 5b), which is
+what makes widening the window afterwards safe.
 
 *The configuration is validated before any DDL is issued.* A window of `0`
 places the cutoff at this instant and makes the current, populated month
