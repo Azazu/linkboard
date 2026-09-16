@@ -46,17 +46,20 @@ flowchart LR
 ```
 
 The dotted line is the whole point: the two paths meet at the `clicks` table
-and nowhere else. The write path persists an entity; the read path never loads
-one — it computes in SQL and returns immutable DTOs. `tests/Unit/Architecture/`
-enforces that: a file under `src/Analytics/` naming a `Click` entity fails the
-suite.
+and nowhere else. Neither path hydrates a click — the handler runs one DBAL
+transaction that inserts the row and increments the link's counter, and the
+read path computes in SQL and returns immutable DTOs. What they do not share is
+a model, and `tests/Unit/Architecture/` enforces it: a file under
+`src/Analytics/` naming a `Click` entity fails the suite.
 
 **What the write path buys.** The redirect answers 302 without waiting for the
 click to be written: it dispatches to the Redis stream and returns. A database
 that is slow, or a worker that is down, cannot turn a redirect into an error —
-the messages wait. The cost is that a click is visible in the reports a moment
-later than it happened, and that failure to log is invisible to the visitor,
-which is the trade the specification asks for (FR-RED-2).
+those messages wait and are retried by the transport. The costs are two, and
+they are different: a click is visible in the reports a moment later than it
+happened, and a click whose *dispatch* fails is lost rather than delayed —
+`MessengerClickRecorder` catches that failure, logs it at error, and serves the
+redirect anyway (FR-RED-2, [ADR-002](../adr/ADR-002-cqrs-lite-click-and-analytics.md)).
 
 **What the read path buys.** Every report is one SQL statement with window
 functions rather than a loop in PHP, and every answer is cached for 300 seconds

@@ -12,9 +12,10 @@
 # fresh `make init` leaves a keypair the suite cannot authenticate with. CI is
 # unaffected — it runs the same target natively, where `.env.test` applies.
 #
-# The precedence is the one `tests/bootstrap.php` uses, so the generator and
-# the suite can never disagree about which value is in force: `.env.test`,
-# then `.env.test.local` if it exists.
+# The precedence AND the parser are the ones `tests/bootstrap.php` uses, so the
+# generator and the suite cannot disagree about which value is in force:
+# `.env.test`, then `.env.test.local` if it exists, parsed by Symfony's Dotenv
+# in `scripts/test-jwt-passphrase.php`, whose output is this script's argument.
 #
 # Detection, when a non-empty passphrase is in force:
 #   the private key must REFUSE an empty passphrase (so it is encrypted at all)
@@ -23,7 +24,8 @@
 #   passphrase" alone is not enough: an unencrypted key accepts every
 #   passphrase, so that test would keep exactly the key it means to replace.
 #
-# Run through `make jwt-keys`; it is not meant to be called directly.
+# Run through `make jwt-keys`, which computes the argument; it is not meant to
+# be called directly.
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,15 +33,12 @@ dir="$root/config/jwt/test"
 private="$dir/private.pem"
 public="$dir/public.pem"
 
-passphrase=''
-for file in "$root/.env.test" "$root/.env.test.local"; do
-    [ -f "$file" ] || continue
-    value="$(sed -n 's/^[[:space:]]*JWT_PASSPHRASE=//p' "$file" | tail -n 1)"
-    [ -n "$value" ] || continue
-    # strip one layer of matching quotes, as dotenv does
-    value="$(printf '%s' "$value" | sed "s/^'\(.*\)'$/\1/; s/^\"\(.*\)\"$/\1/")"
-    passphrase="$value"
-done
+# The passphrase is resolved by `scripts/test-jwt-passphrase.php` — Symfony's
+# own Dotenv, the same parser and precedence `tests/bootstrap.php` applies —
+# and passed in as the first argument, so this script needs no PHP of its own
+# and both halves go through the Makefile's EXEC indirection (the container
+# locally, natively in CI).
+passphrase="${1?the effective test passphrase is passed in by make jwt-keys}"
 
 usable() {
     [ -f "$private" ] && [ -f "$public" ] || return 1

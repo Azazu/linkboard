@@ -1,7 +1,7 @@
 # Handoff — harden-quality-and-docs
 
-**Updated:** 2026-09-15 · claude
-**State:** implementing
+**Updated:** 2026-09-16 · claude
+**State:** fixing-g2
 **Branch:** change/harden-quality-and-docs
 
 ## Done this session
@@ -17,7 +17,7 @@
 
 - Implemented while the tier was `low` (sections 1–6), touching only documents and tests:
   - **The three rules of NFR-QA-2** as source-scanning tests, each shown failing on a planted violation and each naming its own blind spot. The controller rule permits `EntityManagerInterface::flush()` — a unit-of-work commit is not a query — which `RegistrationController` uses; that it flushes directly rather than through a use case is worth a later change and is recorded here rather than refactored.
-  - **Benchmarks**, all three with their commands, machine and distributions in `docs/how-to/benchmarks.md`. Redirect p50 20.4 ms / p95 ≈ 22 ms — met. Eight of nine reports 43–169 ms uncached on 1 000 005 clicks — met; **the global top-links report p95 303 ms against a 300 ms target — missed, published as missed**, and 309 ms when re-measured prod-like. Worker 10 000 messages in 15.55 s → 643/s — met. A first worker figure of 488/s came from polling the queue every two seconds and was replaced with an exact count, not kept because it was close enough.
+  - **Benchmarks**, all three with their commands, machine and distributions in `docs/how-to/benchmarks.md` — every recipe re-executed as printed during Gate 2 round 1 (below), so the published figures are the ones the published commands produce. Redirect p50 20.5 ms / p95 ≈ 22 ms — met; `/health` p50 1.8 ms beside it, and the four-connection distribution (p90 97 ms) published as queueing on a five-child pool rather than server time. Eight of nine reports p95 52–192 ms uncached on 1 020 279 clicks — met; **the global top-links report p95 322 ms against a 300 ms target — missed, published as missed** (303 ms and a prod-like 309 ms in earlier runs: the miss is consistent, not noise). Worker 10 000 messages in 11.09 s → 902/s — met. A first worker figure of 488/s came from polling the queue every two seconds and was replaced with an exact count, not kept because it was close enough.
   - **The diagram** as Mermaid, rendered by Mermaid itself in headless Chromium (`tests/Acceptance/mermaid-check.mjs`): 13 nodes, 136 KB of SVG. The npm build needs a DOM and cannot parse headlessly, which is why the check is a browser run.
   - **Screenshots** from the acceptance browser against a seeded stack; each was opened and looked at, not assumed.
   - **README** rewritten, and the `scaffold` claim swept: the only remaining hits name the historical change `scaffold-symfony-app`.
@@ -52,8 +52,15 @@ The consequence is that a fresh `make init` on this branch still produces a test
 
 - Branch run on the exact head (`b33d46a`) is green: run 35064944178 (2026-09-16). It runs `make jwt-keys EXEC=` natively, so it is also the evidence that the new script works outside the container — the one thing the local runs could not show.
 
+- Gate 2 round 1 (`6b39be3`, Reviewed-Commit `c69f769`): changes-requested — two major, one minor, all three real and all three fixed.
+  1. **The generator resolved the passphrase with a lookalike parser.** My `sed` extraction in `scripts/test-jwt-keys.sh` implemented a subset of dotenv syntax, so a legal local override would have made the generator and the suite disagree permanently — the opposite of what the script exists for. Reproduced on the reviewer's own input: `JWT_PASSPHRASE=review-fixture # local comment` reads as `review-fixture` through Symfony's Dotenv and as `review-fixture # local comment` through my parser; `JWT_PASSPHRASE="${PASS_BASE}-tail"` diverges too. The resolution moved to `scripts/test-jwt-passphrase.php`, which uses `Symfony\Component\Dotenv\Dotenv` with the bootstrap's precedence, and `make jwt-keys` passes its output as the shell script's argument — so the shell parses no dotenv file at all, and the generator cannot drift from the suite by construction. Verified with both inputs: the generated key accepts the resolved value and refuses the tainted one, `tests/Api/Auth` green (36 tests) each time.
+  2. **The published report recipe was not runnable, and the task claiming otherwise was false.** The prose recipe mixed a host shell with the compose-internal `http://nginx`, never established a token, a link or a period, and contained neither the sample loop nor eight of the nine reports. Replaced by `scripts/report-benchmark.sh`, which is the recipe rather than a summary of one: it runs in the container, authenticates, picks the most-clicked link, derives a 30-day period, clears `cache.reports` before every one of 20 samples per report, and fails the run on any non-200. Writing it found something the prose had hidden: the demo owner gets **403** on the three global reports, which need `ROLE_ADMIN`, so the script takes both accounts' credentials. Twenty samples rather than fifteen because over 15 nearest-rank samples the 95th percentile *is* the maximum. Re-seeded and re-run as published; the table and the README figures are its output, and the top-links miss is now 321.9 ms.
+  3. **Two new documents described code that does not exist.** ADR-002 and `docs/explanation/architecture.md` said the handler persists an entity, while `ClickRecordedHandler` hydrates nothing — it runs one DBAL transaction that inserts the click and increments the link counter — and ADR-002 implied every logging failure ends up queued. Corrected: neither path hydrates a click, and the two failure modes are now distinguished — a dispatched message whose handling fails is retried and ends in the failure transport; a **dispatch** that fails is caught in `MessengerClickRecorder`, logged at error, and **that click is lost**. The redirect is served either way; losing a click rather than a redirect is the trade, and it is a loss, not a delay.
+
+  Fixing the CLAIM rather than the line, the same sweep also caught what the reviewer had not: sections 1 and 3 of `docs/how-to/benchmarks.md` were no more runnable than section 2. Section 1 printed `http://nginx/<slug>` with no query to produce a slug, and section 3's load run — 10 000 redirects from one IP — silently depended on section 1's raised rate limiter, which section 1 told the reader to delete first. Both sections now print every command they need, including the slug query and `redis-cli del messages`, and all three were re-executed end to end; `/health` and the four-connection figures gained their own printed commands too.
+
 ## Next step
-Gate 2: `scripts/gate-run.sh harden-quality-and-docs 2 full`, per the lifecycle section at the end of `tasks.md`.
+The user pushes the branch; the executor records the green Actions run on the new head and re-reviews round 1 with `scripts/gate-run.sh harden-quality-and-docs 2 confirm 1`.
 
 ## Blockers
 None.

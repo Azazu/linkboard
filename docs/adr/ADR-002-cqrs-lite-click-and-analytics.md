@@ -26,11 +26,18 @@ memory-hungry way to reach a number PostgreSQL already knows.
 The click write path and the analytics read path share no model.
 
 - Writing: the redirect dispatches a `ClickRecorded` message to the async
-  transport and returns 302 without waiting. A handler persists a `Click`
-  entity. That entity exists for the write and nowhere else.
+  transport and returns 302 without waiting. The handler does not hydrate
+  anything either — it runs one DBAL transaction that inserts the click row and
+  increments the link's counter (`src/Click/Handler/ClickRecordedHandler.php`).
+  The `Click` entity exists for the schema, the fixtures and the cascade, not
+  for the write path.
 - Reading: `src/Analytics/` computes every figure in SQL — `date_trunc`,
   `generate_series`, window functions — and returns immutable DTOs. It never
   names a `Click` entity, never loads one, and never asks a repository for one.
+
+So both sides of the boundary are SQL, and what they do not share is a *model*:
+neither path hydrates a click, and neither could start doing so without the
+architecture rule failing.
 
 The mechanism that keeps it true is a test, not a convention:
 `tests/Unit/Architecture/AnalyticsKeepsItsDistanceTest.php` fails when a file
@@ -61,8 +68,15 @@ not a compiler.
   own work stays a lookup and a dispatch.
 - A click is visible in the reports a moment after it happened — the queue's
   latency plus the report cache's staleness ([ADR-004](ADR-004-report-cache-staleness.md)).
-- A failure to log a click never becomes a failed redirect; it becomes a message
-  that waits, and a retry the transport owns.
+- A failure to log a click never becomes a failed redirect. What happens to the
+  record depends on where the failure is, and the distinction matters: a message
+  that was dispatched and whose handling fails is retried by the transport and
+  ends in the failure transport if it keeps failing; a **dispatch** that fails —
+  Redis unreachable at that moment — is caught in
+  `src/Click/Recorder/MessengerClickRecorder.php`, logged at error with the link
+  id, and **that click is lost**. The redirect is still served. Losing a click
+  rather than a redirect is the trade this decision makes, and it is a loss, not
+  a delay.
 - Someone adding a figure to a report has to write SQL rather than reach for an
   entity, which is more work per figure and the reason the figures are fast.
 

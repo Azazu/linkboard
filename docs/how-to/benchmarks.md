@@ -17,6 +17,15 @@ docker run --rm --network linkboard_default williamyeh/wrk --version
 
 ## 1. Redirect latency (NFR-PERF-1, target p95 ≤ 50 ms server time)
 
+Seed first, in `dev` — `app:demo:seed` refuses to run in `prod` — and take a
+slug to hammer:
+
+```bash
+docker compose exec php bin/console app:demo:seed --clicks=50000 --reset
+docker compose exec php bin/console dbal:run-sql \
+    'SELECT slug FROM links ORDER BY click_count DESC LIMIT 1'
+```
+
 The redirect limiter is per client IP and a load generator is one IP, so the
 run raises it for its duration. Create `docker-compose.bench.yml` — it is
 temporary and belongs to nobody's commit:
@@ -30,72 +39,93 @@ services:
       APP_DEBUG: "0"
 ```
 
+Every command below substitutes the slug that query printed — `app-download`
+in the seed's own data:
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.bench.yml up -d php
 docker compose exec php sh -c 'APP_ENV=prod APP_DEBUG=0 bin/console cache:warmup'
-docker run --rm --network linkboard_default williamyeh/wrk -t1 -c1 -d20s --latency http://nginx/<slug>
+docker run --rm --network linkboard_default williamyeh/wrk -t1 -c1 -d20s --latency http://nginx/app-download
 ```
+
+Keep `docker-compose.bench.yml` until section 3 is done — its load run needs the
+same raised limiter. Then `rm docker-compose.bench.yml && docker compose up -d
+php`, which puts the stack back into `dev`.
 
 Measured, prod-like, one connection — this is the server time the target is
 about:
 
 ```
   Latency Distribution
-     50%   20.39ms
-     75%   21.34ms
-     90%   21.95ms
-     99%   25.62ms
+     50%   20.46ms
+     75%   21.43ms
+     90%   22.11ms
+     99%   25.26ms
 ```
 
 **p95 ≈ 22 ms: the target is met.** For scale, `/health` — no database, no
-Redis dispatch — is 2.64 ms at the same concurrency, so the redirect's own work
-is roughly 18 ms: one indexed lookup, the rule matcher, and a dispatch to the
-Redis stream.
+Redis dispatch — at the same concurrency:
 
-At four concurrent connections against a five-child pool the distribution moves
-to p50 17 ms / p90 98 ms / p99 152 ms. That is queueing, not server time, and it
-is what the number looks like when the pool is the bottleneck — published here
-so nobody reads the single-connection figure as a throughput claim.
+```bash
+docker run --rm --network linkboard_default williamyeh/wrk -t1 -c1 -d20s --latency http://nginx/health
+```
 
-Afterwards: `rm docker-compose.bench.yml && docker compose up -d php`.
+is p50 1.82 ms, so the redirect's own work is roughly 19 ms: one indexed lookup,
+the rule matcher, and a dispatch to the Redis stream.
+
+Against a five-child pool, four connections:
+
+```bash
+docker run --rm --network linkboard_default williamyeh/wrk -t4 -c4 -d20s --latency http://nginx/app-download
+```
+
+move the distribution to p50 17.4 ms / p90 97.3 ms / p99 134.7 ms. That is
+queueing, not server time, and it is what the number looks like when the pool is
+the bottleneck — published here so nobody reads the single-connection figure as
+a throughput claim.
 
 ## 2. Report latency (NFR-PERF-2, target p95 ≤ 300 ms uncached on 1 M clicks)
 
 ```bash
 docker compose exec php bin/console app:demo:seed --clicks=1000000 --days=60 --reset
+docker compose exec php sh scripts/report-benchmark.sh \
+    demo@example.com '<demo password>' admin@example.com '<admin password>'
 ```
 
-That produced 1 000 005 click rows in 13 s. Each report is then requested 15
-times with the report cache cleared before every request, so every request is a
-miss:
+The seed prints both passwords once; both accounts are needed, because the
+three global reports require `ROLE_ADMIN`. `scripts/report-benchmark.sh` is the
+recipe, not a summary of one: it authenticates, picks the account's most-clicked
+link, derives a 30-day period, and for each of the nine reports issues 20
+requests, clearing `cache.reports` before every single one so that every sample
+is a cache miss. A response that is not 200 fails the run rather than being
+timed. It runs inside the `php` container, which is why it addresses
+`http://nginx` — the service name on the compose network.
 
-```bash
-docker compose exec php bin/console cache:pool:clear cache.reports
-curl -sS -o /dev/null -w '%{time_total}' -H 'Accept: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "http://nginx/api/v1/links/$LINK/stats/summary?from=$FROM&to=$TO"
+Twenty samples rather than fifteen for a reason: with nearest-rank percentiles
+over 15 samples, the 95th *is* the maximum, so a p95 column would just repeat
+the worst sample.
+
+Measured on 1 020 279 click rows (the seed's million plus the rows the worker
+benchmark below persisted), 20 samples per report:
+
+```
+report                  p50      p95      max
+link/summary           89.7    119.5    123.0
+link/timeseries        60.3     69.2     73.2
+link/countries         63.8     72.9     82.1
+link/devices           93.7    117.9    126.9
+link/referrers         62.9     74.6     82.6
+link/variants          40.7     51.6     54.5
+admin/summary          69.2     83.6     86.0
+admin/timeseries      170.3    192.1    216.7
+admin/top-links       292.6    321.9    327.6
 ```
 
-Measured over a 30-day period (n = 15 per report):
-
-| Report | p50 | p95 |
-|---|---|---|
-| link/summary | 86.5 ms | 96.6 ms |
-| link/timeseries | 59.0 ms | 65.7 ms |
-| link/countries | 61.7 ms | 74.3 ms |
-| link/devices | 88.7 ms | 96.5 ms |
-| link/referrers | 59.8 ms | 78.4 ms |
-| link/variants | 37.7 ms | 43.4 ms |
-| admin/summary | 69.1 ms | 73.7 ms |
-| admin/timeseries | 161.8 ms | 169.3 ms |
-| **admin/top-links** | **284.5 ms** | **303.0 ms** |
-
-**Eight of the nine meet the target with room. `admin/top-links` does not:** its
-p95 is 303 ms against a 300 ms target. Re-measured prod-like it is p50 270 ms,
-p95 309 ms — 287 ms if the cold first request is excluded. The miss is small,
-consistent and real, and it is the report that ranks every link in the service
-by clicks in the period, so it is the one that grows with the service rather
-than with a link.
+**Eight of the nine meet the target. `admin/top-links` does not:** p95 321.9 ms
+against 300 ms. The miss is consistent, not noise — earlier runs of the same
+report measured 303 ms and, prod-like, 309 ms — and it is the one report that
+ranks every link in the service by clicks in the period, so it grows with the
+service rather than with a link.
 
 What to do about it is a separate decision with its own evidence: the
 specification already names the `click_daily` aggregate as the answer if report
@@ -104,23 +134,28 @@ number look better.
 
 ## 3. Worker throughput (NFR-PERF-3, target ≥ 500 clicks/s, 10 000 in ≤ 20 s)
 
-With the worker stopped, redirects queue their messages; the drain is then
-timed exactly by consuming a fixed count:
+With no worker running, redirects only queue their messages; the drain is then
+timed exactly by consuming a fixed count. The load run sends more than ten
+thousand requests from one IP, so it needs `docker-compose.bench.yml` from
+section 1 in place. Deleting the stream first is what makes `xlen` the count
+this run produced — it discards whatever was queued and not yet consumed:
 
 ```bash
-docker run --rm --network linkboard_default williamyeh/wrk -t4 -c8 -d90s http://nginx/<slug>
-docker compose exec redis redis-cli xlen messages     # 10583
+docker compose -f docker-compose.yml -f docker-compose.bench.yml up -d php
+docker compose exec redis redis-cli del messages
+docker run --rm --network linkboard_default williamyeh/wrk -t4 -c8 -d90s http://nginx/app-download
+docker compose exec redis redis-cli xlen messages     # 11925
 docker compose exec php sh -c 'time bin/console messenger:consume async --limit=10000 --no-interaction'
 ```
 
 ```
-real	0m 15.55s
+real	0m 11.09s
 ```
 
-**10 000 messages in 15.55 s → 643 messages/s: the target is met**, and the
+**10 000 messages in 11.09 s → 902 messages/s: the target is met**, and the
 click rows appear in the table as they are consumed. The redirect answered all
-10 583 requests while none of them had been persisted yet, which is the
-decoupling the number is there to demonstrate.
+11 917 requests of the load run while none of them had been persisted yet, which
+is the decoupling the number is there to demonstrate.
 
 ## Reading these numbers honestly
 

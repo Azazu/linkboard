@@ -71,7 +71,7 @@ test-db: ## Create and migrate the test database (DATABASE_URL's database + _tes
 # keypair that does not match it (change harden-quality-and-docs, decision 6a).
 jwt-keys: ## Generate the dev and test JWT keypairs (config/jwt/<env>/, gitignored; dev skips an existing key, test replaces one that does not match .env.test)
 	$(EXEC) bin/console lexik:jwt:generate-keypair --skip-if-exists --env=dev
-	$(EXEC) sh scripts/test-jwt-keys.sh
+	$(EXEC) sh scripts/test-jwt-keys.sh "$$($(EXEC) php scripts/test-jwt-passphrase.php)"
 
 worker: ## Consume the async Messenger transport in the foreground
 	$(COMPOSE) exec php bin/console messenger:consume async -vv --time-limit=3600

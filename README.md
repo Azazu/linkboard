@@ -57,10 +57,10 @@ enforced.
 
 | Target | Measured | |
 |---|---|---|
-| Redirect p95 ≤ 50 ms server time | **p50 20.4 ms, p95 ≈ 22 ms** | met |
-| Report p95 ≤ 300 ms uncached on 1 M clicks | **8 of 9 reports, 43–169 ms** | met |
-| — the global top-links report | **p95 303 ms** | missed, by 3 ms |
-| Worker ≥ 500 clicks/s | **10 000 messages in 15.55 s → 643/s** | met |
+| Redirect p95 ≤ 50 ms server time | **p50 20.5 ms, p95 ≈ 22 ms** | met |
+| Report p95 ≤ 300 ms uncached on 1 M clicks | **8 of 9 reports, p95 52–192 ms** | met |
+| — the global top-links report | **p95 322 ms** | missed |
+| Worker ≥ 500 clicks/s | **10 000 messages in 11.09 s → 902/s** | met |
 
 [`docs/how-to/benchmarks.md`](docs/how-to/benchmarks.md) carries the commands,
 the machine and the full distributions — including what the redirect's numbers
