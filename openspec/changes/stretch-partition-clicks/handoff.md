@@ -1,7 +1,7 @@
 # Handoff — stretch-partition-clicks
 
 **Updated:** 2026-09-16 · claude
-**State:** proposing
+**State:** implementing
 **Branch:** change/stretch-partition-clicks
 
 ## Done this session
@@ -30,8 +30,10 @@
   1. Two loose ends. Task 4.1 still described the command as creating current-and-future months while the design had moved to "from the start of the window" — reconciled, and its test now drops a historical partition and asserts the command recreates it. And the real one: the design accepted that a fixed-date fixture fails once it ages out of the window, while the proposal promised the analytics suites pass unchanged — **a suite that starts failing on a calendar date is not a suite**. The test database now provisions its own declared fixture range through the same `clicks_ensure_partition` function, so 2026-03-28 keeps working when the production window has long passed it; rewriting the fixtures onto a moving clock was rejected because those tests assert exact bucket arithmetic against fixed timestamps.
   2. **The age guard was only as durable as a configuration value.** Drop July under a one-month window, widen the window to thirteen, and the backward provisioning recreates July — a replayed message then passes a guard that only knows the window and increments the lifetime counter a second time. The retention command now records how far the data has actually been removed, in the same transaction as the drops, that record never moves backwards, and the guard compares against the later of the two. The second half of the finding: a message for a **deleted link** whose month has no partition never reaches the FK guard, because the insert cannot run — so the deleted-link requirement is modified to state the precedence (the missing partition is an operational failure and is retried; the discard happens on the attempt after the partition exists), and the case is in the tasks.
 
+- Gate 1 Confirmation 2 (`d8fef63`, Reviewed-Commit `be353c1`): **confirmed — Gate 1 passed.** All four findings closed. The reviewer notes what it has not seen: the promised tests are promises until Gate 2.
+
 ## Next step
-Gate 1 confirmation, second attempt on findings 1 and 2: `scripts/gate-run.sh stretch-partition-clicks 1 confirm 1`. **This is the second confirmation of round 1 — if either comes back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
+`/opsx:apply stretch-partition-clicks`. Section order is the task order: the migration and the fresh-database check, the entity and the handler's one guard, the maintenance command with its validation and its boundary, what retention does to the numbers, the proof that the reports did not change, the documents, and the measurement. `make check` green at each commit, and `make migrations-roundtrip` is part of section 2 rather than an afterthought.
 
 ## Blockers
 None.

@@ -12,7 +12,7 @@ that floor, not move it.
 
 ## 1. Gate 1
 
-- [ ] 1.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh stretch-partition-clicks 1 full`) and disposition every finding before section 2 starts. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed` with no finding row left `open`.
+- [x] 1.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh stretch-partition-clicks 1 full`) and disposition every finding before section 2 starts. Verify: the last Gate 1 record in `review.md` reads `confirmed` with no finding row left `open` — round 1 raised three major and one minor, Confirmation 1 returned findings 1 and 2, and Confirmation 2 (`be353c1`) confirmed all four.
 
 ## 2. The migration
 
