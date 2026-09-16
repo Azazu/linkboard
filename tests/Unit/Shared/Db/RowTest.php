@@ -47,6 +47,24 @@ final class RowTest extends TestCase
         self::assertNull(Row::nullableFloat(['delta' => null], 'delta'), 'no previous clicks is not a delta of zero');
     }
 
+    public function testTheValueReadersConvertASingleValueTheSameWay(): void
+    {
+        // `fetchOne()` is `mixed` for the same reason `fetchAllAssociative()`
+        // is, and the tests read scalar counts with these
+        self::assertSame(3, Row::toInt('3'));
+        self::assertSame(3, Row::toInt(3));
+        self::assertSame(2.5, Row::toFloat('2.5'));
+        self::assertSame('a', Row::toString('a'));
+
+        try {
+            Row::toInt(null, 'the click count');
+            self::fail('null was accepted as an integer');
+        } catch (UnexpectedColumnValue $e) {
+            self::assertSame('the click count', $e->column);
+            self::assertStringContainsString('got null', $e->getMessage());
+        }
+    }
+
     /**
      * @return iterable<string, array{callable(array<string, mixed>, string): mixed, mixed, string}>
      */

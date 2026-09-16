@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Auth;
 
 use App\Auth\Api\ApiKeys\CreateApiKeyProcessor;
+use App\Shared\Db\Row;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -50,7 +51,7 @@ final class ApiKeyCreationConcurrencyTest extends KernelTestCase
             self::bootKernel();
             $connection = self::getContainer()->get('doctrine.dbal.default_connection');
             self::assertInstanceOf(Connection::class, $connection);
-            self::assertSame(10, (int) $connection->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :u AND revoked_at IS NULL', ['u' => $userId]));
+            self::assertSame(10, Row::toInt($connection->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :u AND revoked_at IS NULL', ['u' => $userId])));
         } finally {
             (new Process(['php', $script, 'cleanup', $email], $root))->run();
         }

@@ -7,6 +7,7 @@ namespace App\Tests\Api\Auth;
 use App\Auth\Entity\User;
 use App\Auth\UserRepositoryInterface;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
@@ -83,10 +84,9 @@ final class RegistrationTest extends WebTestCase
         self::assertSame(422, $problem['status']);
         self::assertIsArray($problem['violations']);
         $byPath = [];
-        foreach ($problem['violations'] as $violation) {
-            self::assertIsArray($violation);
+        foreach (Json::objects($problem, 'violations') as $violation) {
             self::assertNotSame('', $violation['message']);
-            $byPath[$violation['propertyPath']] = $violation['message'];
+            $byPath[Json::string($violation, 'propertyPath')] = $violation['message'];
         }
         self::assertSame(['email', 'password'], array_keys($byPath));
     }
@@ -138,11 +138,7 @@ final class RegistrationTest extends WebTestCase
      */
     private function violationPaths(string|false $body): array
     {
-        self::assertIsString($body);
-        $problem = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($problem);
-        self::assertIsArray($problem['violations']);
-        $paths = array_values(array_unique(array_map(static fn (array $v): string => (string) $v['propertyPath'], $problem['violations'])));
+        $paths = array_values(array_unique(Json::column(Json::objects(Json::decode($body), 'violations'), 'propertyPath')));
         sort($paths);
 
         return $paths;

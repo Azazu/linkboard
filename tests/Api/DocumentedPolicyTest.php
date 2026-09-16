@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Api;
 
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Yaml\Yaml;
@@ -36,7 +37,7 @@ final class DocumentedPolicyTest extends WebTestCase
             if (!self::matchesAny($path, $public) || $path === $token) {
                 $expected[] = $name;
             }
-            if (isset($operation['responses']['401'])) {
+            if (Json::hasAt($operation, 'responses', '401')) {
                 $documented[] = $name;
             }
         }
@@ -70,7 +71,7 @@ final class DocumentedPolicyTest extends WebTestCase
             if ($ipLimited || $identityLimited) {
                 $expected[] = $name;
             }
-            if (isset($operation['responses']['429'])) {
+            if (Json::hasAt($operation, 'responses', '429')) {
                 $documented[] = $name;
             }
         }
@@ -94,11 +95,12 @@ final class DocumentedPolicyTest extends WebTestCase
                     $ipLimited = true;
                 }
             }
-            foreach ($operation['responses'] ?? [] as $status => $response) {
+            $responses = Json::mapAt($operation, 'responses');
+            foreach (array_keys($responses) as $status) {
                 if ((int) $status >= 400) {
                     continue;
                 }
-                $headers = array_keys($response['headers'] ?? []);
+                $headers = array_keys(Json::mapAt($responses, $status, 'headers'));
                 if ($ipLimited) {
                     self::assertNotContains('X-RateLimit-Remaining', $headers, "$name: the per-address limiter sends no allowance header");
                 } else {
@@ -164,15 +166,13 @@ final class DocumentedPolicyTest extends WebTestCase
     {
         $client->request('GET', '/api/docs.json');
         self::assertResponseIsSuccessful();
-        /** @var array<string, mixed> $document */
-        $document = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
         $operations = [];
-        /** @var array<string, array<string, mixed>> $paths */
-        $paths = $document['paths'] ?? [];
-        foreach ($paths as $path => $item) {
-            foreach ($item as $method => $operation) {
-                if (\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true) && \is_array($operation)) {
-                    $operations[strtoupper($method).' '.$path] = $operation;
+        $paths = Json::mapAt(Json::decode($client->getResponse()->getContent()), 'paths');
+        foreach (array_keys($paths) as $path) {
+            $item = Json::map($paths, $path);
+            foreach (array_keys($item) as $method) {
+                if (\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true)) {
+                    $operations[strtoupper((string) $method).' '.$path] = Json::map($item, $method);
                 }
             }
         }

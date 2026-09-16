@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Api\Auth;
 
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -58,7 +59,7 @@ final class TokenTest extends WebTestCase
 
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => 'nobody@example.com', 'password' => 'definitely-not-the-password']);
         $unknown = $this->assertProblem($client, 401);
-        self::assertStringNotContainsString('nobody', $unknown['detail']);
+        self::assertStringNotContainsString('nobody', Json::string($unknown, 'detail'));
     }
 
     public function testMissingTokenIs401ProblemDetails(): void
@@ -87,7 +88,7 @@ final class TokenTest extends WebTestCase
         $client->request('GET', '/api/v1/me', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$expired, 'HTTP_ACCEPT' => 'application/json']);
 
         $problem = $this->assertProblem($client, 401);
-        self::assertStringContainsStringIgnoringCase('expired', $problem['detail']);
+        self::assertStringContainsStringIgnoringCase('expired', Json::string($problem, 'detail'));
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Click;
 
 use App\Click\Message\ClickRecorded;
+use App\Tests\Support\Env;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
@@ -23,7 +24,7 @@ final class RedisTransportRoundTripTest extends TestCase
 {
     public function testAClickMessageRoundTripsThroughTheStream(): void
     {
-        $url = (string) ($_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? '');
+        $url = Env::string('REDIS_URL');
         self::assertNotSame('', $url);
         $connection = Connection::fromDsn($url, ['stream' => 'messages_test_'.bin2hex(random_bytes(4)), 'group' => 'test', 'consumer' => 'phpunit']);
         $transport = new RedisTransport($connection, new PhpSerializer());

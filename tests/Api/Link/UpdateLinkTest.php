@@ -7,6 +7,7 @@ namespace App\Tests\Api\Link;
 use App\Link\LinkRepositoryInterface;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Uid\Uuid;
@@ -59,7 +60,7 @@ final class UpdateLinkTest extends LinkApiTestCase
         self::assertSame('https://example.org/new', $body['targetUrl']);
         self::assertSame(['utm_medium' => 'email'], $body['utm']);
         // timestamps have second precision: an update within the creation second is equal, never earlier
-        self::assertGreaterThanOrEqual(new \DateTimeImmutable($body['createdAt']), new \DateTimeImmutable($body['updatedAt']));
+        self::assertGreaterThanOrEqual(new \DateTimeImmutable(Json::string($body, 'createdAt')), new \DateTimeImmutable(Json::string($body, 'updatedAt')));
     }
 
     public function testNullWhereAValueIsRequiredIs422(): void

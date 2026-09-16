@@ -6,6 +6,7 @@ namespace App\Tests\Api\Link;
 
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -28,10 +29,10 @@ final class LinkRulesTest extends LinkApiTestCase
         $created = $this->decode($client);
         self::assertEquals($example, $created['rules'], 'JSON-value-equal to the posted document');
 
-        $this->api($client, $token, 'GET', '/api/v1/links/'.$created['id']);
+        $this->api($client, $token, 'GET', '/api/v1/links/'.Json::string($created, 'id'));
         self::assertEquals($example, $this->decode($client)['rules']);
         $this->api($client, $token, 'GET', '/api/v1/links');
-        self::assertEquals($example, $this->decode($client)['items'][0]['rules']);
+        self::assertEquals($example, Json::objects($this->decode($client), 'items')[0]['rules']);
 
         $this->api($client, $token, 'POST', '/api/v1/links', ['targetUrl' => 'https://example.com/plain']);
         self::assertResponseStatusCodeSame(201);
@@ -111,7 +112,7 @@ final class LinkRulesTest extends LinkApiTestCase
 
         $this->api($client, $token, 'PATCH', '/api/v1/links/'.$link->getId(), rawBody: '{"rules":'.self::example().'}');
         self::assertResponseStatusCodeSame(200);
-        self::assertCount(4, $this->decode($client)['rules']['rules']);
+        self::assertCount(4, Json::listAt($this->decode($client), 'rules', 'rules'));
 
         $this->api($client, $token, 'PATCH', '/api/v1/links/'.$link->getId(), ['rules' => $variantsOnly]);
         self::assertResponseStatusCodeSame(200);

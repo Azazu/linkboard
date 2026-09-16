@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Api\Link;
 
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Zenstruck\Foundry\Test\Factories;
@@ -18,10 +19,8 @@ abstract class LinkApiTestCase extends WebTestCase
     protected function token(KernelBrowser $client, string $email): string
     {
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => $email, 'password' => UserFactory::PASSWORD]);
-        $token = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR)['token'] ?? null;
-        self::assertIsString($token);
 
-        return $token;
+        return Json::string(Json::decode($client->getResponse()->getContent()), 'token');
     }
 
     /**
@@ -37,15 +36,11 @@ abstract class LinkApiTestCase extends WebTestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     protected function decode(KernelBrowser $client): array
     {
-        $decoded = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-
-        /** @var array<string, mixed> $decoded */
-        return $decoded;
+        return Json::decode($client->getResponse()->getContent());
     }
 
     /**
@@ -55,9 +50,8 @@ abstract class LinkApiTestCase extends WebTestCase
     {
         self::assertResponseStatusCodeSame(422);
         self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
-        $problem = $this->decode($client);
-        self::assertIsArray($problem['violations']);
-        $paths = array_values(array_unique(array_map(static fn (array $v): string => (string) $v['propertyPath'], $problem['violations'])));
+        $violations = Json::objects($this->decode($client), 'violations');
+        $paths = array_values(array_unique(Json::column($violations, 'propertyPath')));
         sort($paths);
 
         return $paths;

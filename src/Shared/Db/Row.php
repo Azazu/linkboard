@@ -36,8 +36,15 @@ final class Row
      */
     public static function int(array $row, string $column): int
     {
-        $value = self::present($row, $column, 'an integer');
+        return self::toInt(self::present($row, $column, 'an integer'), $column);
+    }
 
+    /**
+     * The same conversion for a single value rather than a column of a row —
+     * `fetchOne()` is `mixed` for the same reason `fetchAllAssociative()` is.
+     */
+    public static function toInt(mixed $value, string $what = 'the value'): int
+    {
         if (\is_int($value)) {
             return $value;
         }
@@ -46,7 +53,7 @@ final class Row
             return (int) $value;
         }
 
-        throw new UnexpectedColumnValue($column, 'an integer', get_debug_type($value));
+        throw new UnexpectedColumnValue($what, 'an integer', get_debug_type($value));
     }
 
     /**
@@ -57,8 +64,12 @@ final class Row
      */
     public static function float(array $row, string $column): float
     {
-        $value = self::present($row, $column, 'a number');
+        return self::toFloat(self::present($row, $column, 'a number'), $column);
+    }
 
+    /** As `float()`, for a single value. */
+    public static function toFloat(mixed $value, string $what = 'the value'): float
+    {
         if (\is_float($value) || \is_int($value)) {
             return (float) $value;
         }
@@ -67,7 +78,7 @@ final class Row
             return (float) $value;
         }
 
-        throw new UnexpectedColumnValue($column, 'a number', get_debug_type($value));
+        throw new UnexpectedColumnValue($what, 'a number', get_debug_type($value));
     }
 
     /**
@@ -103,13 +114,17 @@ final class Row
      */
     public static function string(array $row, string $column): string
     {
-        $value = self::present($row, $column, 'a string');
+        return self::toString(self::present($row, $column, 'a string'), $column);
+    }
 
+    /** As `string()`, for a single value. */
+    public static function toString(mixed $value, string $what = 'the value'): string
+    {
         if (\is_string($value)) {
             return $value;
         }
 
-        throw new UnexpectedColumnValue($column, 'a string', get_debug_type($value));
+        throw new UnexpectedColumnValue($what, 'a string', get_debug_type($value));
     }
 
     /**

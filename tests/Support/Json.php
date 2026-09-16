@@ -28,21 +28,34 @@ final class Json
     /**
      * A response body that is a JSON object.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     public static function decode(string|false $body): array
     {
         Assert::assertIsString($body, 'the response has a body');
         $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
         Assert::assertIsArray($decoded, 'the body is a JSON object');
+        Assert::assertFalse([] !== $decoded && array_is_list($decoded), 'the body is a JSON object, not a list');
 
-        $object = [];
-        foreach ($decoded as $key => $value) {
-            Assert::assertIsString($key, 'the body is a JSON object, not a list');
-            $object[$key] = $value;
-        }
+        return $decoded;
+    }
 
-        return $object;
+    /**
+     * An array out of something the type system calls `mixed` — a decoded body,
+     * a normalizer's output.
+     *
+     * The keys are `array-key`, not `string`: PHP turns a JSON object's numeric
+     * member names into integers, so a document's `responses` is keyed by
+     * `200`, not `'200'`, and pretending otherwise would fail on every
+     * status code.
+     *
+     * @return array<array-key, mixed>
+     */
+    public static function asMap(mixed $value, string $what = 'the value'): array
+    {
+        Assert::assertIsArray($value, "$what is a JSON object");
+
+        return $value;
     }
 
     /**
@@ -127,20 +140,14 @@ final class Json
      *
      * @param array<array-key, mixed> $data
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     public static function map(array $data, string|int $key): array
     {
         $value = self::at($data, $key);
         Assert::assertIsArray($value, self::describe($key).' is an object');
 
-        $object = [];
-        foreach ($value as $name => $member) {
-            Assert::assertIsString($name, self::describe($key).' is an object, not a list');
-            $object[$name] = $member;
-        }
-
-        return $object;
+        return $value;
     }
 
     /**
@@ -165,22 +172,128 @@ final class Json
      *
      * @param array<array-key, mixed> $data
      *
-     * @return list<array<string, mixed>>
+     * @return list<array<array-key, mixed>>
      */
     public static function objects(array $data, string|int $key): array
     {
         $rows = [];
         foreach (self::items($data, $key) as $index => $member) {
             Assert::assertIsArray($member, self::describe($key)."[$index] is an object");
-            $row = [];
-            foreach ($member as $name => $value) {
-                Assert::assertIsString($name, self::describe($key)."[$index] is an object, not a list");
-                $row[$name] = $value;
-            }
-            $rows[] = $row;
+            $rows[] = $member;
         }
 
         return $rows;
+    }
+
+    /**
+     * One string field of every row of an array of objects — the `array_column`
+     * these tests compare against a list of slugs or ids, with each value
+     * checked instead of assumed.
+     *
+     * @param list<array<array-key, mixed>> $rows
+     *
+     * @return list<string>
+     */
+    public static function column(array $rows, string|int $key): array
+    {
+        return array_map(static fn (array $row): string => self::string($row, $key), $rows);
+    }
+
+    /**
+     * The object at a path — `[]` when any step of the path is absent, which is
+     * the `?? []` a document is navigated with, typed. A step that is present
+     * but not an object fails, because that is a document in the wrong shape
+     * rather than a document without that member.
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @return array<array-key, mixed>
+     */
+    public static function mapAt(array $data, string|int ...$keys): array
+    {
+        $value = self::walk($data, $keys);
+        if (null === $value) {
+            return [];
+        }
+
+        Assert::assertIsArray($value, self::path($keys).' is an object');
+
+        return $value;
+    }
+
+    /**
+     * The array at a path — `[]` when any step is absent.
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @return list<mixed>
+     */
+    public static function listAt(array $data, string|int ...$keys): array
+    {
+        $value = self::walk($data, $keys);
+        if (null === $value) {
+            return [];
+        }
+
+        Assert::assertIsArray($value, self::path($keys).' is an array');
+        Assert::assertTrue(array_is_list($value), self::path($keys).' is an array, not an object');
+
+        return $value;
+    }
+
+    /**
+     * The array of objects at a path — `[]` when any step is absent.
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    public static function objectsAt(array $data, string|int ...$keys): array
+    {
+        $rows = [];
+        foreach (self::listAt($data, ...$keys) as $index => $member) {
+            Assert::assertIsArray($member, self::path($keys)."[$index] is an object");
+            $rows[] = $member;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Whether a path leads anywhere — `isset($doc[a][b])`, typed. A `null` at
+     * the end counts as absent, exactly as `isset()` does.
+     *
+     * @param array<array-key, mixed> $data
+     */
+    public static function hasAt(array $data, string|int ...$keys): bool
+    {
+        return null !== self::walk($data, $keys);
+    }
+
+    /**
+     * @param array<array-key, mixed>      $data
+     * @param array<array-key, string|int> $keys
+     */
+    private static function walk(array $data, array $keys): mixed
+    {
+        $value = $data;
+        foreach ($keys as $key) {
+            if (!\is_array($value) || !\array_key_exists($key, $value)) {
+                return null;
+            }
+
+            $value = $value[$key];
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<array-key, string|int> $keys
+     */
+    private static function path(array $keys): string
+    {
+        return \sprintf('"%s"', implode('.', array_map(strval(...), $keys)));
     }
 
     /**

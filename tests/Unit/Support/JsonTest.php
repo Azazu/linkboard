@@ -40,6 +40,46 @@ final class JsonTest extends TestCase
         self::assertSame([['id' => '1']], Json::objects($body, 'items'));
     }
 
+    public function testThePathReadersNavigateAndTreatAnAbsentStepAsEmpty(): void
+    {
+        $doc = Json::decode('{"paths":{"/links":{"get":{"responses":{"200":{"headers":["X-Total"],"items":[{"id":"a"}]}}}}}}');
+
+        self::assertSame(['headers' => ['X-Total'], 'items' => [['id' => 'a']]], Json::mapAt($doc, 'paths', '/links', 'get', 'responses', '200'));
+        self::assertSame(['X-Total'], Json::listAt($doc, 'paths', '/links', 'get', 'responses', '200', 'headers'));
+        self::assertSame([['id' => 'a']], Json::objectsAt($doc, 'paths', '/links', 'get', 'responses', '200', 'items'));
+
+        // an absent step is the `?? []` these documents are navigated with
+        self::assertSame([], Json::mapAt($doc, 'paths', '/nope', 'get'));
+        self::assertSame([], Json::listAt($doc, 'paths', '/links', 'get', 'responses', '404', 'headers'));
+        self::assertSame([], Json::objectsAt($doc, 'components', 'schemas'));
+
+        self::assertTrue(Json::hasAt($doc, 'paths', '/links', 'get'));
+        self::assertFalse(Json::hasAt($doc, 'paths', '/links', 'post'));
+    }
+
+    public function testAJsonObjectWithNumericMemberNamesIsReadByThoseNames(): void
+    {
+        // PHP turns a JSON object's numeric member names into integers, so a
+        // document's responses are keyed by 204, not '204'
+        $doc = Json::decode('{"responses":{"204":{"description":"gone"}}}');
+
+        self::assertSame([204], array_keys(Json::mapAt($doc, 'responses')));
+        self::assertSame('gone', Json::string(Json::mapAt($doc, 'responses', '204'), 'description'));
+        self::assertTrue(Json::hasAt($doc, 'responses', '204'));
+    }
+
+    public function testAPathStepThatIsPresentInTheWrongShapeFailsRatherThanReadingAsEmpty(): void
+    {
+        $doc = Json::decode('{"responses":{"200":"ok"}}');
+
+        try {
+            Json::mapAt($doc, 'responses', '200');
+            self::fail('a string was read as an object');
+        } catch (AssertionFailedError $e) {
+            self::assertStringContainsString('"responses.200" is an object', $e->getMessage());
+        }
+    }
+
     /**
      * @return iterable<string, array{callable(array<string, mixed>): mixed, string}>
      */
@@ -51,7 +91,7 @@ final class JsonTest extends TestCase
         yield 'a number that is a string' => [static fn (array $b): mixed => Json::float($b, 'token'), '"token" is a number'];
         yield 'a bool that is an int' => [static fn (array $b): mixed => Json::bool($b, 'count'), '"count" is a boolean'];
         yield 'a nullable string that is an int' => [static fn (array $b): mixed => Json::nullableString($b, 'count'), '"count" is a string or null'];
-        yield 'an object that is a list' => [static fn (array $b): mixed => Json::map($b, 'tags'), '"tags" is an object, not a list'];
+        yield 'an object that is a scalar' => [static fn (array $b): mixed => Json::map($b, 'token'), '"token" is an object'];
         yield 'an array that is an object' => [static fn (array $b): mixed => Json::items($b, 'meta'), '"meta" is an array, not an object'];
         yield 'objects that are scalars' => [static fn (array $b): mixed => Json::objects($b, 'tags'), '"tags"[0] is an object'];
     }

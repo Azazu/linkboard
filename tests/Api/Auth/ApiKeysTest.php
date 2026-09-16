@@ -8,9 +8,11 @@ use App\Auth\Api\ApiKeys\CreateApiKeyProcessor;
 use App\Auth\Api\ApiKeys\OwnApiKeyItemProvider;
 use App\Auth\Api\ApiKeys\OwnApiKeysProvider;
 use App\Auth\Api\ApiKeys\RevokeApiKeyProcessor;
+use App\Shared\Db\Row;
 use App\Tests\Api\Link\LinkApiTestCase;
 use App\Tests\Factory\ApiKeyFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Component\Uid\Uuid;
@@ -33,21 +35,22 @@ final class ApiKeysTest extends LinkApiTestCase
         $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'ci deploy']);
         self::assertResponseStatusCodeSame(201);
         $created = $this->decode($client);
-        self::assertMatchesRegularExpression('/^lb_[A-Za-z0-9]{40}$/', $created['key']);
-        self::assertSame(substr($created['key'], 0, 8), $created['prefix']);
+        $plaintext = Json::string($created, 'key');
+        self::assertMatchesRegularExpression('/^lb_[A-Za-z0-9]{40}$/', $plaintext);
+        self::assertSame(substr($plaintext, 0, 8), Json::string($created, 'prefix'));
         self::assertSame(['ci deploy', null, null, null], [$created['name'], $created['expiresAt'], $created['lastUsedAt'], $created['revokedAt']]);
 
-        $row = $this->connection()->fetchAssociative('SELECT * FROM api_keys WHERE id = :id', ['id' => $created['id']]);
+        $row = $this->connection()->fetchAssociative('SELECT * FROM api_keys WHERE id = :id', ['id' => Json::string($created, 'id')]);
         self::assertIsArray($row);
-        self::assertSame(hash('sha256', $created['key']), $row['key_hash']);
+        self::assertSame(hash('sha256', $plaintext), $row['key_hash']);
         self::assertSame($created['prefix'], $row['prefix']);
         foreach ($row as $column => $value) {
-            self::assertNotSame($created['key'], $value, "column $column must not hold the plaintext");
+            self::assertNotSame($plaintext, $value, "column $column must not hold the plaintext");
         }
 
         $this->api($client, $token, 'GET', '/api/v1/api-keys');
         self::assertResponseStatusCodeSame(200);
-        $listed = $this->decode($client)['items'][0];
+        $listed = Json::objects($this->decode($client), 'items')[0];
         self::assertSame($created['id'], $listed['id']);
         self::assertArrayNotHasKey('key', $listed, 'the plaintext is shown once');
         self::assertSame(['id', 'name', 'prefix', 'expiresAt', 'createdAt', 'lastUsedAt', 'revokedAt'], array_keys($listed));
@@ -69,11 +72,11 @@ final class ApiKeysTest extends LinkApiTestCase
             $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'ok', 'expiresAt' => $value]);
             self::assertSame(['expiresAt'], $this->violationPaths($client), $case);
         }
-        self::assertSame(0, (int) $this->connection()->fetchOne('SELECT count(*) FROM api_keys'), 'nothing was created');
+        self::assertSame(0, Row::toInt($this->connection()->fetchOne('SELECT count(*) FROM api_keys')), 'nothing was created');
 
         $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'expiring', 'expiresAt' => '2030-01-01T00:00:00Z']);
         self::assertResponseStatusCodeSame(201);
-        self::assertSame('2030-01-01T00:00:00+00:00', $this->decode($client)['expiresAt'], 'a valid future timestamp is stored as given');
+        self::assertSame('2030-01-01T00:00:00+00:00', Json::string($this->decode($client), 'expiresAt'), 'a valid future timestamp is stored as given');
         $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'never', 'expiresAt' => null]);
         self::assertResponseStatusCodeSame(201, 'an explicit null means never expires');
         self::assertNull($this->decode($client)['expiresAt']);
@@ -89,13 +92,13 @@ final class ApiKeysTest extends LinkApiTestCase
 
         $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'tenth']);
         self::assertResponseStatusCodeSame(201);
-        $tenth = $this->decode($client)['id'];
+        $tenth = Json::string($this->decode($client), 'id');
 
         $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'eleventh']);
         self::assertResponseStatusCodeSame(409);
         self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
-        self::assertStringContainsString('10', (string) $this->decode($client)['detail']);
-        self::assertSame(10, (int) $this->connection()->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :u AND revoked_at IS NULL', ['u' => $user->getId()->toRfc4122()]), 'nothing was created');
+        self::assertStringContainsString('10', Json::string($this->decode($client), 'detail'));
+        self::assertSame(10, Row::toInt($this->connection()->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :u AND revoked_at IS NULL', ['u' => $user->getId()->toRfc4122()])), 'nothing was created');
 
         $this->api($client, $token, 'DELETE', '/api/v1/api-keys/'.$tenth);
         self::assertResponseStatusCodeSame(204);
@@ -114,8 +117,8 @@ final class ApiKeysTest extends LinkApiTestCase
         $aToken = $this->token($client, 'a@example.com');
 
         $this->api($client, $aToken, 'GET', '/api/v1/api-keys');
-        $items = $this->decode($client)['items'];
-        self::assertSame(['a-key'], array_column($items, 'name'), 'only A\'s keys');
+        $items = Json::objects($this->decode($client), 'items');
+        self::assertSame(['a-key'], Json::column($items, 'name'), 'only A\'s keys');
         self::assertSame(['id', 'name', 'prefix', 'expiresAt', 'createdAt', 'lastUsedAt', 'revokedAt'], array_keys($items[0]));
 
         $this->api($client, $aToken, 'DELETE', '/api/v1/api-keys/'.$aKey->getId());
@@ -123,7 +126,7 @@ final class ApiKeysTest extends LinkApiTestCase
         $this->api($client, $aToken, 'DELETE', '/api/v1/api-keys/'.$aKey->getId());
         self::assertResponseStatusCodeSame(204, 'idempotent');
         $this->api($client, $aToken, 'GET', '/api/v1/api-keys');
-        self::assertNotNull($this->decode($client)['items'][0]['revokedAt']);
+        self::assertNotNull(Json::objects($this->decode($client), 'items')[0]['revokedAt']);
 
         foreach ([(string) $bKey->getId(), Uuid::v7()->toRfc4122(), 'not-a-uuid'] as $id) {
             $this->api($client, $aToken, 'DELETE', '/api/v1/api-keys/'.$id);
@@ -139,10 +142,9 @@ final class ApiKeysTest extends LinkApiTestCase
     {
         $client = self::createClient();
         $client->request('GET', '/api/docs.json');
-        $paths = $this->decode($client)['paths'];
-        self::assertIsArray($paths);
-        self::assertSame(['get', 'post'], array_keys($paths['/api/v1/api-keys']));
-        self::assertSame(['delete'], array_keys($paths['/api/v1/api-keys/{id}']));
+        $paths = Json::map($this->decode($client), 'paths');
+        self::assertSame(['get', 'post'], array_keys(Json::map($paths, '/api/v1/api-keys')));
+        self::assertSame(['delete'], array_keys(Json::map($paths, '/api/v1/api-keys/{id}')));
     }
 
     private function connection(): Connection

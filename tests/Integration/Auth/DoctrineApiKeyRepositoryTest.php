@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Auth;
 use App\Auth\ApiKeyRepositoryInterface;
 use App\Auth\Entity\ApiKey;
 use App\Auth\Repository\DoctrineApiKeyRepository;
+use App\Shared\Db\Row;
 use App\Tests\Factory\ApiKeyFactory;
 use App\Tests\Factory\UserFactory;
 use Doctrine\DBAL\Connection;
@@ -121,7 +122,7 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
 
         $connection->executeStatement('DELETE FROM users WHERE id = :id', ['id' => $owner->getId()->toRfc4122()]);
 
-        self::assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :id', ['id' => $owner->getId()->toRfc4122()]));
+        self::assertSame(0, Row::toInt($connection->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :id', ['id' => $owner->getId()->toRfc4122()])));
     }
 
     public function testMigrationRoundTrip(): void
@@ -135,11 +136,11 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
         $version = 'DoctrineMigrations\\Version20260912134933';
 
         $this->console(['doctrine:migrations:execute', $version, '--down', '--no-interaction']);
-        self::assertSame(0, (int) $connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'"), 'down drops the table');
+        self::assertSame(0, Row::toInt($connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'")), 'down drops the table');
 
         $this->console(['doctrine:migrations:execute', $version, '--up', '--no-interaction']);
-        self::assertSame(1, (int) $connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'"), 'up recreates it');
-        self::assertSame(1, (int) $connection->fetchOne("SELECT count(*) FROM pg_indexes WHERE tablename = 'api_keys' AND indexdef LIKE 'CREATE UNIQUE INDEX%(key_hash)'"), 'the hash is unique');
+        self::assertSame(1, Row::toInt($connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'")), 'up recreates it');
+        self::assertSame(1, Row::toInt($connection->fetchOne("SELECT count(*) FROM pg_indexes WHERE tablename = 'api_keys' AND indexdef LIKE 'CREATE UNIQUE INDEX%(key_hash)'")), 'the hash is unique');
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Analytics\Cache\ReportCache;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use App\Tests\Fixture\StatementRecorder;
+use App\Tests\Support\Json;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -101,14 +102,14 @@ final class ReportCacheTest extends AnalyticsApiTestCase
         $top = '/api/v1/admin/stats/top-links?'.self::PERIOD;
 
         $this->get($client, $token, $uri);
-        self::assertSame(['doomed', 'stays'], array_column($this->get($client, $admin, $top)['items'], 'slug'));
+        self::assertSame(['doomed', 'stays'], array_column(Json::objects($this->get($client, $admin, $top), 'items'), 'slug'));
 
         $this->api($client, $token, 'DELETE', '/api/v1/links/'.$link->getId());
         self::assertResponseStatusCodeSame(204);
 
         $this->api($client, $token, 'GET', $uri);
         self::assertResponseStatusCodeSame(404);
-        self::assertSame(['stays'], array_column($this->get($client, $admin, $top)['items'], 'slug'));
+        self::assertSame(['stays'], array_column(Json::objects($this->get($client, $admin, $top), 'items'), 'slug'));
     }
 
     public function testCacheStoreUnavailableStillAnswersWithDatabaseNumbers(): void

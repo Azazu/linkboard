@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Api;
 
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -75,18 +76,15 @@ final class ErrorCatalogueTest extends WebTestCase
         $client = self::createClient();
         $client->request('GET', '/api/docs.json');
         self::assertResponseIsSuccessful();
-        /** @var array<string, mixed> $document */
-        $document = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
-
         $statuses = [];
-        /** @var array<string, array<string, mixed>> $paths */
-        $paths = $document['paths'] ?? [];
-        foreach ($paths as $item) {
-            foreach ($item as $method => $operation) {
-                if (!\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true) || !\is_array($operation)) {
+        $paths = Json::mapAt(Json::decode($client->getResponse()->getContent()), 'paths');
+        foreach (array_keys($paths) as $path) {
+            $item = Json::map($paths, $path);
+            foreach (array_keys($item) as $method) {
+                if (!\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true)) {
                     continue;
                 }
-                foreach (array_keys($operation['responses'] ?? []) as $status) {
+                foreach (array_keys(Json::mapAt($item, $method, 'responses')) as $status) {
                     if ((int) $status >= 400) {
                         $statuses[] = (int) $status;
                     }

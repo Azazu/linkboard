@@ -43,7 +43,7 @@ final readonly class ProdHealthRequest
         $process = new Process($arguments, $root, [
             'APP_ENV' => 'prod',
             'APP_DEBUG' => '0',
-            'APP_SECRET' => (string) ($_SERVER['APP_SECRET'] ?? 'prod-kernel-test-secret'),
+            'APP_SECRET' => Env::string('APP_SECRET', 'prod-kernel-test-secret'),
             // the prod container has no `fixed` country resolver (a test-only service)
             'COUNTRY_RESOLVERS' => 'header,geolite2',
             'DATABASE_URL' => ProbeTestEnvironment::appDatabaseUrl(),

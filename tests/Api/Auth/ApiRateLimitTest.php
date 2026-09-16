@@ -6,9 +6,11 @@ namespace App\Tests\Api\Auth;
 
 use App\Auth\RateLimit\ApiRateLimitHeaders;
 use App\Auth\RateLimit\ApiRateLimitListener;
+use App\Shared\Db\Row;
 use App\Tests\Api\Link\LinkApiTestCase;
 use App\Tests\Factory\ApiKeyFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use Doctrine\DBAL\Connection;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
@@ -70,8 +72,8 @@ final class ApiRateLimitTest extends LinkApiTestCase
         self::assertGreaterThanOrEqual(1, (int) $client->getResponse()->headers->get('Retry-After'));
         self::assertResponseHeaderSame('X-RateLimit-Limit', '3');
         self::assertResponseHeaderSame('X-RateLimit-Remaining', '0');
-        self::assertSame(429, $this->decode($client)['status']);
-        self::assertSame(0, (int) $this->connection()->fetchOne("SELECT count(*) FROM links WHERE target_url = 'https://example.com/over-the-limit'"), 'the operation did not run');
+        self::assertSame(429, Json::int($this->decode($client), 'status'));
+        self::assertSame(0, Row::toInt($this->connection()->fetchOne("SELECT count(*) FROM links WHERE target_url = 'https://example.com/over-the-limit'")), 'the operation did not run');
 
         $this->withKey($client, $keyB, 'GET', '/api/v1/me');
         self::assertResponseStatusCodeSame(200, 'a second key of the same user has its own window');

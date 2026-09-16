@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Click;
 
+use App\Shared\Db\Row;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -110,7 +111,7 @@ final class MessengerMessagesMigrationTest extends KernelTestCase
 
     private function rows(): int
     {
-        return (int) $this->connection()->fetchOne('SELECT count(*) FROM messenger_messages');
+        return Row::toInt($this->connection()->fetchOne('SELECT count(*) FROM messenger_messages'));
     }
 
     private function connection(): Connection

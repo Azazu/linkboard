@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Web\Redirect;
 
+use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -54,7 +55,7 @@ final class ClickLoggingTest extends RedirectWebTestCase
         self::visit($client, '/expired');
 
         self::assertSame([], self::pendingMessages(), 'non-redirects dispatch nothing');
-        self::assertSame(0, (int) self::connection()->fetchOne('SELECT count(*) FROM clicks'));
+        self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM clicks')));
         self::assertSame(2, self::clickCountOf($inactive->getId()));
         self::assertSame(2, self::clickCountOf($expired->getId()));
     }

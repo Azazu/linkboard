@@ -6,6 +6,7 @@ namespace App\Tests\Api\Auth;
 
 use App\Auth\UserRepositoryInterface;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -27,8 +28,7 @@ final class BlockedUserTest extends WebTestCase
         $client = self::createClient();
         UserFactory::createOne(['email' => 'ann@example.com']);
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => 'ann@example.com', 'password' => UserFactory::PASSWORD]);
-        $token = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR)['token'];
-        self::assertIsString($token);
+        $token = Json::string(Json::decode($client->getResponse()->getContent()), 'token');
 
         $client->request('GET', '/api/v1/me', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token, 'HTTP_ACCEPT' => 'application/json']);
         self::assertResponseStatusCodeSame(200);

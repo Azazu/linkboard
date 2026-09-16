@@ -14,8 +14,10 @@ use App\Click\RefererHost;
 use App\Click\Visit;
 use App\Click\VisitorHasher;
 use App\Link\Entity\Link;
+use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Env;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Monolog\Handler\TestHandler;
@@ -50,7 +52,7 @@ final class LimitTransitionTest extends KernelTestCase
 
     protected function setUp(): void
     {
-        $url = (string) ($_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? '');
+        $url = Env::string('REDIS_URL');
         $redis = RedisAdapter::createConnection($url);
         self::assertInstanceOf(\Redis::class, $redis);
         $this->redis = $redis;
@@ -98,7 +100,7 @@ final class LimitTransitionTest extends KernelTestCase
         foreach ($this->queue as $message) {
             $handler($message);
         }
-        self::assertSame(13, (int) self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$id->toRfc4122()]));
+        self::assertSame(13, Row::toInt(self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$id->toRfc4122()])));
 
         // the next call lifts the key to the persisted count and is exhausted
         $refreshed = $this->reload($id);
@@ -144,7 +146,7 @@ final class LimitTransitionTest extends KernelTestCase
         foreach ($this->queue as $message) {
             $handler($message);
         }
-        self::assertSame(3, (int) self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$id->toRfc4122()]));
+        self::assertSame(3, Row::toInt(self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$id->toRfc4122()])));
         $this->redis->del($this->counter->key($id));
 
         // the paused requests resume with seed 0: the stated bound counts what was unpersisted when THEIR snapshot was read (three)

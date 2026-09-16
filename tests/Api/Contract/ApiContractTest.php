@@ -9,6 +9,7 @@ use App\Tests\Api\Link\LinkApiTestCase;
 use App\Tests\Factory\ApiKeyFactory;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
@@ -63,11 +64,10 @@ final class ApiContractTest extends LinkApiTestCase
             // would otherwise pass, because its 200 is documented too (Gate 2
             // round 1, finding 6)
             self::assertSame((string) $case['expect'], $status, "{$case['name']}: expected {$case['expect']}");
-            $declared = $operations[$case['operation']]['responses'] ?? [];
+            $declared = Json::mapAt($operations, (string) $case['operation'], 'responses');
             self::assertArrayHasKey($status, $declared, "{$case['name']}: {$case['operation']} answered $status, which the document does not declare for it");
 
-            /** @var list<string> $documentedTypes */
-            $documentedTypes = array_map(strval(...), array_keys($declared[$status]['content'] ?? []));
+            $documentedTypes = array_map(strval(...), array_keys(Json::mapAt($declared, $status, 'content')));
             $actual = (string) $client->getResponse()->headers->get('Content-Type');
             if ([] === $documentedTypes) {
                 self::assertSame('', $actual, "{$case['name']}: a response documented without content sent a body type");
@@ -107,7 +107,7 @@ final class ApiContractTest extends LinkApiTestCase
             if (!str_contains($name, '/stats/')) {
                 continue;
             }
-            $parameters = array_column($operation['parameters'] ?? [], 'name');
+            $parameters = array_column(Json::objectsAt($operation, 'parameters'), 'name');
             self::assertContains('includeBots', $parameters, "$name declares includeBots");
             // the global summary is all-time plus today: it has no period, and
             // the capability says so, so it declares none (FR-ANL-4)
@@ -139,7 +139,7 @@ final class ApiContractTest extends LinkApiTestCase
         $this->api($client, $token, 'POST', '/api/v1/api-keys', ['name' => 'one too many']);
 
         self::assertResponseStatusCodeSame(409);
-        self::assertArrayHasKey('409', $operations['POST /api/v1/api-keys']['responses'], 'the operation declares the refusal it just made');
+        self::assertArrayHasKey('409', Json::mapAt($operations, 'POST /api/v1/api-keys', 'responses'), 'the operation declares the refusal it just made');
         self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
     }
 
@@ -197,9 +197,8 @@ final class ApiContractTest extends LinkApiTestCase
         $this->withKey($client, $key, 'GET', '/api/v1/me');
 
         self::assertResponseStatusCodeSame(429);
-        $declared = $operations['GET /api/v1/me']['responses']['429'] ?? null;
-        self::assertIsArray($declared, 'the operation declares the refusal it just made');
-        self::assertArrayHasKey('Retry-After', $declared['headers'] ?? []);
+        self::assertTrue(Json::hasAt($operations, 'GET /api/v1/me', 'responses', '429'), 'the operation declares the refusal it just made');
+        self::assertArrayHasKey('Retry-After', Json::mapAt($operations, 'GET /api/v1/me', 'responses', '429', 'headers'));
         self::assertGreaterThanOrEqual(1, (int) $client->getResponse()->headers->get('Retry-After'), 'and sends the header it documents');
         self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
     }
@@ -299,7 +298,7 @@ final class ApiContractTest extends LinkApiTestCase
             '{admin}' => $this->token($client, 'root@example.com'),
             '{link}' => (string) $link->getId(),
             '{other-link}' => (string) $others->getId(),
-            '{key}' => (string) $key['id'],
+            '{key}' => Json::string($key, 'id'),
             '{stranger-id}' => (string) $stranger->getId(),
             '{nothing}' => Uuid::v7()->toRfc4122(),
         ]];
@@ -328,10 +327,11 @@ final class ApiContractTest extends LinkApiTestCase
      */
     private static function slugs(array $collection): array
     {
-        /** @var list<array<string, mixed>> $members */
-        $members = $collection['member'] ?? $collection['items'] ?? [];
+        $members = Json::hasAt($collection, 'member')
+            ? Json::objects($collection, 'member')
+            : Json::objectsAt($collection, 'items');
 
-        return array_map(static fn (array $link): string => (string) $link['slug'], $members);
+        return Json::column($members, 'slug');
     }
 
     /**
@@ -354,15 +354,13 @@ final class ApiContractTest extends LinkApiTestCase
         if (null === self::$operations) {
             $client->request('GET', '/api/docs.json');
             self::assertResponseIsSuccessful();
-            /** @var array<string, mixed> $document */
-            $document = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
             $operations = [];
-            /** @var array<string, array<string, mixed>> $paths */
-            $paths = $document['paths'] ?? [];
-            foreach ($paths as $path => $item) {
-                foreach ($item as $method => $operation) {
-                    if (\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true) && \is_array($operation)) {
-                        $operations[strtoupper($method).' '.$path] = $operation;
+            $paths = Json::mapAt(Json::decode($client->getResponse()->getContent()), 'paths');
+            foreach (array_keys($paths) as $path) {
+                $item = Json::map($paths, $path);
+                foreach (array_keys($item) as $method) {
+                    if (\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true)) {
+                        $operations[strtoupper((string) $method).' '.$path] = Json::map($item, $method);
                     }
                 }
             }
