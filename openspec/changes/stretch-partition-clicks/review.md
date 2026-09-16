@@ -31,3 +31,18 @@ Validation: `scripts/pregate-verify.sh gate1 stretch-partition-clicks` passed, i
 | 4 | confirmed — The analytics delta now defines retained clicks as rows still present, explicitly includes older rows in a straddling month and all history before maintenance runs, and task 5.0 verifies both cases. |
 
 Validation: reviewed only `fe05c781cb1db086dabe35da4a41ed625a5fb835..4cef6e59563312071cfeaac9e193448a3558d702` and collateral requirements/source reachable from the named findings. Branch and HEAD match the request. `scripts/pregate-verify.sh gate1 stretch-partition-clicks` passed, including strict OpenSpec validation. This confirmation evaluates planning artifacts; implementation verification remains for Gate 2.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-16
+**Reviewed-Commit:** be353c1f12733d7c9f1469b9f4e02e7f9780efbb
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Migration initialization and maintenance now cover the retention window and future horizon. Task 4.1 explicitly verifies recreation of a missing historical partition; task 2.2 verifies seeding on an independently created fresh database. Design decision 5 and task 6.3 additionally provision a declared fixed fixture range through `make test-db`, using the shared partition function, so the analytics fixtures remain insertable after their dates leave the production window. These concrete implementation and verification commitments resolve the two gaps identified in Confirmation 1. |
+| 2 | confirmed — Design decision 5b and the click-logging delta define the expiry boundary as the later of the configured cutoff and a durable, never-decreasing boundary of removed data. The command records that boundary transactionally with the drops; tasks 3.5 and 4.5 cover replay after window expansion and atomic persistence of the boundary. Task 3.4 covers expired first deliveries, redeliveries, manual retries, and the deleted-link/missing-partition recovery case. The deleted-link requirement explicitly qualifies acknowledgement with the missing-partition precedence, and task 3.2 now permits the handler's expiry guard. |
+| 3 | confirmed — Both configuration settings must be positive whole numbers of months, validated before any schema-changing statement. Task 4.6 retains explicit failing inputs for zero, negative, empty and nonnumeric values for each setting, with nonzero exit, a diagnostic naming the setting, and unchanged partitions and row counts. The resolution confirmed previously remains intact. |
+
+Validation: reviewed only `fe05c781cb1db086dabe35da4a41ed625a5fb835..be353c1f12733d7c9f1469b9f4e02e7f9780efbb` and collateral requirements/source reachable from the named findings. Branch and HEAD match the request. `scripts/pregate-verify.sh gate1 stretch-partition-clicks` passed, including strict OpenSpec validation. This confirms the Gate 1 planning resolutions; implementation and execution of the promised tests remain for Gate 2. Finding 4 was already confirmed in Confirmation 1; no unrelated findings are introduced.
