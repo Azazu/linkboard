@@ -5,12 +5,16 @@
 ### Requirement: Summary report
 `GET /api/v1/links/{id}/stats/summary` SHALL return `linkId`; `totalClicks`, `uniqueVisitors` (distinct `visitor_hash`), `firstClickAt` and `lastClickAt` over all of the link's **retained** clicks regardless of the period (null timestamps when the link has none retained); `clicksToday` (clicks of the current UTC day); `clicksInPeriod` (clicks with `from` ≤ `occurred_at` < `to`); `clicksInPreviousPeriod` (clicks in the period of the same length ending at `from`); and `deltaPercent`, the change from the previous period to the period as a percentage rounded to one decimal, null when the previous period has no clicks. Bots are excluded from every number unless `includeBots` is true.
 
-Retained means: within the configured retention window (`click-logging`,
-"Retention drops whole months"). While no partition has been dropped these
-figures are over every click the link ever received; once one has been, they are
-over what survives, and a visitor whose only earlier clicks were dropped counts
-as new when they return. A period that reaches outside the retained history is
-answered from what remains rather than refused.
+Retained means: still present. Click records leave only when a run of the
+maintenance command drops the month they are in (`click-logging`, "Retention
+drops whole months, and only when asked"); the configured window decides which
+months become eligible, not which rows are visible. So a month that straddles
+the boundary keeps its older rows, and a deployment where the command has never
+run retains everything. While no month has been dropped these figures are over
+every click the link ever received; once one has been, they are over what
+survives, and a visitor whose only earlier clicks were dropped counts as new when
+they return. A period that reaches into a dropped month is answered from what
+remains rather than refused.
 
 #### Scenario: Numbers
 - **WHEN** a link has 4 clicks (2 distinct visitors) between 2026-09-01 and 2026-09-08 UTC, 2 clicks (1 visitor) between 2026-08-25 and 2026-09-01, 1 click on 2026-07-01 and 1 click today, and the owner requests `.../stats/summary?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z`

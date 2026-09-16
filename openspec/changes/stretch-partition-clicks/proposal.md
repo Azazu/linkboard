@@ -31,11 +31,21 @@ improvement.
   partition key in every unique constraint. This is not cosmetic: the
   idempotency of redelivery rests on that key, so the requirement that names it
   changes and gets a test that proves the guarantee survives.
-- **A maintenance command creates the partitions ahead of time and drops the
-  expired ones.** A click whose month has no partition cannot be inserted, so
-  the horizon is a correctness concern, not housekeeping.
+- **A maintenance command provisions the months a click may legitimately fall
+  in and drops the expired ones.** The range reaches backwards over the whole
+  retention window, not only forwards: a click whose month has no partition
+  cannot be inserted, and the first thing that happens to a fresh database is a
+  seed or a fixture writing months into the past. It is a correctness concern,
+  not housekeeping. Its configuration is validated before it issues any
+  statement that changes the schema.
 - **A declared retention window**, configured by an environment variable and
   enforced only by that command — nothing drops data on its own.
+- **A click older than the retention window is discarded rather than parked.**
+  Retention and the transport disagree otherwise: after a month is dropped, a
+  redelivery from that month would hit a missing partition and be parked,
+  contradicting the promise that a redelivery is always acknowledged. The
+  handler gains one guard on the message's own timestamp — its insert, its
+  transaction and its two exception guards are untouched.
 - **BREAKING for the all-time figures.** The summary report's `totalClicks`,
   `uniqueVisitors`, `firstClickAt` and `lastClickAt` are defined over *all* of a
   link's clicks. Once a partition is dropped they are over the retained history,
@@ -72,16 +82,18 @@ None.
   is documented, not installed; nothing in the application drops a partition.
 - **No sub-monthly partitions, no hash partitioning, no partitioning of any
   other table.** The month is the unit §9 names.
-- **Not a rewrite of the write path.** The handler keeps its one transaction and
-  its two exception guards.
+- **Not a rewrite of the write path.** The handler keeps its one transaction,
+  its insert and its two exception guards; it gains exactly one guard, for a
+  message older than the retention window, and nothing else.
 
 ## Impact
 
 - **Schema**: a reviewed, reversible migration that converts a populated table —
   the irreversible-migration trigger `AGENTS.md` and NFR-SEC-7 both name, which
   is what puts this at `high` regardless of the roadmap's minimum.
-- **`src/Click/`**: the entity's mapping (composite key) and a maintenance
-  command; the handler's SQL is unchanged.
+- **`src/Click/`**: the entity's mapping (composite key), a maintenance command,
+  and one guard in the handler for a message older than the window; the
+  handler's SQL is unchanged.
 - **`src/Analytics/`**: nothing. That is a claim this change has to defend.
 - **Tests**: the redelivery guarantee under the new key, a click that lands in
   no partition, retention dropping a month and what that does to the summary,

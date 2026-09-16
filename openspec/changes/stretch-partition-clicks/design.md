@@ -90,7 +90,8 @@ analytics code is untouched.
 ```
 ALTER TABLE clicks RENAME TO clicks_legacy;          -- keeps the rows
 CREATE TABLE clicks (…) PARTITION BY RANGE (occurred_at);
-SELECT clicks_ensure_partition(month) for every month in the data, and the current month;
+SELECT clicks_ensure_partition(month) for every month of the retention window,
+  every month up to the horizon, and every month present in the data;
 INSERT INTO clicks SELECT … FROM clicks_legacy;
 DROP TABLE clicks_legacy;
 ```
@@ -128,28 +129,81 @@ covers columns, indexes and constraints — **not functions**, which it says
 plainly. A changed function body round-trips silently; the function's behaviour
 is covered by tests instead.
 
-### 5. The horizon is a correctness property
+### 5. The covered range is a correctness property, and it reaches backwards
 
 `app:clicks:partitions` (name settled in the tasks) creates every missing
-partition from the current month to `now + horizon` months, default 3,
-configured by environment variable. It is idempotent and prints only what it
-created.
+partition **from the first month of the retention window to `now + horizon`
+months**, and additionally for any month in which a record already exists. It is
+idempotent and prints only what it created.
+
+*Why backwards and not only forwards.* A fresh database migrated today would
+otherwise carry the current month alone, and the first thing that happens to a
+fresh database is a seed or a test fixture: `app:demo:seed` writes over the
+preceding 60 days by default, and the analytics fixtures write clicks as far
+back as 2026-03-28 — every one of those inserts would fail, in CI, on a database
+nobody had populated first (Gate 1 round 1, finding 1; the dates are read from
+`tests/`, not assumed). Covering the window backwards makes "any click inside
+the retention window is storable" a property of a freshly migrated database, and
+that is what the spec now says.
+
+*The boundary it creates.* A fixture dated **outside** the window still fails —
+deliberately, because such a click is one retention would refuse to keep. The
+oldest click fixture in the suite is about six months old against a window of
+thirteen, and a test that reaches further is telling the truth about a click the
+system does not store.
 
 *What happens without it, stated because it is the failure mode:* an insert
 into a month with no partition raises `no partition of relation "clicks" found`
-— not a unique violation, not a foreign key violation, so **neither guard
-catches it**. The handler lets it propagate, the transport retries, and the
+— not a unique violation, not a foreign key violation, so **neither existing
+guard catches it**. The handler lets it propagate, the transport retries, and the
 message ends in the failure transport rather than being acknowledged as a
-duplicate. That is the correct behaviour and the test asserts exactly it: the
-click is not lost silently, the counter is not incremented, and the message is
-retried.
+duplicate. That is the correct behaviour for a click inside the window, and the
+test asserts exactly it: the click is not lost silently, the counter is not
+incremented, and the message is retried.
 
-### 6. Retention: whole months, on demand, with a declared window
+### 5a. A click older than the window is discarded, not parked
+
+Retention and the transport disagree unless somebody decides between them: after
+a month is dropped, a redelivery of a message from that month hits the missing
+partition and would be **parked** rather than acknowledged — which contradicts
+the idempotency requirement's promise that a redelivery is always acknowledged.
+Recreating the month to absorb it would be worse: it destroys the only evidence
+that the click was already counted, and permits a second increment of a lifetime
+counter (Gate 1 round 1, finding 2).
+
+The decision: the handler gains one guard **before** the insert — a message
+whose `occurred_at` is older than the retention window is acknowledged,
+discarded and logged at info, exactly as a message for a deleted link is. It
+covers the three ways such a message arrives: a redelivery after its month was
+dropped, a first delivery delayed past the window, and a manual retry from the
+failed transport long after the fact.
+
+*Why a guard and not a caught exception.* The two cases must not be confused:
+too old is expected and is acknowledged; inside the window with no partition is
+an operational failure and is retried. A caught `no partition` error cannot tell
+them apart, so the rule is stated on the message's own timestamp, before the
+statement runs.
+
+*What this costs.* The handler is no longer literally unchanged — it gains one
+comparison and one log line, and the proposal says so. Its insert, its
+transaction and its two exception guards are untouched.
+
+### 6. Retention: whole months, on demand, with a declared and validated window
 
 The same command drops every partition whose **entire** range is older than
 `now - window`, default 13 months so that a year-over-year comparison is still
 possible, configured by environment variable. A partition that straddles the
 boundary is kept and named. Nothing else in the application drops click data.
+
+*The configuration is validated before any DDL is issued.* A window of `0`
+places the cutoff at this instant and makes the current, populated month
+eligible; a negative one places it in the future and makes every month eligible.
+Neither is a strange input — an unset variable reads as an empty string, and a
+typo reads as `-1` (Gate 1 round 1, finding 3). So the command parses both
+settings first, requires each to be a whole number of months of at least one,
+and on anything else fails naming the setting, having created nothing and
+dropped nothing. Each of those inputs is a demonstrated failing input in the
+tasks, not a claim here.
 
 *Why dropping and not `DELETE`.* Dropping a partition is a catalogue operation;
 `DELETE` on a month of a large table rewrites and then needs a vacuum. That is
@@ -174,11 +228,11 @@ schema the ORM's tooling does not model).
 
 | Question | Answer |
 |---|---|
-| Crash before/after an external effect | The conversion is one migration in one transaction — PostgreSQL's DDL is transactional, so a crash mid-copy leaves the original table under its original name and Doctrine's version row unwritten. The retention drop is also transactional per run: a crash leaves the partitions it had not dropped. Both are re-runnable, which is the property the tests assert. |
+| Crash before/after an external effect | The conversion is one migration in one transaction — PostgreSQL's DDL is transactional, so a crash mid-copy leaves the original table under its original name and Doctrine's version row unwritten. The retention drop is also transactional per run: a crash leaves the partitions it had not dropped. Both are re-runnable, which is the property the tests assert. A message in flight during any of it is retried by the transport, and if its month has meanwhile been dropped it is discarded by the guard of decision 5a rather than parked. |
 | Concurrent writers | A click arriving during the conversion waits on the exclusive lock and is written afterwards, to the partitioned table; the redirect never waits on it because the write is already asynchronous. A click arriving for a month retention is dropping is a click outside the window — the only way to lose a live write is a window shorter than the clock skew, which the command refuses by keeping a straddling month. |
 | Deletion/expiry | The heart of this change. Retention is deletion, it is irreversible, and it runs only when the command runs: the window is declared, a straddling month is kept, every dropped partition is named in the output, and nothing in the request path or the worker can trigger it. |
-| Idempotency of retries | Two senses, both tested: the maintenance command is safe to run repeatedly (creates nothing the second time, drops nothing the second time), and the handler's redelivery guarantee survives the key change — that is decision 2's scenario. |
-| Empty/zero/null inputs | An empty `clicks` table at migration time (a fresh database, which is what CI runs) creates the current month's partition and nothing else; a link with no retained clicks answers the summary with zeros and nulls, which is the existing scenario the spec keeps. |
+| Idempotency of retries | Three senses, all tested: the maintenance command is safe to run repeatedly (creates nothing the second time, drops nothing the second time); the handler's redelivery guarantee survives the key change (decision 2); and it survives retention, because a redelivery whose month is gone is acknowledged by the too-old guard rather than parked or re-recorded (decision 5a). |
+| Empty/zero/null inputs | Three places. An empty `clicks` table at migration time — a fresh database, which is what CI runs — still gets the whole window's partitions, so a seed or a fixture works without preparation (decision 5). A link with no retained clicks answers the summary with zeros and nulls, the existing scenario the spec keeps. And the command's own configuration: `0`, a negative number, an empty value or a non-number for either the window or the horizon fails the run before any statement changes the schema, because a window of `0` or less makes populated months eligible for dropping (decision 6). |
 | Authorization boundary | n/a — no endpoint, no role, no voter changes. The command is a console command, reachable only by whoever can run the container. |
 | Money rounding | n/a. |
 
@@ -201,6 +255,11 @@ schema the ORM's tooling does not model).
   record), the command is documented with a cron line, and the test proves the
   loud failure rather than a silent one.
 - **One more moving part in the demo** → the seed writes 60 days of history,
-  which is inside the window and inside the partitions the migration creates
-  from the data; the benchmark recipe is re-run as part of this change, so if
-  that is wrong it fails there.
+  which is inside the window the migration provisions on any database, empty or
+  not (decision 5); the benchmark recipe is re-run as part of this change, and a
+  fresh-database seed is its own task, so if that is wrong it fails there rather
+  than in someone's first `make init`.
+- **A fixture dated outside the retention window now fails** → that is the
+  system telling the truth, and the tasks name the oldest fixture in the suite
+  (2026-03-28, against a 13-month window) so the margin is a measured fact
+  rather than a hope.
