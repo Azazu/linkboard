@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Link\Rules;
 
+use App\Tests\Support\Json;
 use App\Link\Rules\RulesDocument;
 use App\Link\Rules\RulesDocumentParser;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -19,14 +20,12 @@ use PHPUnit\Framework\TestCase;
 #[CoversNothing]
 final class RulesSchemaParityTest extends TestCase
 {
-    /** @var array<string, mixed> */
+    /** @var array<array-key, mixed> */
     private array $schema;
 
     protected function setUp(): void
     {
-        $decoded = json_decode((string) file_get_contents(self::root().'/docs/reference/rules-schema.json'), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-        $this->schema = $decoded;
+        $this->schema = Json::decode(file_get_contents(self::root().'/docs/reference/rules-schema.json'));
     }
 
     public function testTopLevelShape(): void
@@ -36,40 +35,42 @@ final class RulesSchemaParityTest extends TestCase
         self::assertFalse($s['additionalProperties']);
         self::assertSame(['version'], $s['required']);
         self::assertSame([['required' => ['rules']], ['required' => ['variants']]], $s['anyOf']);
-        self::assertSame(RulesDocument::VERSION, $s['properties']['version']['const']);
-        self::assertSame(['type' => 'array', 'minItems' => RulesDocument::MIN_RULES, 'maxItems' => RulesDocument::MAX_RULES, 'items' => ['$ref' => '#/$defs/rule']], $s['properties']['rules']);
-        self::assertSame(['type' => 'array', 'minItems' => RulesDocument::MIN_VARIANTS, 'maxItems' => RulesDocument::MAX_VARIANTS, 'items' => ['$ref' => '#/$defs/variant']], $s['properties']['variants']);
-        self::assertSame(['version', 'rules', 'variants'], array_keys($s['properties']));
+        self::assertSame(RulesDocument::VERSION, Json::mapAt($s, 'properties', 'version')['const']);
+        self::assertSame(['type' => 'array', 'minItems' => RulesDocument::MIN_RULES, 'maxItems' => RulesDocument::MAX_RULES, 'items' => ['$ref' => '#/$defs/rule']], Json::mapAt($s, 'properties', 'rules'));
+        self::assertSame(['type' => 'array', 'minItems' => RulesDocument::MIN_VARIANTS, 'maxItems' => RulesDocument::MAX_VARIANTS, 'items' => ['$ref' => '#/$defs/variant']], Json::mapAt($s, 'properties', 'variants'));
+        self::assertSame(['version', 'rules', 'variants'], array_keys(Json::map($s, 'properties')));
     }
 
     public function testValueListsMatchTheVocabulariesAndLimits(): void
     {
-        $defs = $this->schema['$defs'];
+        $defs = Json::map($this->schema, '$defs');
         foreach (['deviceValues', 'osValues', 'countryValues', 'languageValues'] as $name) {
-            self::assertSame('array', $defs[$name]['type'], $name);
-            self::assertSame(RulesDocument::MIN_VALUES, $defs[$name]['minItems'], $name);
-            self::assertSame(RulesDocument::MAX_VALUES, $defs[$name]['maxItems'], $name);
-            self::assertTrue($defs[$name]['uniqueItems'], $name);
-            self::assertSame('string', $defs[$name]['items']['type'], $name);
+            $values = Json::map($defs, $name);
+            self::assertSame('array', $values['type'], $name);
+            self::assertSame(RulesDocument::MIN_VALUES, $values['minItems'], $name);
+            self::assertSame(RulesDocument::MAX_VALUES, $values['maxItems'], $name);
+            self::assertTrue($values['uniqueItems'], $name);
+            self::assertSame('string', Json::map($values, 'items')['type'], $name);
         }
-        self::assertSame(RulesDocument::DEVICES, $defs['deviceValues']['items']['enum']);
-        self::assertSame(RulesDocument::OSES, $defs['osValues']['items']['enum']);
-        self::assertSame(self::ecma(RulesDocument::COUNTRY_PATTERN), $defs['countryValues']['items']['pattern']);
-        self::assertSame(self::ecma(RulesDocument::LANGUAGE_PATTERN), $defs['languageValues']['items']['pattern']);
-        self::assertSame(RulesDocument::MATCH_KEYS, array_keys($defs['match']['properties']));
-        self::assertCount(3, $defs['match']['oneOf'], 'exactly one dimension: device (device and/or os), country, language');
+        self::assertSame(RulesDocument::DEVICES, Json::mapAt($defs, 'deviceValues', 'items')['enum']);
+        self::assertSame(RulesDocument::OSES, Json::mapAt($defs, 'osValues', 'items')['enum']);
+        self::assertSame(self::ecma(RulesDocument::COUNTRY_PATTERN), Json::mapAt($defs, 'countryValues', 'items')['pattern']);
+        self::assertSame(self::ecma(RulesDocument::LANGUAGE_PATTERN), Json::mapAt($defs, 'languageValues', 'items')['pattern']);
+        self::assertSame(RulesDocument::MATCH_KEYS, array_keys(Json::mapAt($defs, 'match', 'properties')));
+        self::assertCount(3, Json::listAt($defs, 'match', 'oneOf'), 'exactly one dimension: device (device and/or os), country, language');
     }
 
     public function testRuleAndVariantShapes(): void
     {
-        $defs = $this->schema['$defs'];
-        self::assertSame(['match', 'target'], $defs['rule']['required']);
-        self::assertSame(['name', 'weight', 'target'], $defs['variant']['required']);
-        self::assertSame(['type' => 'string', 'pattern' => self::ecma(RulesDocument::NAME_PATTERN)], $defs['variant']['properties']['name']);
-        self::assertSame(['type' => 'integer', 'minimum' => RulesDocument::MIN_WEIGHT], $defs['variant']['properties']['weight']);
-        self::assertSame('string', $defs['target']['type']);
-        self::assertSame(RulesDocument::TARGET_MAX_LENGTH, $defs['target']['maxLength']);
-        self::assertStringContainsString((string) RulesDocument::WEIGHT_SUM, $this->schema['description']);
+        $defs = Json::map($this->schema, '$defs');
+        self::assertSame(['match', 'target'], Json::map($defs, 'rule')['required']);
+        self::assertSame(['name', 'weight', 'target'], Json::map($defs, 'variant')['required']);
+        self::assertSame(['type' => 'string', 'pattern' => self::ecma(RulesDocument::NAME_PATTERN)], Json::mapAt($defs, 'variant', 'properties', 'name'));
+        self::assertSame(['type' => 'integer', 'minimum' => RulesDocument::MIN_WEIGHT], Json::mapAt($defs, 'variant', 'properties', 'weight'));
+        $target = Json::map($defs, 'target');
+        self::assertSame('string', $target['type']);
+        self::assertSame(RulesDocument::TARGET_MAX_LENGTH, $target['maxLength']);
+        self::assertStringContainsString((string) RulesDocument::WEIGHT_SUM, Json::string($this->schema, 'description'));
     }
 
     public function testEveryObjectSchemaRejectsUnknownKeys(): void
