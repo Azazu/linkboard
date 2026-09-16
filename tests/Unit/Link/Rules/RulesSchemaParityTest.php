@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Link\Rules;
 
-use App\Tests\Support\Json;
 use App\Link\Rules\RulesDocument;
 use App\Link\Rules\RulesDocumentParser;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Web\Redirect;
 
+use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Fixture\UserAgents;
 use Monolog\Handler\TestHandler;
@@ -221,7 +222,7 @@ final class RoutingRulesTest extends RedirectWebTestCase
         }
 
         self::assertCount(1, array_unique($locations));
-        $variants = array_unique(array_column(self::clicksOf($link->getId()), 'variant'));
+        $variants = array_unique(Row::toStrings(array_column(self::clicksOf($link->getId()), 'variant'), 'variant'));
         self::assertCount(1, $variants);
         self::assertSame('https://example.com/'.strtolower((string) reset($variants)), $locations[0]);
     }

@@ -58,15 +58,14 @@ final readonly class ProdHealthRequest
             throw new \RuntimeException(\sprintf("the prod kernel did not answer within %.0f s.\nstdout: %s\nstderr: %s", $e->getProcess()->getTimeout() ?? 0.0, trim($process->getOutput()), trim($process->getErrorOutput())), 0, $e);
         }
 
-        $payload = json_decode(trim($process->getOutput()), true, 512, \JSON_THROW_ON_ERROR);
-        \assert(\is_array($payload));
+        $payload = Json::decode(trim($process->getOutput()));
 
         return new self(
-            (int) $payload['status'],
-            \is_string($payload['contentType']) ? $payload['contentType'] : null,
-            \is_string($payload['cacheControl']) ? $payload['cacheControl'] : null,
-            (string) $payload['body'],
-            (float) $payload['elapsed'],
+            Json::int($payload, 'status'),
+            Json::nullableString($payload, 'contentType'),
+            Json::nullableString($payload, 'cacheControl'),
+            Json::string($payload, 'body'),
+            Json::float($payload, 'elapsed'),
             self::parseRecords($process->getErrorOutput()),
         );
     }
@@ -96,11 +95,14 @@ final readonly class ProdHealthRequest
         $records = [];
         foreach (explode("\n", $stderr) as $line) {
             $decoded = json_decode(trim($line), true);
-            if (\is_array($decoded) && \is_string($decoded['message'] ?? null)) {
+            $message = \is_array($decoded) ? ($decoded['message'] ?? null) : null;
+            if (\is_array($decoded) && \is_string($message)) {
+                $level = $decoded['level_name'] ?? '';
+                $channel = $decoded['channel'] ?? '';
                 $records[] = [
-                    'level' => strtolower((string) ($decoded['level_name'] ?? '')),
-                    'channel' => (string) ($decoded['channel'] ?? ''),
-                    'message' => $decoded['message'],
+                    'level' => strtolower(\is_string($level) ? $level : ''),
+                    'channel' => \is_string($channel) ? $channel : '',
+                    'message' => $message,
                     'context' => \is_array($decoded['context'] ?? null) ? $decoded['context'] : [],
                 ];
             }

@@ -8,6 +8,7 @@ use App\Click\Counter\RedisClickCounter;
 use App\Shared\Db\Row;
 use App\Tests\Factory\UserFactory;
 use App\Tests\Support\Env;
+use App\Tests\Support\Json;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -214,10 +215,8 @@ abstract class RedirectWebTestCase extends WebTestCase
     {
         $client->disableReboot();
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => $email, 'password' => UserFactory::PASSWORD]);
-        $token = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR)['token'] ?? null;
-        self::assertIsString($token);
 
-        return $token;
+        return Json::string(Json::decode($client->getResponse()->getContent()), 'token');
     }
 
     /** @return array<string, mixed> */

@@ -73,7 +73,7 @@ final class ClickLoggingTest extends RedirectWebTestCase
         self::assertCount(3, $hashes);
         self::assertSame($hashes[0], $hashes[1]);
         self::assertNotSame($hashes[0], $hashes[2]);
-        self::assertMatchesRegularExpression('/^[0-9a-f]{64}\z/', (string) $hashes[0]);
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}\z/', Row::toString($hashes[0], 'visitor_hash'));
     }
 
     public function testRefererHostCases(): void
