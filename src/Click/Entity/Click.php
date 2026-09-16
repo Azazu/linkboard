@@ -28,12 +28,20 @@ class Click
     #[ORM\Column(type: 'uuid')]
     private Uuid $id;
 
+    /**
+     * Part of the key, not only a column: the table is partitioned by month on
+     * this value, and PostgreSQL requires the partition key in every unique
+     * constraint (change stretch-partition-clicks). The redelivery guarantee
+     * rests on the pair — a `ClickRecorded` message is immutable, so a
+     * redelivery carries the same id AND the same instant.
+     */
+    #[ORM\Id]
+    #[ORM\Column(name: 'occurred_at', type: Types::DATETIMETZ_IMMUTABLE)]
+    private \DateTimeImmutable $occurredAt;
+
     #[ORM\ManyToOne(targetEntity: Link::class)]
     #[ORM\JoinColumn(name: 'link_id', nullable: false, onDelete: 'CASCADE')]
     private Link $link;
-
-    #[ORM\Column(name: 'occurred_at', type: Types::DATETIMETZ_IMMUTABLE)]
-    private \DateTimeImmutable $occurredAt;
 
     #[ORM\Column(type: Types::STRING, length: 2, nullable: true, options: ['fixed' => true])]
     private ?string $country = null;

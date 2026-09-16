@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Click\Handler;
 
 use App\Click\Message\ClickRecorded;
+use App\Click\Retention\ClickRetention;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Types\Types;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -23,6 +25,14 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * failed transport by Messenger's failure listener. Anything else propagates to
  * the retry strategy and, after the last retry, to `failed`. No entities: the
  * write path never hydrates (CQRS-lite).
+ *
+ * One guard runs before the insert: a click older than the retention boundary
+ * is acknowledged and discarded, exactly as one for a deleted link is. Without
+ * it, a redelivery whose month retention had dropped would hit a missing
+ * partition and be parked — against the promise that a redelivery is always
+ * acknowledged — and recreating that month to absorb it would destroy the only
+ * evidence the click was already counted (change stretch-partition-clicks,
+ * design decision 5b).
  */
 #[AsMessageHandler]
 final readonly class ClickRecordedHandler
@@ -30,11 +40,19 @@ final readonly class ClickRecordedHandler
     public function __construct(
         private Connection $connection,
         private LoggerInterface $logger,
+        private ClickRetention $retention,
+        private ClockInterface $clock,
     ) {
     }
 
     public function __invoke(ClickRecorded $message): void
     {
+        if ($this->retention->isExpired($message->occurredAt, $this->clock->now())) {
+            $this->logger->info('Click message discarded: older than the retention boundary', ['link_id' => $message->linkId, 'click_id' => $message->clickId]);
+
+            return;
+        }
+
         try {
             $this->connection->transactional(static function (Connection $connection) use ($message): void {
                 $connection->insert('clicks', [

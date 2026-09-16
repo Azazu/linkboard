@@ -75,6 +75,12 @@ services:
     # (design decision 8); the chain itself is a startup check.
     App\Redirect\Geo\CountryResolverInterface: '@App\Redirect\Geo\ChainCountryResolver'
 
+    # The retention policy validates its two settings on every boot: a window
+    # the application cannot parse must stop it starting, not reach the click
+    # handler (change stretch-partition-clicks).
+    App\Click\Retention\ClickRetention:
+        tags: ['app.startup_check']
+
     # Run from App\Kernel::boot() on every boot, hence public: constructs the
     # tagged app.startup_check services so a misconfiguration fails before
     # anything is served.

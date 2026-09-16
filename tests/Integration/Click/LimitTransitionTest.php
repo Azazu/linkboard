@@ -11,6 +11,7 @@ use App\Click\Message\ClickRecorded;
 use App\Click\Recorder\MessengerClickRecorder;
 use App\Click\RecordOutcome;
 use App\Click\RefererHost;
+use App\Click\Retention\ClickRetention;
 use App\Click\Visit;
 use App\Click\VisitorHasher;
 use App\Link\Entity\Link;
@@ -25,6 +26,7 @@ use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Cache\Adapter\RedisAdapter;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Uid\Uuid;
@@ -96,7 +98,7 @@ final class LimitTransitionTest extends KernelTestCase
         self::assertCount(13, $this->queue, 'thirteen accepted — the in-flight bound');
 
         // the worker persists all thirteen
-        $handler = new ClickRecordedHandler(self::connection(), new Logger('test', [new TestHandler()]));
+        $handler = new ClickRecordedHandler(self::connection(), new Logger('test', [new TestHandler()]), new ClickRetention(self::connection(), '13', '3'), new NativeClock());
         foreach ($this->queue as $message) {
             $handler($message);
         }
@@ -142,7 +144,7 @@ final class LimitTransitionTest extends KernelTestCase
         self::assertSame(0, $paused[0]->getClickCount());
 
         // the worker persists the three queued clicks; nothing unpersisted remains — then the key is lost
-        $handler = new ClickRecordedHandler(self::connection(), new Logger('test', [new TestHandler()]));
+        $handler = new ClickRecordedHandler(self::connection(), new Logger('test', [new TestHandler()]), new ClickRetention(self::connection(), '13', '3'), new NativeClock());
         foreach ($this->queue as $message) {
             $handler($message);
         }
