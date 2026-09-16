@@ -15,7 +15,6 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 13 | `harden-quality-and-docs` | README with screenshots, architecture diagram and benchmarks; architecture tests (NFR-QA-2); ADR index and the records the series still owes | low |
 | 13a | `harden-gate-floor` | PHPStan level 9 over `src`, and a migration down/up job in CI — the two parts of row 13 that change the gate floor and the verifier (split out by user arbitration, 2026-09-15) | high |
 
 ## Stretch — only after stages 1–4 are archived
