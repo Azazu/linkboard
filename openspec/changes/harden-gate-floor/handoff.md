@@ -42,8 +42,10 @@
 
   The suite grew from 30 cases to **56** and stays non-vacuous: six mutations of the real script now turn it red, the three new ones being keeping the `dbname` parameter (53/3), removing the effective-database check (50/6) and ignoring the console's status again (50/6). Replacing `format_type` with `data_type` fails `SchemaFingerprintTest` on precision and scale.
 
+- Branch run on the head that carries the round 1 fixes (`4176d3f`) is green: run 35122939983 (2026-09-16), all four jobs.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head (four jobs) and re-reviews round 1 with `scripts/gate-run.sh harden-gate-floor 2 confirm 1`.
+Re-review round 1: `scripts/gate-run.sh harden-gate-floor 2 confirm 1`.
 
 ## Blockers
 None.
