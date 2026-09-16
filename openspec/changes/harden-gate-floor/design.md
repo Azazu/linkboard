@@ -104,22 +104,44 @@ type-level edit — if a test was asserting nothing useful, it still is.
 
 ### 4. The migration round trip is a fingerprint comparison, not `schema:validate`
 
-`make migrations-roundtrip` runs, against a database of its own:
+`make migrations-roundtrip` runs, against a database it creates and owns:
 
-1. create the scratch database (name = the configured one plus `_roundtrip`),
-2. `doctrine:migrations:migrate latest` — every `up`,
-3. fingerprint the schema,
-4. `doctrine:migrations:migrate first` — every `down`,
-5. assert the tables left are exactly the declared set,
-6. `doctrine:migrations:migrate latest` — every `up` again,
-7. fingerprint again; the two fingerprints must be identical,
-8. drop the scratch database.
+1. resolve a scratch name — the configured database plus `_roundtrip_` and eight
+   random hex characters — and refuse to continue if it somehow equals the
+   configured one,
+2. create it, and **abort without dropping anything** if the create fails or if
+   the database that answers is not empty: a database this run did not create is
+   never dropped,
+3. `doctrine:migrations:migrate latest` — every `up`,
+4. fingerprint the schema,
+5. `doctrine:migrations:migrate first` — every `down`,
+6. assert the tables left are exactly the declared set,
+7. `doctrine:migrations:migrate latest` — every `up` again,
+8. fingerprint again; the two listings must be identical,
+9. drop the scratch database — from a `trap`, so a failure at any step still
+   cleans up, and only when step 2 recorded that this run created it.
 
 The fingerprint is one sorted text listing built by SQL over
 `information_schema.columns`, `pg_indexes` and `pg_constraint`: every column
 with its type, nullability and default, every index definition, every
-constraint definition. Step 7 compares the two listings with `diff`, so a
+constraint definition. Step 8 compares the two listings with `diff`, so a
 failure names the line that differs.
+
+*Why a fresh name per run rather than a fixed `<db>_roundtrip`.* A fixed name
+plus a defensive initial drop destroys an unrelated database that happens to
+carry that name, and two invocations against the same configured database — a
+developer and a CI job, or two CI jobs — would drop each other's schema
+mid-run (Gate 1 round 1, finding 2). A per-run name makes the script's target
+unshared by construction, which is what "owns" means here; the equality guard
+and the printed name stay, but they are not what provides the isolation.
+
+*What a crash leaves behind.* A `trap` covers every exit including a failed
+step; only a signal the shell cannot handle (SIGKILL, a pulled plug) leaves a
+database, and because names are never reused, that leftover is inert rather
+than something the next run silently deletes. The script prints the name it
+created before it creates it, so the leftover is identifiable, and removing it
+is a deliberate human command — this design would rather leak a scratch
+database than drop one it does not own.
 
 *Why not `doctrine:schema:validate`.* It answers a different question — does the
 mapping match the database — and it fails today for two reasons that have
@@ -127,7 +149,7 @@ nothing to do with reversibility (Context). Wiring it in would either import
 that unrelated failure or require fixing it here, and `proposal.md` puts that
 out of scope.
 
-*Why a declared set of surviving tables rather than "none".* Step 5 would fail
+*Why a declared set of surviving tables rather than "none".* Step 6 would fail
 today on `messenger_messages`, whose `down` deliberately keeps it. Asserting
 emptiness would force that argued decision to be undone to make a check green.
 The check instead names the survivors and why, so a future migration that keeps
@@ -137,6 +159,37 @@ a table has to say so in the same place.
 database. It does not prove a `down` preserves data, and no migration here
 rewrites rows; it does not prove the mapping agrees with the migrations; and a
 migration that is wrong in both directions symmetrically passes it.
+
+### 4a. The fingerprint SQL is one file, and it is tested against real PostgreSQL
+
+The query lives in `scripts/schema-fingerprint.sql` and is read by both the
+shell script and `tests/Integration/Db/SchemaFingerprintTest.php`, so there is
+one authority for what "the schema" means here.
+
+The test is the part the stub suite cannot do (Gate 1 round 1, finding 3). A
+stub that returns a different listing proves the shell compares two strings; it
+proves nothing about whether the SQL would have noticed. So the test creates a
+throwaway schema in the test database, points `search_path` at it — the query is
+written against `current_schema()`, which is what makes that possible — and
+takes a fingerprint before and after each of the three categories the listing
+promises to cover:
+
+- an index added and dropped,
+- a column's nullability, default and type changed,
+- a constraint added and dropped.
+
+Each case asserts the two fingerprints differ **and** that the differing line
+names the object. Together they are the reason removing any one of the three
+extractions from the SQL turns a test red rather than leaving a check that
+passes on everything. DDL in PostgreSQL is transactional and
+`dama/doctrine-test-bundle` wraps each test in a transaction, so the throwaway
+schema disappears with the rollback.
+
+*What this does not guarantee.* The listing covers columns, indexes and
+constraints; it does not cover sequences, triggers, functions, comments or
+grants, and a migration that changes only one of those round-trips silently.
+That is a stated limit of the check, not an oversight, and the test names the
+categories it covers so the limit is visible where the promise is.
 
 ### 5. Its own CI job, its own database
 
@@ -164,9 +217,15 @@ fails with a message naming the difference.
 *Why a stub rather than a planted migration.* A planted migration proves the
 rule once, in a session, and is recorded in prose; the stub proves it on every
 push, and it can produce failures a real migration cannot easily be made to
-produce on demand. The real end-to-end run against a real PostgreSQL still
-happens — that is the CI job of decision 5 — so neither replaces the other: the
-job proves the migrations, the suite proves the check.
+produce on demand — a `down` that exits non-zero, a database that already
+exists, a second listing that differs.
+
+*What the stub suite is not allowed to be asked.* It exercises orchestration:
+ordering, exit codes, cleanup, ownership. Whether the fingerprint SQL actually
+sees an index is a question only real PostgreSQL can answer, and decision 4a is
+where that is answered. Three layers, three jobs: the stub suite proves the
+script's control flow, `SchemaFingerprintTest` proves the query's coverage, and
+the CI job of decision 5 proves this repository's own migrations round-trip.
 
 ### 7. The documents are corrected in the same change
 
@@ -182,12 +241,12 @@ possible.
 
 | Question | Answer |
 |---|---|
-| Crash before/after an external effect | The round-trip target creates and drops a scratch database. A crash between them leaves `<db>_roundtrip` behind; the target drops it **before** creating it as well as after, so a rerun converges rather than failing on the leftover. It never touches the configured database: the name is always the configured one plus a suffix. |
+| Crash before/after an external effect | The target creates a scratch database and drops it from a `trap`, so every exit path including a failed step cleans up. A signal the shell cannot handle leaves the database behind; because the name carries eight random characters and is never reused, the next run is unaffected and nothing deletes a database this run did not create. The name is always the configured one plus a suffix, and the target refuses if the two are somehow equal. |
 | Empty/zero/null inputs | The heart of decision 2. `Row::int()` on `null` must throw rather than return `0`; on an empty result set the query returns no rows and the reader is never called; a numeric string is accepted because that is what PDO returns for `bigint` and `numeric`. Each of these is a unit test. |
-| Deletion/expiry | The round trip drops a database and drops every table its migrations created. Scoped by construction to the `_roundtrip` database, and the target prints which database it is operating on before it does anything. |
+| Deletion/expiry | The round trip drops a database and every table its migrations created. It drops only the database this run created and found empty — a database that already existed with tables aborts the run untouched — and it prints the name before creating it. |
 | Idempotency of retries | `make migrations-roundtrip` must converge when run twice in a row, including after a failed run that left the scratch database behind. Verified by running it twice and by running it after an interrupted one. |
 | Authorization boundary | n/a for a decision, but named because the diff touches it: `DoctrineApiKeyRepository` and `DoctrineUserRepository` return `mixed` today and get typed returns. No lookup, no voter and no firewall rule changes; the tests that cover those boundaries are the evidence. |
-| Concurrent writers | n/a — the round trip owns its database and nothing else writes to it. |
+| Concurrent writers | Two invocations against the same configured database — a developer and CI, or two CI jobs — used to mean two runs dropping and recreating one `<db>_roundtrip` under each other (Gate 1 round 1, finding 2). The per-run name removes the shared object: each run creates, owns and drops a database no other run knows the name of. The stub suite asserts two invocations resolve different names. |
 | Money rounding | n/a — no money in this project. |
 
 ## Risks / Trade-offs
@@ -204,9 +263,21 @@ possible.
 - **The round trip adds a CI job and roughly a minute of wall clock** → accepted:
   it runs in parallel with `php`, and it is the only evidence that the
   specification's reversibility claim is true.
-- **The scratch database name could collide with something a developer has** →
-  it is always `<configured>_roundtrip`, printed before use and dropped at both
-  ends; the target refuses to run if the resolved name equals the configured one.
+- **The scratch database could collide with one that already exists, or with
+  another run** → the name carries eight random characters, so runs do not share
+  a target; the script creates the database and aborts untouched if what answers
+  is not empty, so it never drops something it did not create; and it refuses if
+  the resolved name equals the configured one (Gate 1 round 1, finding 2).
+- **A killed run leaks a scratch database** → accepted deliberately: the
+  alternative is a script that deletes a database it does not own. The name is
+  printed before creation, so a leaked one is identifiable and removing it is a
+  human decision.
+- **A check that passes on everything is worse than no check** — a fingerprint
+  SQL missing a category would leave both the stub suite and this repository's
+  own round trip green (Gate 1 round 1, finding 3) → `SchemaFingerprintTest`
+  runs the real query against real PostgreSQL for each promised category, and
+  removing an extraction from the query is executed and recorded as a failing
+  input.
 - **Raising the level makes every later change pay for it** → that is the point,
   and it is why this is `high` tier and a change of its own rather than a line
   inside row 13.

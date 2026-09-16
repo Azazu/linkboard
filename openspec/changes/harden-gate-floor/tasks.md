@@ -28,7 +28,7 @@ them to make its own check pass would prove nothing.
 - [ ] 3.3 `tests/Integration` converted (70 findings). Verify: as above, its own commit.
 - [ ] 3.4 `tests/Unit` converted (49 findings, almost all in `tests/Unit/Link/Rules/RulesSchemaParityTest.php`). Verify: as above, its own commit.
 - [ ] 3.5 `tests/Web` and `tests/Support` converted (18 findings). Verify: as above, its own commit.
-- [ ] 3.6 The conversion changed no assertion's meaning. Verify: `make test` reports the same test and assertion counts as before the conversion except for the tests this change adds, and the count of each is recorded here.
+- [ ] 3.6 The conversion changed no assertion's meaning, and the numbers are explained rather than expected to match (Gate 1 round 1, finding 4). Verify: the accessor asserts as it reads, so the assertion count **must** rise — recorded here are the test count before and after (unchanged except for the tests this change adds, named), the assertion count before and after, and the number of accessor calls introduced, so the delta is accounted for rather than assumed away. Each converted file is additionally checked for the original assertions still being present: `git diff` for the group shows no removed `self::assert` line that was not replaced by an accessor reading the same value.
 
 ## 4. The level
 
@@ -36,10 +36,11 @@ them to make its own check pass would prove nothing.
 
 ## 5. The migration round trip
 
-- [ ] 5.1 `scripts/migrations-roundtrip.sh`: the eight steps of design decision 4 against `<configured database>_roundtrip`, POSIX `sh`, printing the database it operates on before touching anything and refusing to run if the resolved name equals the configured one. Verify: `sh -n scripts/migrations-roundtrip.sh` passes (CI's `workflow` job runs that over every script), and the run against the real database is recorded in task 5.3.
-- [ ] 5.2 The fingerprint is one sorted listing from `information_schema.columns`, `pg_indexes` and `pg_constraint` — column type, nullability and default, index definition, constraint definition — and the two listings are compared with `diff`, so a failure names the differing line. Verify: the recorded output of a deliberately broken round trip (task 7.2) shows the diff naming the object that differs, not just a non-zero exit.
-- [ ] 5.3 `make migrations-roundtrip` runs it through the usual `EXEC` indirection (the container locally, natively in CI). Verify, executed and recorded: the target run against the real database reports identical fingerprints and drops its scratch database; run twice in a row it converges; run after an interrupted run that left the scratch database behind, it converges too.
-- [ ] 5.4 The tables that survive a full `down` are declared, not assumed empty: `doctrine_migration_versions` and `messenger_messages`, the latter with the reason its migration gives (design decision 4). Verify: the script names both and fails on any other survivor — demonstrated in task 7.3.
+- [ ] 5.1 `scripts/migrations-roundtrip.sh`: the nine steps of design decision 4 against a scratch database named for the configured one plus `_roundtrip_` and eight random hex characters, POSIX `sh`, printing the name before creating it. Verify: `sh -n scripts/migrations-roundtrip.sh` passes (CI's `workflow` job runs that over every script), and the run against the real database is recorded in task 5.3.
+- [ ] 5.2 Ownership before destruction (Gate 1 round 1, finding 2): the script creates the scratch database, aborts **without dropping anything** if the create fails or if the database that answers already has tables, records that this run created it, and drops it from a `trap` only on that record. It never drops a database it did not create and never the configured one. Verify: demonstrated in tasks 7.5 and 7.6.
+- [ ] 5.3 The fingerprint SQL lives in `scripts/schema-fingerprint.sql` — one sorted listing from `information_schema.columns`, `pg_indexes` and `pg_constraint`, written against `current_schema()` so it can be pointed at any schema — and the shell script reads that file rather than carrying its own copy. Verify: `rg -n 'information_schema' scripts/` shows the query in exactly one file, and `tests/Integration/Db/SchemaFingerprintTest.php` reads the same file.
+- [ ] 5.4 `make migrations-roundtrip` runs it through the usual `EXEC` indirection (the container locally, natively in CI). Verify, executed and recorded: the target run against the real database reports identical fingerprints and drops its scratch database; two runs in a row both pass and operate on different database names; a run interrupted after creation leaves a database the next run neither needs nor touches.
+- [ ] 5.5 The tables that survive a full `down` are declared, not assumed empty: `doctrine_migration_versions` and `messenger_messages`, the latter with the reason its migration gives (design decision 4). Verify: the script names both and fails on any other survivor — demonstrated in task 7.3.
 
 ## 6. CI
 
@@ -48,18 +49,25 @@ them to make its own check pass would prove nothing.
 
 ## 7. The demonstrated failing inputs
 
-- [ ] 7.1 `scripts/migrations_roundtrip_test.sh` in the shape `scripts/gate_run_test.sh` established: a throwaway repository, a fixture `bin/console` on the script's path, one case per rule, no database (design decision 6). Verify: CI's `workflow` job already runs every `scripts/*_test.sh`, and the suite is green there.
-- [ ] 7.2 A `down` that leaves an index behind fails the round trip. Verify: the fixture returns a different fingerprint on the second listing; the suite asserts a non-zero exit and that the message names the index.
+Two layers, because one cannot do the other's job (design decisions 4a and 6):
+the stub suite proves the script's control flow, and a real-PostgreSQL test
+proves the fingerprint SQL sees what the listing promises.
+
+- [ ] 7.1 `scripts/migrations_roundtrip_test.sh` in the shape `scripts/gate_run_test.sh` established: a throwaway repository, a fixture `bin/console` on the script's path, one case per rule, no database. Verify: CI's `workflow` job already runs every `scripts/*_test.sh`, and the suite is green there.
+- [ ] 7.2 A second listing that differs fails the round trip and the message names the differing line. Verify: the fixture returns a different listing the second time; the suite asserts a non-zero exit and that the diff is printed. This case proves the comparison, **not** the SQL — task 7.7 is what proves the SQL.
 - [ ] 7.3 An unexpected surviving table fails the round trip. Verify: the fixture leaves a table the declared set does not name; the suite asserts the failure names that table.
-- [ ] 7.4 A failing `down` fails the round trip rather than being skipped, and the scratch database is still dropped. Verify: the fixture exits non-zero on the down step; the suite asserts the script's exit code and that its cleanup ran.
-- [ ] 7.5 The guard against operating on the configured database. Verify: the fixture supplies a `DATABASE_URL` whose derived name equals the configured one; the suite asserts the script refuses and touches nothing.
+- [ ] 7.4 A failing `down` fails the round trip rather than being skipped, and the scratch database is still dropped. Verify: the fixture exits non-zero on the down step; the suite asserts the script's exit code and that the drop was issued for the database it created.
+- [ ] 7.5 A scratch database that already exists with tables aborts the run and is **not** dropped (Gate 1 round 1, finding 2). Verify: the fixture reports a non-empty database from the create step; the suite asserts a non-zero exit, a message naming the database, and that no drop was issued.
+- [ ] 7.6 Two invocations do not share a target. Verify: the suite runs the script twice against the same configured database and asserts the two created names differ; and the guard against the resolved name equalling the configured one refuses and touches nothing.
+- [ ] 7.7 `tests/Integration/Db/SchemaFingerprintTest.php` against real PostgreSQL (Gate 1 round 1, finding 3): in a throwaway schema with `search_path` pointed at it, the fingerprint changes when an index is added or dropped, when a column's nullability, default or type changes, and when a constraint is added or dropped — each case asserting the differing line names the object. Verify: removing any one of the three extractions from `scripts/schema-fingerprint.sql` turns a case red; the removals are executed and the failures recorded, then restored.
+- [ ] 7.8 The limits of the listing are stated where the promise is. Verify: `scripts/schema-fingerprint.sql` and the test name what the fingerprint does not cover — sequences, triggers, functions, comments, grants — so nobody reads a green round trip as "the schema is identical in every respect".
 
 ## 8. The documents say what the floor is
 
 - [ ] 8.1 `docs/explanation/requirements.md`: NFR-QA-1's analysis level, the tooling table and the summary table (three places, measured by `rg -n 'level 8' docs/`), plus the reversibility claim of section 5 now naming what proves it. Verify: `rg -n 'level 8' README.md docs/ openspec/ AGENTS.md` returns nothing but historical references in archived changes.
 - [ ] 8.2 `openspec/config.yaml`: the analysis level, and the `Stage: scaffold; application code arrives through OpenSpec changes` line the user folded into this change on 2026-09-16 — the text every agent, Codex at the gates included, receives as project context. Verify: the file re-read whole after the edit; `rg -n 'scaffold' openspec/config.yaml` returns nothing.
 - [ ] 8.3 `docs/how-to/local-development.md`'s floor table and `docs/reference/commands.md` gain the new target and the new level. Verify: both re-read whole after the last edit; every command in them run in its exact form.
-- [ ] 8.4 `openspec/ROADMAP.md`: row 13a removed at archive time, and `docs/explanation/requirements.md`'s stage plan row for 13a reconciled with what was actually done. Verify: the roadmap has no row for this change after the archive commit.
+- [ ] 8.4 `docs/explanation/requirements.md`'s stage-plan row for 13a is reconciled with what was actually done (the row's exit criterion names the raised level and the reversibility check). Verify: the row read against this change's tasks after the last edit; the roadmap row itself is removed at archive time, which is a lifecycle step below, not a task — a task that could only be checked after the archive commit can never be checked before Gate 2, which is the deadlock `scripts/pregate-verify.sh` and `scripts/workflow-verify.sh` create by design (Gate 1 round 1, finding 1).
 
 ## 9. Wrap-up
 
@@ -80,3 +88,7 @@ disposition its findings" could never be both truthful and satisfied
 3. The gate has passed when the last Gate 2 record reads `approved` or
    `confirmed` with no finding row left `open`; `scripts/workflow-verify.sh
    merge harden-gate-floor` is what checks that before the merge.
+4. After the user merges: `scripts/workflow-verify.sh archive harden-gate-floor`,
+   then the archive commit on `main`, which is where row 13a leaves
+   `openspec/ROADMAP.md`. That removal is deliberately not a task either, for
+   the same reason: it happens after every task must already be checked.

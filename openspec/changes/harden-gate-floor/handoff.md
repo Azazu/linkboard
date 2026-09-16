@@ -13,8 +13,14 @@
 - Scope, from roadmap row 13a: **PHPStan level 9 over `src`**, and a **migration down/up job in CI**. Both were split out of row 13 by the user on 2026-09-15 for the same reason: they change the gate floor and the verifier, which AGENTS.md makes a `high` trigger, while row 13's documentation and architecture tests did not.
 - Tier is expected to be `high` and argued in the proposal rather than inherited: the change edits `phpstan.dist.neon` and `.github/workflows/ci.yml`, the two files every later change is judged by, and `harden-quality-and-docs` stated both as untouched precisely because they belong here.
 
+- Gate 1 round 1 (`206756c`, Reviewed-Commit `d30af22`): changes-requested — three major, one minor, all four real.
+  1. **A lifecycle deadlock, the same class as the one row 13 hit.** Task 8.4 said the roadmap row is removed at archive time, but every task must be checked before Gate 2 and before the merge verifier. Split: the pre-merge half is reconciling the stage-plan row in the brief; the removal itself joins the un-checkboxed lifecycle section, now covering the archive step too.
+  2. **A deterministic scratch name is not ownership.** `<db>_roundtrip` plus a defensive initial drop deletes an unrelated database of that name, and two invocations against the same configured database drop each other's schema mid-run — printing the name prevents neither, so "concurrent writers: n/a" was wrong. The name now carries eight random characters per run, the script aborts untouched if what answers the create is not empty, drops only from the record that this run created it, and a killed run leaks a database rather than deleting one it does not own. Two new failing inputs cover a pre-existing target and two invocations resolving different names.
+  3. **The stub suite proves the comparison, not the query.** A fake console returning a different listing says nothing about whether the fingerprint SQL would have seen a leftover index — and this repository's own migrations round-trip correctly, so the real run would stay green even if the SQL omitted indexes entirely. The query moves into `scripts/schema-fingerprint.sql`, read by both the script and a new `tests/Integration/Db/SchemaFingerprintTest.php`, which points `search_path` at a throwaway schema and proves a change to an index, a column attribute and a constraint each moves the fingerprint — with removing an extraction from the query executed as a failing input.
+  4. **"The same assertion count" contradicted the accessor**, which asserts as it reads and therefore raises the count on purpose. The task now records the test count, the assertion count and the number of accessor calls, and checks the original assertions directly in the diff.
+
 ## Next step
-Gate 1: `scripts/gate-run.sh harden-gate-floor 1 full` — tier `high`, so the artifacts are reviewed before any implementation. `scripts/pregate-verify.sh gate1` passes.
+Gate 1 confirmation: `scripts/gate-run.sh harden-gate-floor 1 confirm 1`. All four findings are `fixed` in `review.md`; `scripts/pregate-verify.sh gate1` passes and `openspec validate --strict` is clean.
 
 ## Blockers
 None.

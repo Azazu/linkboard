@@ -84,6 +84,12 @@ not in `openspec/specs/`, and they are corrected there as tasks of this change.
   (one new job), `Makefile` (one new target). These are the files
   `harden-quality-and-docs` listed as untouched precisely because they are this
   change's subject.
+- **New files for the round trip**: `scripts/migrations-roundtrip.sh` (the
+  orchestration), `scripts/schema-fingerprint.sql` (the one authority for what
+  the listing covers), `scripts/migrations_roundtrip_test.sh` (the stub suite,
+  in the shape the two existing script suites established) and
+  `tests/Integration/Db/SchemaFingerprintTest.php` (the query against real
+  PostgreSQL).
 - **`src/`**: the five `src/Analytics/Query/` classes, the two Doctrine
   repositories returning `mixed`, the API Platform providers and
   `ListQueryFactory`, plus a new typed row reader under `src/Shared/`. 67 findings.
