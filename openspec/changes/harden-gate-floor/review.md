@@ -42,3 +42,25 @@
 - `openspec validate harden-gate-floor --strict` passed.
 - `scripts/pregate-verify.sh gate1 harden-gate-floor` passed with zero warnings; it does not establish the missing ownership-test coverage.
 - This is confirmation of planning artifacts at Gate 1; implementation and the planned database tests remain for Gate 2.
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-16
+**Reviewed-Commit:** 6cf163d685152ec22f3829df9a27963604d59725
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Task 8.4 requires only pre-merge requirements reconciliation. Roadmap removal remains an un-checkboxed post-merge archive step, so it no longer conflicts with the verifiers' requirement that all tasks be complete before Gate 2 and merge. |
+| 2 | confirmed — Design decision 4 and task 5.2 establish ownership only after a successful exclusive `CREATE DATABASE`; failed creation permits neither migration nor cleanup, and crash leftovers are not adopted or deleted by later runs. Task 7.5 explicitly tests collisions with both empty and non-empty existing databases and requires a nonzero exit with no migration or drop. Task 7.6 holds one run inside a migration while a second completes, then checks each run drops only its own database. Task 7.7 separately verifies failed creation cannot trigger a drop. These close the verification gaps identified in Confirmation 1. |
+| 3 | confirmed — Decision 4a and tasks 5.3/7.8 require the production fingerprint SQL to be shared with real-PostgreSQL fixtures covering indexes, column nullability/default/type and constraints, with named differences and executed extraction-removal mutations that must fail. Task 7.2 separately requires a nonzero exit and printed diff from the shell comparison; stub output is no longer treated as proof of SQL coverage. |
+
+### Validation
+
+- Reviewed only the diff from `d30af22939912558645ce18f4525841af033f511` to `6cf163d685152ec22f3829df9a27963604d59725` and collateral context reachable from the named findings; no unrelated findings introduced.
+- Verified branch `change/harden-gate-floor`, HEAD equal to the Reviewed-Commit, and an initially clean worktree. All source-round findings have been dispositioned.
+- Checked the revised design and tasks against the proposal, handoff, project context and existing lifecycle verifiers; searched the repository for the affected round-trip and fingerprint claims.
+- `openspec validate harden-gate-floor --strict` passed.
+- `scripts/pregate-verify.sh gate1 harden-gate-floor` passed with zero warnings.
+- This confirms the resolution of every major finding in the Gate 1 plan; round 1 contained no blockers. Implementation and execution of the planned database tests remain for Gate 2. Finding 4 was already confirmed in Confirmation 1 and is outside this requested blocker/major confirmation.
