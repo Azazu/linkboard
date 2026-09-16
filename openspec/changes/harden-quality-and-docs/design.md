@@ -77,13 +77,25 @@ Four records, each for a decision this project actually turned on and weighed al
 
 *What this does not guarantee.* It makes a test process resolve what `.env.test` declares; it does not make the application do so, and it does not stop a future variable from being added to `.env` alone. The guard against that is a test: the four variables are asserted to hold their `.env.test` values, so a divergence fails rather than being discovered by ten confusing failures a month later.
 
-### 6a. The test keypair is generated with the passphrase its environment declares
+### 6a. The test keypair is generated with the effective test passphrase, and a key that does not match it is replaced
 
-`make jwt-keys` keeps generating the development keypair from `.env` and gains one change for the test one: the passphrase comes from `.env.test`, read in the recipe, so the value still lives in exactly one file. The target also stops trusting `--skip-if-exists` alone for the test key — it checks that the existing private key opens with the declared passphrase and regenerates it when it does not, because the keys on every machine that ran the old target are already wrong and silently skipping them is what made this defect survive.
+`make jwt-keys` keeps generating the development keypair from `.env`. For the test one it resolves the passphrase the way `tests/bootstrap.php` resolves every test variable — `.env.test`, then `.env.test.local` if it exists — so the two entry points cannot disagree about which value is in force (Gate 1 round 2, finding 2). The value still lives only in those files; the recipe reads it, it is not copied anywhere.
 
-*Why in the target and not in the console command.* A console process has the same problem as a test process had, and for the same reason — compose's environment beats the file — but unlike `tests/bootstrap.php` there is no place in the application that knows "this is a test-environment invocation" and may override. The recipe that already says `--env=test` is that place.
+**What the legacy state actually is, measured.** The old target's key is not unencrypted, as this design first claimed: it is *encrypted with an empty passphrase*. Three states, each generated and probed with both passphrases while correcting this decision:
 
-*What this does not guarantee.* It fixes the two entry points that exist today. A third way of generating keys — someone running the console command by hand — has the old behaviour, and nothing here can stop that; what changes is that `make init` and `make jwt-keys`, the documented paths, produce a keypair the suite can use.
+| key | header | opens with an empty passphrase | opens with the declared one |
+|---|---|---|---|
+| written by the old target inside the container | `ENCRYPTED PRIVATE KEY` | opens | **refuses** |
+| unencrypted (`openssl genpkey` with no cipher) | `PRIVATE KEY` | opens | opens |
+| written with the declared passphrase | `ENCRYPTED PRIVATE KEY` | **refuses** | opens |
+
+So "does it open with the declared passphrase?" is not the detection: it keeps an unencrypted key, which opens with anything — the case Gate 1 round 2 raised and reproduced. The detection is the pair of answers: **when a non-empty passphrase is in force, the private key must refuse an empty passphrase and accept the declared one.** That replaces both wrong states and keeps the right one.
+
+A private key alone is not a usable keypair, so the target also checks that the stored public key is the one that belongs to it (the public key derived from the private one must equal the stored file). A replacement writes two files, and the two are not written atomically: if the target dies between them the pair is mismatched, so the check runs on every invocation rather than only after a write, and the fix for a half-written pair is to run the target again.
+
+*Why in the target and not in the console command.* A console process has the same problem a test process had, and for the same reason — compose's environment beats the file — but unlike `tests/bootstrap.php` there is no place in the application that knows "this is a test-environment invocation" and may override. The recipe that already says `--env=test` is that place.
+
+*What this does not guarantee.* It fixes the documented entry points, `make jwt-keys` and the `make init` that calls it. Someone running the console command by hand still gets the container's environment, and nothing here can prevent that. Nor does the check prove the application can sign with the key — that is what the authentication suite proves, which is why the verification ends with the suite rather than with OpenSSL.
 
 ## Applicability
 
@@ -91,8 +103,8 @@ Four records, each for a decision this project actually turned on and weighed al
 |---|---|
 | Authorization boundary | None is added or moved. The fixes change which values a *test* process reads, and which passphrase a *test* keypair is generated with for `APP_SECRET`, `JWT_PASSPHRASE`, `VISITOR_HASH_SALT` and `COUNTRY_RESOLVERS` — from the development values it has been silently using to the test values `.env.test` declares. The application's own resolution is untouched, and the evidence is a test that asserts each of the four. |
 | Empty / zero / null inputs | A missing `.env.test`, or a variable it does not define, must leave the process environment alone rather than setting an empty value — asserted, because an empty `APP_SECRET` or salt would be worse than the defect being fixed. |
-| Crash before/after an external effect | n/a — the bootstrap reads files and sets variables; there is no external effect to be half-done. |
-| Concurrent writers | n/a — nothing writes. |
+| Crash before/after an external effect | The key replacement writes `private.pem` and `public.pem` separately, so a crash between them leaves a mismatched pair. The check therefore runs on every invocation, not only after a write, and compares the stored public key with the one derived from the private key — so a half-written pair is detected and repaired by running the target again. Nothing else here has an external effect: the bootstrap reads files and sets variables. |
+| Concurrent writers | Two `make jwt-keys` runs at once could interleave two key writes. It is a developer setup command run by hand, the loser's pair is detected as mismatched by the next invocation, and the repair is to run it again — accepted rather than locked. |
 | Deletion / expiry | n/a. |
 | Idempotency of retries | The bootstrap runs once per test process and is idempotent by construction: it assigns values, it does not accumulate. `make jwt-keys` is idempotent in a stronger sense than before — it now leaves a matching key alone and replaces a mismatched one, so running it twice converges instead of preserving a broken key forever. |
 | Money rounding | n/a — no monetary value exists in this project. |
@@ -104,7 +116,9 @@ Four records, each for a decision this project actually turned on and weighed al
 - **Screenshots and diagram drift** → both are regenerable from one documented command, and the diagram's elements are checked against `src/` while writing it.
 - **The fix hides a real difference rather than fixing it** → the opposite risk: if a test genuinely needs a production-shaped value it now gets the test one. The four variables are named in the design and asserted in a test, so the set is visible rather than implicit.
 - **Taking CI's own configuration away from it** → only the variables `.env.test` defines are re-applied, and CI's four connection variables are not among them; the CI run on the branch head is what proves it.
-- **Scope creeping further into the floor** → the one thing that would change this change's tier again. `phpstan.dist.neon`, the `Makefile` and `.github/workflows/` are named in the proposal as untouched, and a task that finds itself needing them stops and raises the tier.
+- **A detection that keeps a broken key** → the shape of Gate 1 round 2's finding, and the reason the rule is now "refuses empty *and* accepts declared" rather than "opens". All three key states were generated and probed, and the table in decision 6a is what the rule was written from.
+- **Replacing a key a developer wanted** → the target only replaces a test key that cannot be used with the passphrase in force; the development keypair is untouched, and the test keys are gitignored artifacts a regeneration costs nothing.
+- **Scope creeping further into the floor** → the PHPStan level, `make check`'s steps and the CI jobs remain row 13a's. The `Makefile`'s `jwt-keys` target is in scope here by the user's decision of 2026-09-15; nothing else in that file is. `phpstan.dist.neon`, the `Makefile` and `.github/workflows/` are named in the proposal as untouched, and a task that finds itself needing them stops and raises the tier.
 
 ## Migration Plan
 

@@ -37,8 +37,15 @@ The consequence is that a fresh `make init` on this branch still produces a test
 
 - The user chose to fix the key-generation half here and re-request Gate 1, rather than hand it to row 13a or strip the overlapping keys out of `.env`. Artifacts updated before any code: the proposal records the decision and takes the `Makefile` off the untouched list, the design gains decision 6a (the passphrase is read from `.env.test` in the recipe, and a key that does not match it is replaced rather than skipped — every machine that ran the old target already holds a wrong one), and the tasks gain section 9 plus a second Gate 1 task. `scripts/pregate-verify.sh gate1` passes.
 
+- Gate 1 round 2 (`3a84c12`, Reviewed-Commit `668f034`): changes-requested — three findings, all real, and the first one corrected a causal claim of mine with a reproduction of its own.
+  1. **My diagnosis was imprecise and my detection was wrong.** I wrote that the old target leaves a key "with no passphrase"; the reviewer pointed out that an unencrypted key opens even when a passphrase is supplied, so "does it open with the declared passphrase?" would keep exactly the key it was meant to replace. I generated all three states and probed each with both passphrases: the key the old target writes inside the container is **encrypted with an empty passphrase** — it opens with `pass:` and *refuses* the declared one, so my check would in fact have caught it — while an **unencrypted** key opens with either and my check would have kept it. Both are unusable, so the detection is now the pair of answers: with a non-empty passphrase in force the private key must refuse an empty one and accept the declared one. The table of measurements is in design decision 6a, and the claim is corrected in the proposal too.
+  2. **The two entry points had different authorities.** The bootstrap applies `.env.test` then `.env.test.local`; the target was specified against `.env.test` alone, so a local override would have made them disagree permanently. The target now resolves the same precedence, and a task verifies both with such a file present and without it.
+  3. **Scope and applicability had not been reconciled.** The tasks still declared the `Makefile` untouched while section 9 edits it, and the applicability table still said nothing writes while the target replaces two key files. Both corrected, with the partial-write boundary described: the pair check runs on every invocation, so a crash between the two writes is repaired by running the target again.
+
+- The working test keypair was backed up and restored while measuring; `tests/Api/Auth` passes (36 tests, 323 assertions).
+
 ## Next step
-`scripts/gate-run.sh harden-quality-and-docs 1 full` — the second Gate 1, on the widened scope. Section 9 is not written until it reads `approved`/`confirmed`.
+`scripts/gate-run.sh harden-quality-and-docs 1 confirm 2` — the confirmation on round 2's three findings. Section 9 is not written until it reads `confirmed`.
 
 ## Blockers
 None.

@@ -8,8 +8,10 @@ defect. Sections 1–6 were implemented while the tier was `low` and touched onl
 documents and tests; section 8 is the fix the raised tier is about, and it is
 not started until Gate 1 passes.
 
-`phpstan.dist.neon`, the `Makefile`, the CI workflow, `docker-compose.yml` and
-`.env` stay untouched — the floor's composition is row 13a's.
+`phpstan.dist.neon`, the CI workflow, `docker-compose.yml` and `.env` stay
+untouched — the floor's composition is row 13a's. The `Makefile` is in scope
+for its `jwt-keys` target only, by the user's decision of 2026-09-15, and for
+nothing else in that file.
 
 ## 1. The architecture rules of NFR-QA-2
 
@@ -70,10 +72,12 @@ not started until Gate 1 passes.
 
 ## 9. Key generation declares the same authority
 
-- [ ] 9.1 `make jwt-keys` generates the **test** keypair with the passphrase `.env.test` declares, read in the recipe so the value stays in one file (design decision 6a); the development keypair keeps coming from `.env`. Verify: the recipe run in its exact form on a machine with no `config/jwt/test/`, and the resulting private key opens with the declared passphrase (`openssl rsa -in config/jwt/test/private.pem -passin pass:<declared> -noout -check`).
-- [ ] 9.2 A test key that does not match the declared passphrase is replaced, not skipped. Verify: with a deliberately mismatched key in place, the target regenerates it and the suite passes afterwards — the state every machine that ran the old target is already in; recorded with the command and the output.
-- [ ] 9.3 `make init` end to end produces a working test setup. Verify: `make jwt-keys` followed by `make test` with no override, from a state where `config/jwt/test/` was removed first.
-- [ ] 9.4 The claim sweep: `docs/how-to/local-development.md` and `docs/reference/commands.md` describe what the target now does. Verify: both re-read whole after the last edit; `rg -n 'jwt-keys' docs/ README.md Makefile` reviewed.
+- [ ] 9.1 `make jwt-keys` resolves the test passphrase the way `tests/bootstrap.php` resolves every test variable — `.env.test`, then `.env.test.local` when it exists — and generates the test keypair with it; the development keypair keeps coming from `.env` (design decision 6a). Verify: run from a state with no `config/jwt/test/`, the private key refuses an empty passphrase and accepts the resolved one, and the stored public key equals the one derived from the private key.
+- [ ] 9.2 A test key that cannot be used with the passphrase in force is replaced, not skipped — for **both** unusable states, which were measured while correcting the design (Gate 1 round 2, finding 1). Verify, each executed and recorded with its command and output: **(a)** the state the old target writes inside the container — encrypted with an empty passphrase, which refuses the declared one — is detected and replaced; **(b)** an unencrypted key, which opens with any passphrase and which an "opens with the declared passphrase" check would have kept, is detected and replaced; **(c)** a key already encrypted with the passphrase in force is left exactly as it was, byte for byte.
+- [ ] 9.3 A mismatched pair is repaired by running the target again. Verify: with the public key replaced by another key's, the target detects the mismatch and regenerates both; the check runs on every invocation, not only after a write, so a crash between the two file writes is recoverable (design decision 6a).
+- [ ] 9.4 The local override is honoured by both entry points. Verify: with a `.env.test.local` declaring a different non-empty `JWT_PASSPHRASE`, the target generates a key for **that** value and the suite — which resolves the same precedence — authenticates with it; the file is removed afterwards and the state restored.
+- [ ] 9.5 `make init`'s path end to end produces a working test setup. Verify: `config/jwt/test/` removed, then `make jwt-keys` and the authentication suite with no environment override; the suite is what proves the key is usable, since OpenSSL only proves it opens.
+- [ ] 9.6 The claim sweep: `docs/how-to/local-development.md` and `docs/reference/commands.md` describe what the target now does, and no document repeats the corrected claim that the legacy key is unencrypted. Verify: both re-read whole after the last edit; `rg -n 'jwt-keys|JWT_PASSPHRASE' docs/ README.md Makefile openspec/changes/harden-quality-and-docs` reviewed.
 
 ## 10. Wrap-up
 
