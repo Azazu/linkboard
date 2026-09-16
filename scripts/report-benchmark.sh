@@ -44,9 +44,22 @@ token="$(authenticate "$email" "$password")"
 admin_token="$(authenticate "$admin_email" "$admin_password")"
 [ -n "$admin_token" ] || { echo "could not authenticate as $admin_email" >&2; exit 1; }
 
-link="$(curl -sS -H 'Accept: application/json' -H "Authorization: Bearer $token" \
+# The link is selected structurally, by PHP, from the collection's `items` and
+# by the highest clickCount rather than by trusting the ordering: a `sed`
+# extraction over the compact body returned the LAST id in it, because `.*` is
+# greedy — so the reports were timed against the account's least-clicked link
+# while the document said its most-clicked one (Gate 2 confirmation 1,
+# finding 2). The selected link's click count is printed, so a wrong one cannot
+# hide in the table again.
+selected="$(curl -sS -H 'Accept: application/json' -H "Authorization: Bearer $token" \
     "$base/api/v1/links?order%5BclickCount%5D=desc" \
-    | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)"
+    | php -r '$body = json_decode(stream_get_contents(STDIN), true);
+        $items = array_filter((array) ($body["items"] ?? $body), "is_array");
+        if ([] === $items) { exit(0); }
+        usort($items, static fn (array $a, array $b): int => ($b["clickCount"] ?? 0) <=> ($a["clickCount"] ?? 0));
+        printf("%s %s", $items[0]["id"] ?? "", $items[0]["clickCount"] ?? 0);')"
+link="${selected%% *}"
+link_clicks="${selected##* }"
 [ -n "$link" ] || { echo "the account owns no links — run app:demo:seed first" >&2; exit 1; }
 
 # epoch arithmetic rather than `date -d '-29 days'`: the container's date is
@@ -55,7 +68,7 @@ now="$(date -u +%s)"
 from="$(date -u -d "@$((now - 29 * 86400))" +%Y-%m-%dT00:00:00Z)"
 to="$(date -u -d "@$((now + 86400))" +%Y-%m-%dT00:00:00Z)"
 
-echo "link=$link  period=$from..$to  samples=$samples  clicks=$(bin/console dbal:run-sql 'SELECT count(*) FROM clicks' 2>/dev/null | sed -n 's/[^0-9]*\([0-9][0-9]*\).*/\1/p' | head -1)"
+echo "link=$link ($link_clicks clicks, the account's most-clicked)  period=$from..$to  samples=$samples  clicks in table=$(bin/console dbal:run-sql 'SELECT count(*) FROM clicks' 2>/dev/null | sed -n 's/[^0-9]*\([0-9][0-9]*\).*/\1/p' | head -1)"
 printf '%-18s %8s %8s %8s\n' report p50 p95 max
 
 measure() {

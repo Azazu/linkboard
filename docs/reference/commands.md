@@ -13,7 +13,7 @@ Authoritative live source: `make help`.
 | `make console ARGS='…'` | `bin/console` inside the container |
 | `make migrate` / `make migration` | apply migrations / generate a diff migration |
 | `make test-db` | create and migrate the test database (`<DATABASE_URL db>_test`); called by `make init` |
-| `make jwt-keys` | generate the dev and test JWT keypairs under `config/jwt/<env>/`; the dev one is skipped when it exists, the test one is replaced unless it is encrypted with the passphrase `.env.test` (then `.env.test.local`) declares and matches its public key (`scripts/test-jwt-keys.sh`, with the passphrase resolved by Symfony's own Dotenv in `scripts/test-jwt-passphrase.php` — the same parser and precedence `tests/bootstrap.php` uses). Called by `make init` and CI |
+| `make jwt-keys` | generate the dev and test JWT keypairs under `config/jwt/<env>/`; the dev one is skipped when it exists, the test one is replaced unless it is encrypted with the passphrase `.env.test` (then `.env.test.local`) declares and matches its public key (`scripts/test-jwt-keys.sh`, with the passphrase resolved by `scripts/test-jwt-passphrase.php` — which calls the same code `tests/bootstrap.php` runs, so the generator and the suite cannot resolve different values). Called by `make init` and CI |
 | `make console ARGS='app:user:promote <email>'` / `app:user:demote` | grant / remove `ROLE_ADMIN`; exit 1 for an unknown email |
 | `make console ARGS='app:demo:seed [--clicks=50000] [--days=60] [--reset]'` | demo dataset: two accounts (generated passwords printed once), ten links with rules, synthetic clicks; exit 1 in `prod` or when the demo accounts exist without `--reset` |
 | `make worker` | consume the async Messenger transport (foreground) |

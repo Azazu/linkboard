@@ -67,8 +67,10 @@ test-db: ## Create and migrate the test database (DATABASE_URL's database + _tes
 # The test keypair does not go through the console command: inside the
 # container that command takes JWT_PASSPHRASE from .env, not from .env.test,
 # and --skip-if-exists would then keep the unusable key it wrote. The script
-# resolves the passphrase the way tests/bootstrap.php does and replaces a
-# keypair that does not match it (change harden-quality-and-docs, decision 6a).
+# resolves the passphrase by running the code tests/bootstrap.php runs
+# (App\Tests\TestEnvironment::apply, through scripts/test-jwt-passphrase.php)
+# and replaces a keypair that does not match it, so the generator and the suite
+# cannot resolve different values (change harden-quality-and-docs, decision 6a).
 jwt-keys: ## Generate the dev and test JWT keypairs (config/jwt/<env>/, gitignored; dev skips an existing key, test replaces one that does not match .env.test)
 	$(EXEC) bin/console lexik:jwt:generate-keypair --skip-if-exists --env=dev
 	$(EXEC) sh scripts/test-jwt-keys.sh "$$($(EXEC) php scripts/test-jwt-passphrase.php)"

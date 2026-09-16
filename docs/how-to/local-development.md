@@ -511,7 +511,9 @@ docker compose exec -T -e COUNTRY_RESOLVERS=bogus php bin/console about
   Symfony's `Dotenv` will not override a real variable with a file's, so
   `tests/bootstrap.php` re-applies the variables `.env.test` declares — and
   only those, leaving the connection settings CI provides alone. No local run
-  needs an environment override to behave like CI.
+  needs an environment override to behave like CI. The re-application itself
+  lives in `App\Tests\TestEnvironment`, because `make jwt-keys` has to resolve
+  the same values when it generates the test JWT keypair.
 
 Device, OS, browser and bot detection use `matomo/device-detector`; its regex
 database is parsed once per deploy into the filesystem pool

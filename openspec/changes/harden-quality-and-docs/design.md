@@ -69,7 +69,9 @@ Four records, each for a decision this project actually turned on and weighed al
 
 ### 6. The test environment is resolved from `.env.test`, in the test bootstrap
 
-`tests/bootstrap.php` re-applies, after Symfony's `bootEnv`, exactly the variables `.env.test` (and `.env.test.local`, per the same convention) defines — and nothing else. A variable that file does not name is left as the process found it.
+`tests/bootstrap.php` re-applies, after Symfony's `bootEnv`, exactly the variables `.env.test` (and `.env.test.local`, per the same convention) defines — and nothing else. A variable that file does not name is left as the process found it. Each file is published to `$_ENV`, `$_SERVER` and `putenv()` before the next is parsed, so a value in `.env.test.local` that refers to one in `.env.test` resolves against it rather than against the process environment.
+
+The resolution itself lives in `App\Tests\TestEnvironment::apply()` rather than in the bootstrap file, because the key generator of decision 6a has to produce the same values (Gate 2 confirmation 1, finding 1): two implementations of one precedence drifted twice, so there is one implementation and both entry points call it.
 
 *Why here and not elsewhere.* The defect is that a real environment variable beats a dotenv file, by design, and compose puts `.env` into the process. Fixing it in `docker-compose.yml` would mean listing test variables on a service that also serves the application; fixing it in `.env` would mean deleting values the application needs. The test bootstrap is the one place that knows a test process is running and is allowed to be opinionated about it.
 
@@ -79,7 +81,7 @@ Four records, each for a decision this project actually turned on and weighed al
 
 ### 6a. The test keypair is generated with the effective test passphrase, and a key that does not match it is replaced
 
-`make jwt-keys` keeps generating the development keypair from `.env`. For the test one it resolves the passphrase the way `tests/bootstrap.php` resolves every test variable — `.env.test`, then `.env.test.local` if it exists — so the two entry points cannot disagree about which value is in force (Gate 1 round 2, finding 2). The value still lives only in those files; the recipe reads it, it is not copied anywhere.
+`make jwt-keys` keeps generating the development keypair from `.env`. For the test one it resolves the passphrase by running the code the test bootstrap runs — `App\Tests\TestEnvironment::apply()`, through `scripts/test-jwt-passphrase.php` — so the two entry points cannot disagree about which value is in force (Gate 1 round 2, finding 2; Gate 2 confirmation 1, finding 1). The value still lives only in those files; the recipe reads it, it is not copied anywhere.
 
 **What the legacy state actually is, measured.** The old target's key is not unencrypted, as this design first claimed: it is *encrypted with an empty passphrase*. Three states, each generated and probed with both passphrases while correcting this decision:
 

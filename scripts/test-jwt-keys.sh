@@ -12,10 +12,13 @@
 # fresh `make init` leaves a keypair the suite cannot authenticate with. CI is
 # unaffected — it runs the same target natively, where `.env.test` applies.
 #
-# The precedence AND the parser are the ones `tests/bootstrap.php` uses, so the
-# generator and the suite cannot disagree about which value is in force:
-# `.env.test`, then `.env.test.local` if it exists, parsed by Symfony's Dotenv
-# in `scripts/test-jwt-passphrase.php`, whose output is this script's argument.
+# The resolution is not "the same precedence, implemented again" — it is the
+# same CODE: `scripts/test-jwt-passphrase.php` calls
+# `App\Tests\TestEnvironment::apply()`, which is what `tests/bootstrap.php`
+# runs, and its output is this script's argument. Two implementations of that
+# precedence drifted twice, first on a trailing comment and then on a value in
+# `.env.test.local` that refers to one in `.env.test`, so the generator and the
+# suite now share one implementation rather than agreeing by inspection.
 #
 # Detection, when a non-empty passphrase is in force:
 #   the private key must REFUSE an empty passphrase (so it is encrypted at all)
@@ -33,11 +36,10 @@ dir="$root/config/jwt/test"
 private="$dir/private.pem"
 public="$dir/public.pem"
 
-# The passphrase is resolved by `scripts/test-jwt-passphrase.php` — Symfony's
-# own Dotenv, the same parser and precedence `tests/bootstrap.php` applies —
-# and passed in as the first argument, so this script needs no PHP of its own
-# and both halves go through the Makefile's EXEC indirection (the container
-# locally, natively in CI).
+# The passphrase is resolved by `scripts/test-jwt-passphrase.php` — the code
+# `tests/bootstrap.php` itself runs — and passed in as the first argument, so
+# this script needs no dotenv parsing of its own and both halves go through the
+# Makefile's EXEC indirection (the container locally, natively in CI).
 passphrase="${1?the effective test passphrase is passed in by make jwt-keys}"
 
 usable() {
