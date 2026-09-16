@@ -15,13 +15,13 @@
 - **NFR-SEC-7** puts any migration that partitions at `high` tier with a failing-input test for each new guard — the tier is not the roadmap's to grant.
 - **§9** asks the ADR to cover the effect of retention on unique-visitor counts: dropping a month makes a returning visitor look new, which changes a published number, not only storage.
 
-## Next step
-`/opsx:propose stretch-partition-clicks`. Four things the proposal must establish rather than assume:
+- Artifacts written and `openspec/validate --strict` passes: proposal (tier `high` argued from the irreversible migration rather than the roadmap's minimum), two capability deltas, design (seven decisions plus the applicability table), tasks (24 across nine sections, Gate 1 first, the Gate 2 and archive steps as an un-checkboxed lifecycle section).
+- **Read from the source before proposing, not remembered**: `clicks` is `PRIMARY KEY (id)` with an FK to `links` and two indexes, one partial; the handler's idempotency rests entirely on that key, through its `UniqueConstraintViolationException` guard; the `Click` entity is `readOnly` and named by nothing but the architecture test; and the summary's `total`, `uniques`, `first_at` and `last_at` are computed with **no period bound**, which is why retention is a spec change and not only an operational one.
+- **Two consequences the proposal had to name rather than discover**: the primary key becomes `(id, occurred_at)` because PostgreSQL requires the partition key in every unique constraint — so the idempotency requirement is reworded and gets a scenario that redelivers a message from an earlier month; and an insert into a month with no partition raises `no partition of relation` — **neither** of the handler's two guards — so the horizon is a correctness property with a failing-input test, not housekeeping.
+- **One implementation of how a partition is named and bounded**: a SQL function created by the migration and called by both the migration and the command. This series has been bitten twice by two implementations of one rule agreeing by inspection until they did not.
 
-1. **The migration path for a table that already holds rows.** `clicks` is not empty anywhere this runs — the local database carries a million demo rows. Converting an ordinary table into a partitioned one is not an `ALTER`: it is a new parent, the old table attached or copied, and a swap. Which of those, what it costs on a million rows, and what happens to writes while it runs, are the decision this change is about — and it is irreversible in the way the tier means.
-2. **What the round trip of `harden-gate-floor` says about it.** `make migrations-roundtrip` now runs every `down` and compares the schema; a partitioning migration has to be reversible under that check, or the check has to be told why not — in writing, not by exception.
-3. **The retention window and who enforces it.** A number (90 days? 12 months?), a command, and whether it runs from the worker, from cron, or by hand. `app:demo:seed` and the benchmarks both write months of history, so the window interacts with what the README publishes.
-4. **The measurement.** Partitioning is a performance change; the series has a benchmark recipe (`docs/how-to/benchmarks.md`) and a published miss — `devices` p95 324 ms against 300 — so this change can state what it did to the numbers rather than assert an improvement.
+## Next step
+Gate 1: `scripts/gate-run.sh stretch-partition-clicks 1 full` — tier `high`, so the artifacts are reviewed before any implementation. `scripts/pregate-verify.sh gate1` passes.
 
 ## Blockers
 None.
