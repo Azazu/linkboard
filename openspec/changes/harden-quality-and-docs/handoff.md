@@ -1,7 +1,7 @@
 # Handoff — harden-quality-and-docs
 
 **Updated:** 2026-09-16 · claude
-**State:** fixing-g2
+**State:** ready-to-merge
 **Branch:** change/harden-quality-and-docs
 
 ## Done this session
@@ -69,8 +69,10 @@ The consequence is that a fresh `make init` on this branch still produces a test
 
 - Branch run on the head that carries the confirmation 1 fixes (`a5db0c2`) is green: run 35071736367 (2026-09-16), `completed`/`success` — which is also the evidence that `make jwt-keys EXEC=` still works natively now that the passphrase is resolved by a class under `tests/`.
 
+- Gate 2 Confirmation 2 (`4fda843`, Reviewed-Commit `bdba7ee`): **confirmed — Gate 2 passed.** The reviewer traced the shared environment implementation against the previous bootstrap, the installed Dotenv's variable resolution, the PHPUnit configuration, Composer's dev autoloading and the Makefile invocation, and the benchmark sequence against the compose configuration, the seed's production guard, the collection format and the report cache's per-environment pools. It states plainly what it could not do: no host PHP and no Docker socket, so authentication, the mutation runs, `make check` and the benchmark timings were taken as the executor's supplied evidence rather than reproduced.
+
 ## Next step
-Re-review round 1: `scripts/gate-run.sh harden-quality-and-docs 2 confirm 1`. **This is the second confirmation of round 1: if findings 1 or 2 come back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
+The user pushes this commit and merges (`/git:merge harden-quality-and-docs`), then `/opsx:archive` — `skip_specs`, so the archive syncs no capability delta and only removes roadmap row 13. Row 13a `harden-gate-floor` (PHPStan level 9 over `src`, migration down/up in CI, tier `high` with its own Gate 1) is next. **This is the second confirmation of round 1: if findings 1 or 2 come back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
 
 ## Blockers
 None.
