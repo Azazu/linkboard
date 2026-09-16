@@ -59,8 +59,10 @@ The consequence is that a fresh `make init` on this branch still produces a test
 
   Fixing the CLAIM rather than the line, the same sweep also caught what the reviewer had not: sections 1 and 3 of `docs/how-to/benchmarks.md` were no more runnable than section 2. Section 1 printed `http://nginx/<slug>` with no query to produce a slug, and section 3's load run — 10 000 redirects from one IP — silently depended on section 1's raised rate limiter, which section 1 told the reader to delete first. Both sections now print every command they need, including the slug query and `redis-cli del messages`, and all three were re-executed end to end; `/health` and the four-connection figures gained their own printed commands too.
 
+- Branch run on the head that carries the round 1 fixes (`0487548`) is green: run 35068431211 (2026-09-16), `completed`/`success`.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head and re-reviews round 1 with `scripts/gate-run.sh harden-quality-and-docs 2 confirm 1`.
+Re-review round 1: `scripts/gate-run.sh harden-quality-and-docs 2 confirm 1`.
 
 ## Blockers
 None.
