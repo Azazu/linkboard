@@ -56,3 +56,23 @@
 - Checked the environment and setup boundaries against `tests/bootstrap.php`, `tests/Integration/TestEnvironmentTest.php`, `phpunit.dist.xml`, the Makefile, CI configuration, JWT configuration and installed Lexik key-generation / JWT signing source. The installed generator writes private and public files separately.
 - Ran the disposable in-memory OpenSSL reproduction in finding 1; no repository key or environment file was read or changed by it.
 - `scripts/pregate-verify.sh gate1 harden-quality-and-docs` passed, including strict OpenSpec validation, with zero warnings. This is a planning review; application checks and Gate 2 implementation validation were not run.
+
+## Confirmation 2 · Gate 1 · Round 2
+**Reviewer:** codex
+**Date:** 2026-09-16
+**Reviewed-Commit:** 03b1302a796e03b22d8fb8ba60de660a8848a9e1
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The proposal and decision 6a correct the legacy state to encryption with an empty passphrase, distinguish it from an unencrypted key, and explicitly require encryption with the effective nonempty passphrase: reject an empty passphrase and accept the effective one. Task 9.2 covers both rejected states and byte-for-byte preservation of the compliant state; tasks 9.4–9.5 require authentication evidence. This resolves the detection defect at Gate 1. The references to both states as "unusable" in task 9.2 and the handoff remain imprecise: an unencrypted key violates the chosen encryption guarantee but can still sign. They do not invalidate the now-explicit detection and verification contract. |
+| 2 | confirmed — Decision 6a and task 9.1 now require the bootstrap's precedence: `.env.test`, followed by `.env.test.local`. Task 9.2 applies replacement and preservation to the passphrase in force, task 9.4 verifies generation and authentication with a nonempty local override, and task 9.5 verifies the default setup. Read together, these requirements apply the same effective value to generation and existing-key handling; implementation evidence remains due at Gate 2. |
+| 3 | changes-requested — Nonblocking remainder of the original minor finding: design.md, Risks / Trade-offs, still says the proposal names the Makefile as untouched, immediately after authorizing its jwt-keys target. Remove that stale sentence or restriction. The tasks' scope declaration and the design's key-write boundary are corrected; decision 6a and task 9.3 now require checking the public/private pair on every invocation and repairing a mismatch on retry. This minor wording remainder is at the executor's discretion and does not prevent confirmation of the major findings. |
+
+### Validation
+
+- Reviewed only the requested diff from `668f0342cb784d587d34f8156157f313e6d734a2` to the Reviewed-Commit and collateral material reachable from round 2's findings. Both major findings were marked `fixed`; there were no blockers or open source-round findings.
+- Verified the requested branch and HEAD and an initially clean working tree. Checked the revised contract against the bootstrap, Makefile, JWT configuration, and installed Lexik generator and JWT signer source; no implementation of section 9 is claimed by this confirmation.
+- Reproduced all three OpenSSL key states entirely in memory with disposable fixture values. Empty/effective passphrase exit codes were respectively `0/0` for an unencrypted key, `0/1` for empty-passphrase encryption, and `1/0` for effective-passphrase encryption. No repository keys or environment files were read or changed by the reproduction.
+- `git diff --check` for the requested range passed. `scripts/pregate-verify.sh gate1 harden-quality-and-docs` passed, including strict OpenSpec validation, with zero warnings. Application tests and Gate 2 checks were not run for this planning confirmation.
