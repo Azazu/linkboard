@@ -20,7 +20,7 @@ endif
 SKIP_MSG = @echo "[SKIP] no composer.json — application not scaffolded yet"
 
 .DEFAULT_GOAL := help
-.PHONY: help init up down ps logs sh composer console migrate migration test-db jwt-keys worker test stan cs cs-fix check
+.PHONY: help init up down ps logs sh composer console migrate migration test-db jwt-keys migrations-roundtrip worker test stan cs cs-fix check
 
 help: ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -74,6 +74,16 @@ test-db: ## Create and migrate the test database (DATABASE_URL's database + _tes
 jwt-keys: ## Generate the dev and test JWT keypairs (config/jwt/<env>/, gitignored; dev skips an existing key, test replaces one that does not match .env.test)
 	$(EXEC) bin/console lexik:jwt:generate-keypair --skip-if-exists --env=dev
 	$(EXEC) sh scripts/test-jwt-keys.sh "$$($(EXEC) php scripts/test-jwt-passphrase.php)"
+
+# Every migration down and up again, on a scratch database this run creates
+# and drops, comparing the schema before and after (change harden-gate-floor).
+# CI runs the same target natively in its own job.
+migrations-roundtrip: ## Run every migration down and up again on a scratch database and compare the schema
+ifdef APP_MISSING
+	$(SKIP_MSG)
+else
+	$(EXEC) sh scripts/migrations-roundtrip.sh
+endif
 
 worker: ## Consume the async Messenger transport in the foreground
 	$(COMPOSE) exec php bin/console messenger:consume async -vv --time-limit=3600
