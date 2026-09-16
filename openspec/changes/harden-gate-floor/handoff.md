@@ -1,7 +1,7 @@
 # Handoff — harden-gate-floor
 
 **Updated:** 2026-09-16 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/harden-gate-floor
 
 ## Done this session
@@ -23,8 +23,18 @@
 
 - Gate 1 Confirmation 2 (`e6dfeb2`, Reviewed-Commit `6cf163d`): **confirmed — Gate 1 passed.** The reviewer checked ownership after an exclusive create, the collision cases on both an empty and a non-empty existing database, the overlapping-run case and the failed-create-issues-no-drop case, and the shared fingerprint SQL with its real-PostgreSQL fixtures. It notes what it has not seen: the planned database tests are plans until Gate 2.
 
+- **Implemented after the gate, in the task order.**
+  - **The typed row reader** (`src/Shared/Db/Row.php`, `UnexpectedColumnValue`, `OneResult`): the five analytics query classes read every DBAL value where its type is checked instead of casting it. `(int) null` is `0`, and a report publishing that zero for a column a query stopped returning is what the exception replaces. 67 findings in `src` gone with no `@phpstan-ignore` and no new `ignoreErrors` entry. Two refusals of input that used to be stringified came out of it, each with a test: an `order[]` whose key is not a field name or whose value is not a word is a 400, and a stored rules document whose `match` values are not a list of strings opens the raw editor rather than a row with empty values the next save would have written back.
+  - **The typed JSON accessor** (`tests/Support/Json.php`) and the 42-file conversion: 294 findings in `tests`. Three helpers came out of the work rather than being designed up front — path readers for the document walks, `Json::column()`, and `tests/Support/Env.php`, because `(string) ($_SERVER['REDIS_URL'] ?? …)` hid the one case worth knowing about. Maps are keyed `array-key`, not `string`: PHP turns a JSON object's numeric member names into integers, so a document's responses are keyed by `204`.
+  - **The level**: `phpstan.dist.neon` at `level: 9` over `src` and `tests`, no baseline file, the reason a comment beside the number.
+  - **The round trip**: `make migrations-roundtrip` + `scripts/schema-fingerprint.sql`, with ownership from an atomic `CREATE DATABASE` (measured: a duplicate exits `7` with `already exists`) and a `trap` that drops only what this process created. Against the real database: 77 schema objects, only the declared survivors after a full down, and an identical listing after up again. Two runs in a row take different names; a leftover from a killed run is left alone.
+  - **Both proof layers, executed**: the fixture suite reports `30 passed, 0 failed` and three mutations of the real script turn it red (28/2, 27/3, 27/3); `SchemaFingerprintTest` proves the query sees an index, a column's nullability/default/type and a constraint, and removing any one extraction from the query turns a case red.
+  - **CI**: a `migrations` job with its own PostgreSQL, additive — the diff removes no line from the three existing jobs.
+  - **The documents**: NFR-QA-1, the two summary tables, the reversibility claim, the how-to's floor table, the commands reference, and `openspec/config.yaml` — whose `Stage: scaffold` line the previous change's sweep had missed.
+- **Counts**: `make check` green with no override — 899 tests, 21 800 assertions (891/11 324 before the test conversion). The assertion delta is the accessor asserting as it reads across 169 call sites; every one of the 152 removed assertion lines is either the same assertion through an accessor or a type guard the accessor now performs.
+
 ## Next step
-`/opsx:apply harden-gate-floor`. Section order is the task order: the typed row reader and `src`, then the JSON accessor and `tests` group by group, then the level, then the round trip with its two proof layers, then CI, then the documents. `make check` must stay green at each commit, and the level only rises in section 4 — after the findings it would report are gone.
+The user pushes the branch; the executor records the green Actions run on the new head — **four jobs now**, `workflow`, `detect`, `php` and the new `migrations` — and then requests Gate 2 per the lifecycle section of `tasks.md`.
 
 ## Blockers
 None.

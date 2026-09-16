@@ -72,7 +72,7 @@ proves the fingerprint SQL sees what the listing promises.
 
 ## 9. Wrap-up
 
-- [ ] 9.1 `make check` green inside the container with no environment override, at level 9; `openspec validate harden-gate-floor --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the counts before and after and the recorded round-trip output.
+- [x] 9.1 `make check` green inside the container with no environment override, at level 9 — **899 tests, 21 800 assertions**; `openspec validate harden-gate-floor --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the counts before and after and the recorded round-trip output.
 - [ ] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-gate-floor` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head and all four jobs are green.
 
 ## After every task above is complete — the gate, not a task
