@@ -67,8 +67,10 @@ The consequence is that a fresh `make init` on this branch still produces a test
 
   Re-run end to end, and the numbers moved enough to change the conclusions. Against the 220 000-click link the per-link reports are three to five times slower than the ones published before, and **`link/devices` now misses at p95 324 ms** while `admin/top-links` — the earlier miss — comes in at 299 ms prod-like against 322 ms in `dev`. Both are published with their numbers, the miss as a miss and the borderline one as met but named. The redirect and worker figures were re-measured in the same pass (p95 22.96 ms; 10 000 messages in 11.65 s), and the redirect section now asks wrk for p95 itself rather than bracketing it between p90 and p99.
 
+- Branch run on the head that carries the confirmation 1 fixes (`a5db0c2`) is green: run 35071736367 (2026-09-16), `completed`/`success` — which is also the evidence that `make jwt-keys EXEC=` still works natively now that the passphrase is resolved by a class under `tests/`.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head and re-reviews round 1 with `scripts/gate-run.sh harden-quality-and-docs 2 confirm 1`. **This is the second confirmation of round 1: if findings 1 or 2 come back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
+Re-review round 1: `scripts/gate-run.sh harden-quality-and-docs 2 confirm 1`. **This is the second confirmation of round 1: if findings 1 or 2 come back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
 
 ## Blockers
 None.
