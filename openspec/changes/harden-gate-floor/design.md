@@ -108,24 +108,27 @@ type-level edit — if a test was asserting nothing useful, it still is.
 
 1. resolve a scratch name — the configured database plus `_roundtrip_` and eight
    random hex characters — and refuse to continue if it somehow equals the
-   configured one,
+   configured one; build the scratch URL from the configured one with the path
+   replaced **and any `dbname` query parameter dropped**,
 2. create it with `CREATE DATABASE`, issued over the configured connection —
    PostgreSQL's own uniqueness is the exclusivity, so a name that already
    exists fails here, before any migration and before any drop, and this run
    owns the database if and only if that statement succeeded,
-3. `doctrine:migrations:migrate latest` — every `up`,
-4. fingerprint the schema,
-5. `doctrine:migrations:migrate first` — every `down`,
-6. assert the tables left are exactly the declared set,
-7. `doctrine:migrations:migrate latest` — every `up` again,
-8. fingerprint again; the two listings must be identical,
-9. drop the scratch database — from a `trap`, so a failure at any step still
+3. ask the connection `SELECT current_database()` and abort unless the answer
+   is this run's own database — the migrations' target is asked, not assumed,
+4. `doctrine:migrations:migrate latest` — every `up`,
+5. fingerprint the schema,
+6. `doctrine:migrations:migrate first` — every `down`,
+7. assert the tables left are exactly the declared set,
+8. `doctrine:migrations:migrate latest` — every `up` again,
+9. fingerprint again; the two listings must be identical,
+10. drop the scratch database — from a `trap`, so a failure at any step still
    cleans up, and only when step 2 recorded that this run created it.
 
 The fingerprint is one sorted text listing built by SQL over
 `information_schema.columns`, `pg_indexes` and `pg_constraint`: every column
 with its type, nullability and default, every index definition, every
-constraint definition. Step 8 compares the two listings with `diff`, so a
+constraint definition. Step 9 compares the two listings with `diff`, so a
 failure names the line that differs.
 
 *Why a fresh name per run rather than a fixed `<db>_roundtrip`.* A fixed name
@@ -146,6 +149,27 @@ existing database as a notice and exits `0`, which would turn a collision into
 a silent adoption — exactly the case this has to refuse. The equality guard
 against the configured name and the printed name stay, but they are hints for a
 human, not the isolation.
+
+*Why the target is asked and not computed.* Rewriting the URL's path is not
+enough. DBAL's `DsnParser` merges the query string over the path —
+`parseDatabaseUrlQuery()` runs after `parseDatabaseUrlPath()` and `array_merge`s
+its result — so a legal `DATABASE_URL` carrying `?dbname=app` would have sent
+every migration, every `down` among them, to the **configured** database while
+the cleanup dropped an untouched scratch one: a script written to protect a
+database would have dropped its tables (Gate 2 round 1, finding 1; reproduced
+against the installed DBAL, where that URL resolves to `dbname=app`). The
+parameter is therefore dropped when the scratch URL is built, and step 3 asks
+the connection itself which database it reached, through the same resolution
+the migrations use. The strip makes such a URL work; the question is what makes
+it safe.
+
+*Why each console call's status is checked before its output is formatted.*
+Piping `dbal:run-sql` straight into `sed` reports the pipeline's status, not the
+console's, so a query that failed read as an empty result and the run carried on
+to announce success — including over the post-`down` table check (Gate 2 round
+1, finding 2). Every call writes to a file whose status is checked first, and
+the table list is read from a file rather than through `$(…)`, where an `exit`
+inside a subshell would not have stopped the script either.
 
 *What a crash leaves behind.* A `trap` covers every exit including a failed
 step, and it drops exactly one database: the one whose `CREATE DATABASE`
@@ -170,7 +194,7 @@ nothing to do with reversibility (Context). Wiring it in would either import
 that unrelated failure or require fixing it here, and `proposal.md` puts that
 out of scope.
 
-*Why a declared set of surviving tables rather than "none".* Step 6 would fail
+*Why a declared set of surviving tables rather than "none".* Step 7 would fail
 today on `messenger_messages`, whose `down` deliberately keeps it. Asserting
 emptiness would force that argued decision to be undone to make a check green.
 The check instead names the survivors and why, so a future migration that keeps
@@ -196,7 +220,14 @@ takes a fingerprint before and after each of the three categories the listing
 promises to cover:
 
 - an index added and dropped,
-- a column's nullability, default and type changed,
+- a column's nullability, default and type changed — including the type's
+  **modifiers**: `information_schema.columns.data_type` reports both
+  `varchar(32)` and `varchar(64)` as `character varying`, so a length change
+  round-tripped invisibly inside the coverage this listing promises (Gate 2
+  round 1, finding 3). The listing reads `format_type(atttypid, atttypmod)` from
+  `pg_attribute`, which is what DBAL's own schema manager reads for the same
+  reason, and the test asserts the length and the precision/scale are in the
+  line rather than merely that something changed,
 - a constraint added and dropped.
 
 Each case asserts the two fingerprints differ **and** that the differing line

@@ -12,14 +12,29 @@
 -- What it does NOT cover, stated here rather than discovered later: sequences,
 -- triggers, functions, comments, grants, and row contents. A migration that
 -- changes only one of those round-trips silently as far as this listing goes.
+-- What it does cover, it covers completely: a column's full type including its
+-- modifiers (length, precision and scale), its nullability and its default.
 SELECT line FROM (
+    -- `format_type` rather than `information_schema.columns.data_type`, which
+    -- drops the type's modifiers: varchar(32) and varchar(64) both read as
+    -- `character varying` there, so a length change round-tripped invisibly
+    -- inside the coverage this listing promises (Gate 2 round 1, finding 3).
+    -- It is what DBAL's own schema manager reads for the same reason.
     SELECT format(
                'column %s.%s %s %s %s',
-               table_name, column_name, data_type, is_nullable,
-               coalesce(column_default, '-')
+               rel.relname, att.attname,
+               format_type(att.atttypid, att.atttypmod),
+               CASE WHEN att.attnotnull THEN 'NOT NULL' ELSE 'NULL' END,
+               coalesce(pg_get_expr(def.adbin, def.adrelid), '-')
            ) AS line
-      FROM information_schema.columns
-     WHERE table_schema = current_schema()
+      FROM pg_attribute att
+      JOIN pg_class rel ON rel.oid = att.attrelid
+      JOIN pg_namespace ns ON ns.oid = rel.relnamespace
+      LEFT JOIN pg_attrdef def ON def.adrelid = att.attrelid AND def.adnum = att.attnum
+     WHERE ns.nspname = current_schema()
+       AND rel.relkind IN ('r', 'p')
+       AND att.attnum > 0
+       AND NOT att.attisdropped
     UNION ALL
     SELECT format('index %s', indexdef)
       FROM pg_indexes

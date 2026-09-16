@@ -43,7 +43,7 @@ final class SchemaFingerprintTest extends KernelTestCase
 
         $this->connection->executeStatement('CREATE SCHEMA '.self::SCHEMA);
         $this->connection->executeStatement('SET search_path TO '.self::SCHEMA);
-        $this->connection->executeStatement('CREATE TABLE widgets (id uuid NOT NULL, label varchar(32) NOT NULL, weight int DEFAULT 1, PRIMARY KEY (id))');
+        $this->connection->executeStatement('CREATE TABLE widgets (id uuid NOT NULL, label varchar(32) NOT NULL, weight int DEFAULT 1, price numeric(10, 2), PRIMARY KEY (id))');
     }
 
     protected function tearDown(): void
@@ -71,6 +71,12 @@ final class SchemaFingerprintTest extends KernelTestCase
             'nullability' => ['ALTER TABLE widgets ALTER COLUMN label DROP NOT NULL', 'label'],
             'default' => ['ALTER TABLE widgets ALTER COLUMN weight SET DEFAULT 7', 'weight'],
             'type' => ['ALTER TABLE widgets ALTER COLUMN label TYPE text', 'label'],
+            // the modifiers, not only the base type: varchar(32) and
+            // varchar(64) are both `character varying` to
+            // information_schema.columns.data_type, which is why the listing
+            // reads format_type instead (Gate 2 round 1, finding 3)
+            'length' => ['ALTER TABLE widgets ALTER COLUMN label TYPE varchar(64)', 'label'],
+            'precision and scale' => ['ALTER TABLE widgets ALTER COLUMN price TYPE numeric(12, 4)', 'price'],
         ] as $case => [$statement, $column]) {
             $before = $this->fingerprint();
             $this->connection->executeStatement($statement);
@@ -95,6 +101,22 @@ final class SchemaFingerprintTest extends KernelTestCase
         self::assertSame($before, $this->fingerprint(), 'and dropping it puts the listing back');
     }
 
+    public function testAColumnsTypeIsListedWithItsModifiers(): void
+    {
+        // the length is in the line, not merely different from another line:
+        // a listing that dropped modifiers would still pass the case above if
+        // the change happened to alter something else about the column
+        $line = $this->lineFor('column widgets.label');
+        self::assertStringContainsString('character varying(32)', $line);
+
+        $this->connection->executeStatement('ALTER TABLE widgets ALTER COLUMN label TYPE varchar(64)');
+        self::assertStringContainsString('character varying(64)', $this->lineFor('column widgets.label'));
+
+        self::assertStringContainsString('numeric(10,2)', $this->lineFor('column widgets.price'));
+        $this->connection->executeStatement('ALTER TABLE widgets ALTER COLUMN price TYPE numeric(12, 4)');
+        self::assertStringContainsString('numeric(12,4)', $this->lineFor('column widgets.price'));
+    }
+
     public function testTheListingCoversTheThreeCategoriesItNames(): void
     {
         // a listing that lost a category would still pass every "differs" case
@@ -104,6 +126,17 @@ final class SchemaFingerprintTest extends KernelTestCase
         self::assertContains('column', $kinds);
         self::assertContains('index', $kinds, 'the primary key is an index');
         self::assertContains('constraint', $kinds, 'the primary key is a constraint too');
+    }
+
+    private function lineFor(string $prefix): string
+    {
+        foreach ($this->fingerprint() as $line) {
+            if (str_starts_with($line, $prefix)) {
+                return $line;
+            }
+        }
+
+        self::fail("the listing has no line for $prefix");
     }
 
     /**

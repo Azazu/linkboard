@@ -35,34 +35,75 @@ new_repo() {
     printf 'doctrine_migration_versions messenger_messages\n' > "$REPO/survivors"
     printf 'ok\n' > "$REPO/down-mode"
     printf 'stable\n' > "$REPO/fingerprint-mode"
+    : > "$REPO/query-fail"
+    : > "$REPO/current-database"
     cat > "$REPO/bin/console" <<'STUB'
 #!/bin/sh
-# console stub: records every invocation and answers from the mode files.
+# console stub: records every invocation with the DATABASE_URL it was given,
+# and answers from the mode files.
+#
+# `current_database()` is answered the way DBAL resolves it — the query
+# string's `dbname` wins over the URL's path (DsnParser merges the query after
+# the path) — so the script's own check of which database it reached is
+# exercised for real rather than mocked away.
 set -u
-printf '%s\n' "$*" >> "$PWD/log"
+printf '%s | DATABASE_URL=%s\n' "$*" "${DATABASE_URL:-}" >> "$PWD/log"
+
+stage=fingerprint
 case "$*" in
-    *"CREATE DATABASE"*)
+    *"CREATE DATABASE"*) stage=create ;;
+    *"DROP DATABASE"*) stage=drop ;;
+    *doctrine:migrations:migrate*) stage=migrate ;;
+    *"current_database()"*) stage=current_database ;;
+    *information_schema.tables*) stage=tables ;;
+esac
+if [ "$stage" = fingerprint ]; then
+    n=$(( $(cat "$PWD/fingerprint-calls") + 1 )); printf '%s\n' "$n" > "$PWD/fingerprint-calls"
+    stage="fingerprint$n"
+fi
+if [ "$stage" = "$(cat "$PWD/query-fail" 2>/dev/null)" ]; then
+    echo 'SQLSTATE[08006]: the query failed' >&2
+    exit 7
+fi
+
+case "$stage" in
+    create)
         if [ "$(cat "$PWD/create-mode")" = taken ]; then
             echo 'SQLSTATE[42P04]: database "x" already exists' >&2
             exit 7
         fi
         exit 0 ;;
-    *"DROP DATABASE"*) exit 0 ;;
-    *doctrine:migrations:migrate*)
+    drop) exit 0 ;;
+    migrate)
         [ -f "$PWD/hold" ] && while [ -f "$PWD/hold" ]; do sleep 0.05; done
         case "$*" in
             *" first"*) [ "$(cat "$PWD/down-mode")" = fail ] && { echo 'the down failed' >&2; exit 1; } ;;
         esac
         exit 0 ;;
-    *information_schema.tables*)
+    current_database)
+        forced=$(cat "$PWD/current-database" 2>/dev/null || true)
+        if [ -n "$forced" ]; then
+            name=$forced
+        else
+            url=${DATABASE_URL:-}
+            name=${url%%\?*}; name=${name##*/}
+            case "$url" in *\?*)
+                for part in $(printf '%s' "${url#*\?}" | tr '&' ' '); do
+                    case "$part" in dbname=*) name=${part#dbname=} ;; esac
+                done ;;
+            esac
+        fi
+        echo ' current_database'
+        echo "  $name"
+        exit 0 ;;
+    tables)
         echo ' table_name'
         for t in $(cat "$PWD/survivors"); do echo "  $t"; done
         exit 0 ;;
     *)
-        n=$(( $(cat "$PWD/fingerprint-calls") + 1 )); printf '%s\n' "$n" > "$PWD/fingerprint-calls"
         echo ' line'
-        echo '  column widgets.id uuid NO -'
-        if [ "$(cat "$PWD/fingerprint-mode")" = drifts ] && [ "$n" -gt 1 ]; then
+        echo '  column widgets.id uuid NOT NULL -'
+        if [ "$(cat "$PWD/fingerprint-mode")" = drifts ] && [ "$stage" != fingerprint1 ]; then
             echo '  index idx_widgets_label ON widgets (label)'
         fi
         exit 0 ;;
@@ -139,6 +180,44 @@ run 'postgresql://u:p@h:5432/?serverVersion=16'
 [ $? != 0 ] && ok || bad 'an empty database name passed'
 tgrep 'refusing to operate on the configured database'
 tnolog 'CREATE DATABASE'
+
+# --- a DATABASE_URL whose query selects the database (Gate 2 round 1, #1) ----
+# DBAL merges the query over the path, so a retained `dbname` would have sent
+# every migration — every `down` included — to the configured database
+new_repo dbname
+run 'postgresql://u:p@h:5432/fixture?dbname=fixture&serverVersion=16'
+[ $? = 0 ] && ok || bad 'a dbname query parameter broke the run'
+tgrep 'the round trip reproduced the schema exactly'
+if grep 'doctrine:migrations:migrate' "$REPO/log" | grep -q 'dbname='; then
+    bad 'a migration was sent to the database the query string selected'
+else ok; fi
+if grep 'doctrine:migrations:migrate' "$REPO/log" | grep -q 'fixture_roundtrip_'; then ok; else bad 'the migrations did not reach the scratch database'; fi
+
+# --- the connection resolving to something else entirely --------------------
+new_repo resolution
+printf 'fixture\n' > "$REPO/current-database"
+run "$URL"; [ $? != 0 ] && ok || bad 'a connection resolving to the configured database passed'
+tgrep 'not to the database this run created'
+tnolog 'doctrine:migrations:migrate'
+tlog 'DROP DATABASE IF EXISTS'
+
+# --- a listing query that fails, at each stage (Gate 2 round 1, #2) ---------
+# piping the console straight into `sed` reported the pipeline's status, so a
+# failed query read as an empty result and the run announced success
+for stage in current_database fingerprint1 tables fingerprint2; do
+    new_repo "queryfail.$stage"
+    printf '%s\n' "$stage" > "$REPO/query-fail"
+    run "$URL"; [ $? != 0 ] && ok || bad "a failing $stage query passed"
+    tgrep 'SQLSTATE'
+    tngrep 'the round trip reproduced the schema exactly'
+    tlog 'DROP DATABASE IF EXISTS'
+done
+
+# --- a migration that fails is not swallowed either -------------------------
+new_repo migratefail
+printf 'fail\n' > "$REPO/down-mode"
+run "$URL"; [ $? != 0 ] && ok || bad 'a failing migration passed'
+tgrep 'doctrine:migrations:migrate first failed'
 
 printf '%s passed, %s failed\n' "$PASS" "$FAILED"
 [ "$FAILED" = 0 ] || exit 1

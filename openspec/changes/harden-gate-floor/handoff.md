@@ -1,7 +1,7 @@
 # Handoff — harden-gate-floor
 
 **Updated:** 2026-09-16 · claude
-**State:** awaiting-gate-2
+**State:** fixing-g2
 **Branch:** change/harden-gate-floor
 
 ## Done this session
@@ -35,8 +35,15 @@
 
 - Branch run on the exact head (`f8567ed`) is green: run 35112644807 (2026-09-16), all four jobs — `detect`, `workflow`, `php` and the new `migrations`, which is the only evidence that the round trip works against a PostgreSQL this machine did not set up.
 
+- Gate 2 round 1 (`1258925`, Reviewed-Commit `58b13bd`): changes-requested — **one blocker and two majors, all three real**, and the blocker is the kind worth the tier.
+  1. **The round trip could have dropped the configured database's tables.** Rewriting the URL's path is not enough: DBAL merges the query string over the path, so a legal `DATABASE_URL` carrying `?dbname=app` would have sent every migration — every `down` among them — to the configured database while the cleanup dropped an untouched scratch one. Reproduced against the installed `DsnParser`: `…/app_roundtrip_abc?dbname=app` resolves to `dbname=app`. A script written to protect a database would have emptied it. Fixed twice over: the parameter is dropped when the scratch URL is built, and before a single migration runs the connection is asked `SELECT current_database()` and the run aborts unless the answer is its own database. The fixture console now resolves that name the way DBAL does, so both halves are exercised.
+  2. **A failing query read as an empty result.** `bin/console … | sed` reports the pipeline's status, so a listing that failed left the fingerprints stable and the run announced `the round trip reproduced the schema exactly` — including over the post-`down` table check, which is the one the whole job exists for. Every console call now writes to a file whose status is checked before the output is formatted, and the table list is read from a file rather than through `$(…)`, where an `exit` inside a subshell would not have stopped the script either.
+  3. **The column listing dropped the type's modifiers.** `information_schema.columns.data_type` reports `varchar(32)` and `varchar(64)` alike as `character varying`, so a length or precision change round-tripped invisibly — inside the coverage the listing promises, not among its stated exclusions. It now reads `format_type(atttypid, atttypmod)` from `pg_attribute`, which is what DBAL's own schema manager reads, and the test asserts the modifiers are in the line rather than merely that something changed.
+
+  The suite grew from 30 cases to **56** and stays non-vacuous: six mutations of the real script now turn it red, the three new ones being keeping the `dbname` parameter (53/3), removing the effective-database check (50/6) and ignoring the console's status again (50/6). Replacing `format_type` with `data_type` fails `SchemaFingerprintTest` on precision and scale.
+
 ## Next step
-Gate 2: `scripts/gate-run.sh harden-gate-floor 2 full`, per the lifecycle section at the end of `tasks.md`.
+The user pushes the branch; the executor records the green Actions run on the new head (four jobs) and re-reviews round 1 with `scripts/gate-run.sh harden-gate-floor 2 confirm 1`.
 
 ## Blockers
 None.
