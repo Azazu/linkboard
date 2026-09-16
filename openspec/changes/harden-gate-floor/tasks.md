@@ -73,7 +73,7 @@ proves the fingerprint SQL sees what the listing promises.
 ## 9. Wrap-up
 
 - [x] 9.1 `make check` green inside the container with no environment override, at level 9 — **899 tests, 21 800 assertions**; `openspec validate harden-gate-floor --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the counts before and after and the recorded round-trip output.
-- [ ] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-gate-floor` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: the run's `head_sha` equals the branch head and all four jobs are green.
+- [x] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/harden-gate-floor` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify, executed: run **35112644807** on `f8567ed`, `completed`/`success`, and all four jobs green — `detect`, `workflow` (which runs `scripts/migrations_roundtrip_test.sh` among every `scripts/*_test.sh`), `php` (`make check` at level 9 natively) and the new `migrations` (the round trip against a real PostgreSQL, natively).
 
 ## After every task above is complete — the gate, not a task
 

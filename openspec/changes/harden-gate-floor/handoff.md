@@ -33,8 +33,10 @@
   - **The documents**: NFR-QA-1, the two summary tables, the reversibility claim, the how-to's floor table, the commands reference, and `openspec/config.yaml` — whose `Stage: scaffold` line the previous change's sweep had missed.
 - **Counts**: `make check` green with no override — 899 tests, 21 800 assertions (891/11 324 before the test conversion). The assertion delta is the accessor asserting as it reads across 169 call sites; every one of the 152 removed assertion lines is either the same assertion through an accessor or a type guard the accessor now performs.
 
+- Branch run on the exact head (`f8567ed`) is green: run 35112644807 (2026-09-16), all four jobs — `detect`, `workflow`, `php` and the new `migrations`, which is the only evidence that the round trip works against a PostgreSQL this machine did not set up.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head — **four jobs now**, `workflow`, `detect`, `php` and the new `migrations` — and then requests Gate 2 per the lifecycle section of `tasks.md`.
+Gate 2: `scripts/gate-run.sh harden-gate-floor 2 full`, per the lifecycle section at the end of `tasks.md`.
 
 ## Blockers
 None.
