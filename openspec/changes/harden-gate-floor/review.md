@@ -86,3 +86,24 @@
 - `scripts/pregate-verify.sh gate2 harden-gate-floor` passed its structural checks but failed at `make check`: this reviewer sandbox cannot access `/var/run/docker.sock`. A direct `make check` failed for the same permission reason. PHP is not available natively here, so PHPUnit, PHPStan and the real-PostgreSQL cases could not be independently rerun. This is a validation limitation, not evidence of an application test failure.
 - The recorded CI evidence refers to `f8567ed`; the diff from that commit to the Reviewed-Commit contains only `handoff.md` and `tasks.md`. CI execution was not independently queried in this review.
 - Only this review record was appended; no git write commands were run.
+
+## Confirmation 1 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-16
+**Reviewed-Commit:** 6c75ca6a8edb56255f81a506cda4000681199fbe
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The scratch URL removes the literal `dbname` query override, and `SELECT current_database()` must return the exclusively created scratch name before any migration runs. The effective-name check uses the same scratch URL as the migrations and aborts on a mismatch. The regression suite covers the original query override and a forced connection mismatch, including no migration on mismatch and cleanup of the owned database. |
+| 2 | confirmed — Each scratch query checks the console exit status before formatting output. The post-down table list is read from a file in the main shell, so a failed query cannot become an empty successful listing. Regression cases independently fail the effective-database query, both fingerprints and the table query, requiring nonzero exit, the SQL error, no success announcement and cleanup. Migration failures also propagate. |
+| 3 | confirmed — Column extraction now uses `format_type(att.atttypid, att.atttypmod)` with catalog nullability and default expressions, retaining concrete types and their modifiers. The real-PostgreSQL tests verify numeric precision/scale changes produce a difference naming the column and explicitly assert the varchar length and numeric modifiers before and after alteration. The existing index, constraint and column-attribute checks still pass. |
+
+### Validation
+
+- Reviewed only the diff from `58b13bd75faa1c7148f2162ea422a3a20887fadf` to the Reviewed-Commit and collateral context reachable from the three source findings. All source findings are dispositioned; no unrelated findings introduced.
+- Verified branch `change/harden-gate-floor`, HEAD equal to the Reviewed-Commit, and an initially clean worktree. Checked the connection-resolution fix against installed DBAL source and Doctrine configuration, and searched the affected planning and documentation claims.
+- `sh -n scripts/migrations-roundtrip.sh` passed. `sh scripts/migrations_roundtrip_test.sh` reported **56 passed, 0 failed**.
+- `make test PHPUNIT='vendor/bin/phpunit tests/Integration/Db/SchemaFingerprintTest.php'` passed against PostgreSQL through the PHP container: **5 tests, 49 assertions**. Full `make check` and remote CI were not rerun for this bounded confirmation.
+- Only `review.md` was edited; no git write commands were run.
