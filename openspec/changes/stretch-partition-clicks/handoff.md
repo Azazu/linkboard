@@ -42,8 +42,10 @@
   - **ADR-006**, §3.4 and §9 of the brief, the how-to, the command reference.
 - **The measurement, three runs, published as it came out.** Partitioning moved **nothing** beyond each report's own run-to-run spread: the dataset's whole history is 60 days, so of seventeen partitions only three hold rows and a 30-day period touches two — there was almost nothing to prune. `link/devices` still misses (316.8 ms, was 324.3); `admin/top-links` sits on 300.0 ms and swings 251–427 across runs. The 426.8 ms run was made on partitions autovacuum had not analysed yet, which is why the published recipe now runs `ANALYZE clicks` — a partitioned table keeps statistics per partition, and measuring a bulk load without them measures the planner's ignorance. The answer to report latency remains the `click_daily` aggregate §9 names and this plan left out.
 
+- Branch run on the exact head (`629ae79`) is green: run 35138605772 (2026-09-16), all four jobs — the `migrations` one is what proves the conversion and its `down` work on a database this machine did not set up.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head (four jobs) and then requests Gate 2 per the lifecycle section of `tasks.md`.
+Gate 2: `scripts/gate-run.sh stretch-partition-clicks 2 full`, per the lifecycle section at the end of `tasks.md`.
 
 ## Blockers
 None.
