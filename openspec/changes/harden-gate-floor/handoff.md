@@ -1,7 +1,7 @@
 # Handoff — harden-gate-floor
 
 **Updated:** 2026-09-16 · claude
-**State:** proposing
+**State:** implementing
 **Branch:** change/harden-gate-floor
 
 ## Done this session
@@ -21,8 +21,10 @@
 
 - Gate 1 Confirmation 1 (`6449fbf`, Reviewed-Commit `b9cf013`): findings 1, 3 and 4 **confirmed**; finding 2 came back, and correctly. My fix made the destruction safe but left the *collision* unproven: random names reduce collisions, and what makes one safe is the create failing — which had no demonstrated failing input, and the case I did write covered only a non-empty existing database. Corrected: the scratch database is taken with `CREATE DATABASE` over the configured connection, PostgreSQL's own atomicity being the exclusivity — measured, the second create exits `7` with `already exists` — and `doctrine:database:create` is explicitly rejected because it reports an existing database as a notice and exits `0`, turning a collision into a silent adoption. Ownership is now "this process's create returned success", and three cases carry it: a collision on an existing empty database and on one with tables (no migration, no drop), two overlapping runs where one is held live inside its migration step while the other completes (each drops only the name its own create returned), and a failed create issuing no drop at all.
 
+- Gate 1 Confirmation 2 (`e6dfeb2`, Reviewed-Commit `6cf163d`): **confirmed — Gate 1 passed.** The reviewer checked ownership after an exclusive create, the collision cases on both an empty and a non-empty existing database, the overlapping-run case and the failed-create-issues-no-drop case, and the shared fingerprint SQL with its real-PostgreSQL fixtures. It notes what it has not seen: the planned database tests are plans until Gate 2.
+
 ## Next step
-Gate 1 confirmation, second attempt on finding 2: `scripts/gate-run.sh harden-gate-floor 1 confirm 1`. **This is the second confirmation of round 1 — if finding 2 comes back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
+`/opsx:apply harden-gate-floor`. Section order is the task order: the typed row reader and `src`, then the JSON accessor and `tests` group by group, then the level, then the round trip with its two proof layers, then CI, then the documents. `make check` must stay green at each commit, and the level only rises in section 4 — after the findings it would report are gone.
 
 ## Blockers
 None.

@@ -12,7 +12,7 @@ them to make its own check pass would prove nothing.
 
 ## 1. Gate 1
 
-- [ ] 1.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh harden-gate-floor 1 full`) and disposition every finding before section 2 starts. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed` with no finding row left `open`.
+- [x] 1.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh harden-gate-floor 1 full`) and disposition every finding before section 2 starts. Verify: the last Gate 1 record in `review.md` reads `confirmed` with no finding row left `open` — round 1 raised three major and one minor, Confirmation 1 returned finding 2, and Confirmation 2 (`6cf163d`) confirmed all of them.
 
 ## 2. The typed row reader, and `src` at level 9
 
