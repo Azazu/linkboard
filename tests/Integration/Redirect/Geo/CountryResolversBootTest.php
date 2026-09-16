@@ -22,7 +22,8 @@ final class CountryResolversBootTest extends KernelTestCase
 
     protected function setUp(): void
     {
-        $this->previous = $_SERVER['COUNTRY_RESOLVERS'] ?? null;
+        $previous = $_SERVER['COUNTRY_RESOLVERS'] ?? null;
+        $this->previous = \is_string($previous) ? $previous : null;
     }
 
     protected function tearDown(): void

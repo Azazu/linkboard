@@ -44,9 +44,10 @@ final class DemoSeedCommandTest extends WebTestCase
         $links = $c->fetchAllAssociative('SELECT l.id, l.slug, l.rules, l.click_count, u.email FROM links l JOIN users u ON u.id = l.owner_id ORDER BY l.slug');
         self::assertCount(10, $links);
         foreach ($links as $link) {
+            $slug = Row::string($link, 'slug');
             self::assertSame(DemoDataset::USER_EMAIL, $link['email']);
-            self::assertNotNull($link['rules'], $link['slug'].' carries a routing document');
-            self::assertSame((int) $link['click_count'], Row::toInt($c->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$link['id']])), $link['slug'].' click_count equals its rows');
+            self::assertNotNull($link['rules'], $slug.' carries a routing document');
+            self::assertSame(Row::int($link, 'click_count'), Row::toInt($c->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$link['id']])), $slug.' click_count equals its rows');
         }
         self::assertSame(500, Row::toInt($c->fetchOne('SELECT count(*) FROM clicks')));
         self::assertSame(0, Row::toInt($c->fetchOne("SELECT count(*) FROM clicks WHERE occurred_at < now() - interval '5 days' OR occurred_at > now()")));
@@ -70,7 +71,7 @@ final class DemoSeedCommandTest extends WebTestCase
         self::assertStringContainsString('--reset', $again->getDisplay());
         self::assertSame(500, Row::toInt($c->fetchOne('SELECT count(*) FROM clicks')));
         self::assertSame(2, Row::toInt($c->fetchOne('SELECT count(*) FROM users')));
-        $oldIds = array_column($links, 'id');
+        $oldIds = array_map(static fn (array $link): string => Row::string($link, 'id'), $links);
 
         // --reset: everything of the first run is gone, a new dataset exists
         $reset = new CommandTester(new Application($kernel)->find('app:demo:seed'));
@@ -79,7 +80,7 @@ final class DemoSeedCommandTest extends WebTestCase
         self::assertSame(10, Row::toInt($c->fetchOne('SELECT count(*) FROM links')));
         self::assertSame(300, Row::toInt($c->fetchOne('SELECT count(*) FROM clicks')));
         self::assertSame(0, Row::toInt($c->fetchOne("SELECT count(*) FROM clicks WHERE occurred_at < now() - interval '3 days'")));
-        self::assertSame([], array_intersect($oldIds, $c->fetchFirstColumn('SELECT id FROM links')), 'the links of the first run are gone');
+        self::assertSame([], array_intersect($oldIds, Row::toStrings($c->fetchFirstColumn('SELECT id FROM links'), 'id')), 'the links of the first run are gone');
         self::assertNotSame($password, self::printedPassword($reset->getDisplay()), 'a new password');
     }
 

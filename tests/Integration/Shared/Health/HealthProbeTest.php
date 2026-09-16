@@ -44,7 +44,6 @@ final class HealthProbeTest extends KernelTestCase
     public function testUnreachableDatabaseIsReportedAsFailure(): void
     {
         $redisUrl = Env::string('REDIS_URL');
-        \assert(\is_string($redisUrl));
         $probe = new HealthProbe('postgresql://nobody:nothing@192.0.2.2:5432/nowhere?serverVersion=16', $redisUrl);
 
         $started = microtime(true);

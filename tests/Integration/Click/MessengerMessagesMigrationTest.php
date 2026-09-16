@@ -98,15 +98,13 @@ final class MessengerMessagesMigrationTest extends KernelTestCase
     /** @return list<string> */
     private function indexes(): array
     {
-        $names = $this->connection()->fetchFirstColumn("SELECT indexname FROM pg_indexes WHERE tablename = 'messenger_messages' ORDER BY indexname");
-
-        return array_map(strval(...), $names);
+        return Row::toStrings($this->connection()->fetchFirstColumn("SELECT indexname FROM pg_indexes WHERE tablename = 'messenger_messages' ORDER BY indexname"), 'indexname');
     }
 
     /** @return list<string> */
     private function columns(): array
     {
-        return array_map(strval(...), $this->connection()->fetchFirstColumn("SELECT column_name FROM information_schema.columns WHERE table_name = 'messenger_messages' ORDER BY ordinal_position"));
+        return Row::toStrings($this->connection()->fetchFirstColumn("SELECT column_name FROM information_schema.columns WHERE table_name = 'messenger_messages' ORDER BY ordinal_position"), 'column_name');
     }
 
     private function rows(): int

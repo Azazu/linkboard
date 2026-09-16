@@ -117,6 +117,23 @@ final class Row
         return self::toString(self::present($row, $column, 'a string'), $column);
     }
 
+    /**
+     * A whole column as strings — `fetchFirstColumn()` is a `list<mixed>`.
+     *
+     * @param iterable<mixed> $values
+     *
+     * @return list<string>
+     */
+    public static function toStrings(iterable $values, string $what = 'the column'): array
+    {
+        $strings = [];
+        foreach ($values as $value) {
+            $strings[] = self::toString($value, $what);
+        }
+
+        return $strings;
+    }
+
     /** As `string()`, for a single value. */
     public static function toString(mixed $value, string $what = 'the value'): string
     {

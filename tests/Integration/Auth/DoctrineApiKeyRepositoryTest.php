@@ -81,7 +81,7 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
         $repository->revoke($key->getId(), $t0->modify('+5 minutes'));
 
         $stored = $connection->fetchOne('SELECT revoked_at FROM api_keys WHERE id = :id', ['id' => $key->getId()->toRfc4122()]);
-        self::assertEquals($t0, new \DateTimeImmutable((string) $stored), 'the second revocation does not move the timestamp');
+        self::assertEquals($t0, new \DateTimeImmutable(Row::toString($stored, 'revoked_at')), 'the second revocation does not move the timestamp');
         self::assertNull($repository->findActiveByHash($key->getKeyHash(), $t0), 'a revoked key no longer authenticates');
     }
 
@@ -169,6 +169,6 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
         self::assertInstanceOf(Connection::class, $connection);
         $value = $connection->fetchOne('SELECT last_used_at FROM api_keys WHERE id = :id', ['id' => $id->toRfc4122()]);
 
-        return null === $value || false === $value ? null : new \DateTimeImmutable((string) $value);
+        return null === $value || false === $value ? null : new \DateTimeImmutable(Row::toString($value, 'last_used_at'));
     }
 }

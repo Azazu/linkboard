@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Click;
 
 use App\Click\Message\ClickRecorded;
+use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -88,6 +89,6 @@ final class ClickRetryTest extends KernelTestCase
         self::assertCount(3, $parked[0]->all(RedeliveryStamp::class) ? \array_slice($parked[0]->all(RedeliveryStamp::class), 0, -1) : [], 'three retry stamps precede the parking stamp');
         self::assertSame([], iterator_to_array($async->get(10), false), 'nothing left on async');
         self::assertSame(0, self::getContainer()->get('doctrine.dbal.default_connection')->fetchOne('SELECT count(*) FROM clicks WHERE id = ?', [$poison->clickId]));
-        self::assertSame(0, (int) self::getContainer()->get('doctrine.dbal.default_connection')->fetchOne('SELECT click_count FROM links WHERE id = ?', [$link->getId()->toRfc4122()]));
+        self::assertSame(0, Row::toInt(self::getContainer()->get('doctrine.dbal.default_connection')->fetchOne('SELECT click_count FROM links WHERE id = ?', [$link->getId()->toRfc4122()])));
     }
 }
