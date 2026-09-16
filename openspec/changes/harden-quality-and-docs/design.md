@@ -91,6 +91,8 @@ Four records, each for a decision this project actually turned on and weighed al
 
 So "does it open with the declared passphrase?" is not the detection: it keeps an unencrypted key, which opens with anything — the case Gate 1 round 2 raised and reproduced. The detection is the pair of answers: **when a non-empty passphrase is in force, the private key must refuse an empty passphrase and accept the declared one.** That replaces both wrong states and keeps the right one.
 
+The two wrong states are wrong in different ways, and the distinction is worth keeping straight (Gate 1 confirmation of round 2): the empty-passphrase key **cannot be used at all** with the passphrase in force, while the unencrypted key *can* still sign — it simply does not carry the encryption this environment declares. Both are replaced, one because it is broken and one because it is not what was asked for.
+
 A private key alone is not a usable keypair, so the target also checks that the stored public key is the one that belongs to it (the public key derived from the private one must equal the stored file). A replacement writes two files, and the two are not written atomically: if the target dies between them the pair is mismatched, so the check runs on every invocation rather than only after a write, and the fix for a half-written pair is to run the target again.
 
 *Why in the target and not in the console command.* A console process has the same problem a test process had, and for the same reason — compose's environment beats the file — but unlike `tests/bootstrap.php` there is no place in the application that knows "this is a test-environment invocation" and may override. The recipe that already says `--env=test` is that place.
@@ -118,7 +120,7 @@ A private key alone is not a usable keypair, so the target also checks that the 
 - **Taking CI's own configuration away from it** → only the variables `.env.test` defines are re-applied, and CI's four connection variables are not among them; the CI run on the branch head is what proves it.
 - **A detection that keeps a broken key** → the shape of Gate 1 round 2's finding, and the reason the rule is now "refuses empty *and* accepts declared" rather than "opens". All three key states were generated and probed, and the table in decision 6a is what the rule was written from.
 - **Replacing a key a developer wanted** → the target only replaces a test key that cannot be used with the passphrase in force; the development keypair is untouched, and the test keys are gitignored artifacts a regeneration costs nothing.
-- **Scope creeping further into the floor** → the PHPStan level, `make check`'s steps and the CI jobs remain row 13a's. The `Makefile`'s `jwt-keys` target is in scope here by the user's decision of 2026-09-15; nothing else in that file is. `phpstan.dist.neon`, the `Makefile` and `.github/workflows/` are named in the proposal as untouched, and a task that finds itself needing them stops and raises the tier.
+- **Scope creeping further into the floor** → the PHPStan level, `make check`'s steps and the CI jobs remain row 13a's. The `Makefile`'s `jwt-keys` target is in scope here by the user's decision of 2026-09-15; nothing else in that file is, and the proposal's untouched list says the same. `phpstan.dist.neon`, the `Makefile` and `.github/workflows/` are named in the proposal as untouched, and a task that finds itself needing them stops and raises the tier.
 
 ## Migration Plan
 

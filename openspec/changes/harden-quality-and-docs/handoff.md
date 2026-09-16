@@ -1,7 +1,7 @@
 # Handoff — harden-quality-and-docs
 
 **Updated:** 2026-09-15 · claude
-**State:** awaiting-gate-1
+**State:** implementing
 **Branch:** change/harden-quality-and-docs
 
 ## Done this session
@@ -44,8 +44,14 @@ The consequence is that a fresh `make init` on this branch still produces a test
 
 - The working test keypair was backed up and restored while measuring; `tests/Api/Auth` passes (36 tests, 323 assertions).
 
+- Gate 1 Confirmation 2 (`e35e47b`, Reviewed-Commit `03b1302`): **confirmed — Gate 1 passed.** The reviewer reproduced all three key states independently and got the same exit codes I measured (`0/0` unencrypted, `0/1` empty-passphrase, `1/0` correct). Finding 3 left a wording remainder at the executor's discretion — the design's risk paragraph still repeated the stale "the Makefile is untouched", and calling an unencrypted key "unusable" is imprecise since it can still sign. Both corrected in the following commit.
+
+- Section 9 implemented after the gate. `scripts/test-jwt-keys.sh` resolves the passphrase the way `tests/bootstrap.php` does (`.env.test`, then `.env.test.local`) and regenerates the test keypair unless it refuses an empty passphrase, accepts the resolved one **and** matches its stored public key. `make jwt-keys` calls it instead of the console command for the test environment; the development keypair is untouched. The script is POSIX `sh` and runs natively, which is how CI invokes the target.
+
+  Evidence, all executed and recorded in tasks 9.1–9.5: a keypair generated from nothing satisfies all three conditions; the old target's key (`b5433b69…`) and an unencrypted key (`647f5d05…`) are both replaced; a compliant pair is left byte for byte; a public key swapped for another's is detected and the pair regenerated; a `.env.test.local` override drives both the generator and the suite; and the `make init` path ends with `OK (43 tests, 359 assertions)` and no environment override anywhere. `make check` is green: 848 tests, 11 090 assertions.
+
 ## Next step
-`scripts/gate-run.sh harden-quality-and-docs 1 confirm 2` — the confirmation on round 2's three findings. Section 9 is not written until it reads `confirmed`.
+Task 10.2: the user pushes the branch, the executor records the Actions run on the exact head — which is also what proves `make jwt-keys EXEC=` still works natively — and then Gate 2 is requested per the lifecycle section at the end of `tasks.md`.
 
 ## Blockers
 None.

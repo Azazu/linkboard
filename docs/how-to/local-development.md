@@ -12,7 +12,10 @@ make init                     # build, up, composer install, migrate, create the
 
 `make init` also generates the dev and test JWT keypairs (`make jwt-keys`,
 `config/jwt/<env>/`, gitignored) and creates the test database
-(`make test-db`), so `make test` works right after the first run.
+(`make test-db`), so `make test` works right after the first run. The test
+keypair is generated with the passphrase `.env.test` declares — which needs
+saying, because the console command that generates the dev one would take the
+container's value instead, and used to.
 
 The php image runs as `HOST_UID`/`HOST_GID` from `.env` (default 1000)
 so bind-mounted `var/` and `vendor/` stay owned by you. If your ids
@@ -230,7 +233,7 @@ dashboard URL. In dev the same request works without the header.
 | composer / console | `make composer ARGS='…'` / `make console ARGS='…'` |
 | migrations | `make migration` (generate, then read it) → `make migrate` |
 | test database | `make test-db` (create + migrate `<db>_test`; also run by `make init`) |
-| JWT keys | `make jwt-keys` (dev + test keypairs, skips existing; also run by `make init`) |
+| JWT keys | `make jwt-keys` (dev keypair skipped if it exists; the test keypair is replaced when it does not match the passphrase `.env.test` declares — also run by `make init`) |
 | make an admin | `make console ARGS='app:user:promote you@example.com'` (`app:user:demote` reverts) — the only way roles change |
 | async worker (foreground) | `make worker` in a second terminal — clicks land in `clicks` only while a worker consumes the `async` transport (see Redirect) |
 | async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile, so `make up` does not start it unless asked |
@@ -652,9 +655,13 @@ it yourself.
   before `make test-db EXEC=`.
 - **`make check` fails in the token tests with a key error**, or the dev
   stack answers `POST /api/v1/auth/token` with a 500 "private key/passphrase" —
-  the keypairs are missing or were generated with another passphrase; run
-  `make jwt-keys` (delete `config/jwt/test/` or `config/jwt/dev/` first if the
-  passphrase in `.env.test` / `.env` changed).
+  run `make jwt-keys`. It now repairs the test keypair by itself: it checks
+  that the private key refuses an empty passphrase, accepts the one
+  `.env.test` (then `.env.test.local`) declares, and matches the stored public
+  key, and regenerates the pair when any of that fails. Deleting
+  `config/jwt/test/` first is no longer necessary. The dev keypair is still
+  skipped when it exists, so delete `config/jwt/dev/` by hand if the
+  passphrase in `.env` changed.
 - **Tests boot the `dev` kernel** — the php container carries `APP_ENV=dev`
   in its real environment and `KernelTestCase` reads `$_ENV` first;
   `phpunit.dist.xml` forces both `$_SERVER` and `$_ENV` to `test`. Keep

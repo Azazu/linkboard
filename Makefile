@@ -64,9 +64,14 @@ test-db: ## Create and migrate the test database (DATABASE_URL's database + _tes
 	$(EXEC) bin/console doctrine:database:create --if-not-exists --env=test
 	$(EXEC) bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration
 
-jwt-keys: ## Generate the dev and test JWT keypairs (config/jwt/<env>/, gitignored; skips existing)
+# The test keypair does not go through the console command: inside the
+# container that command takes JWT_PASSPHRASE from .env, not from .env.test,
+# and --skip-if-exists would then keep the unusable key it wrote. The script
+# resolves the passphrase the way tests/bootstrap.php does and replaces a
+# keypair that does not match it (change harden-quality-and-docs, decision 6a).
+jwt-keys: ## Generate the dev and test JWT keypairs (config/jwt/<env>/, gitignored; dev skips an existing key, test replaces one that does not match .env.test)
 	$(EXEC) bin/console lexik:jwt:generate-keypair --skip-if-exists --env=dev
-	$(EXEC) bin/console lexik:jwt:generate-keypair --skip-if-exists --env=test
+	$(EXEC) sh scripts/test-jwt-keys.sh
 
 worker: ## Consume the async Messenger transport in the foreground
 	$(COMPOSE) exec php bin/console messenger:consume async -vv --time-limit=3600
