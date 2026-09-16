@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Auth;
 use App\Auth\ApiKeyRepositoryInterface;
 use App\Auth\Entity\ApiKey;
 use App\Auth\Repository\DoctrineApiKeyRepository;
+use App\Shared\Db\Row;
 use App\Tests\Factory\ApiKeyFactory;
 use App\Tests\Factory\UserFactory;
 use Doctrine\DBAL\Connection;
@@ -80,7 +81,7 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
         $repository->revoke($key->getId(), $t0->modify('+5 minutes'));
 
         $stored = $connection->fetchOne('SELECT revoked_at FROM api_keys WHERE id = :id', ['id' => $key->getId()->toRfc4122()]);
-        self::assertEquals($t0, new \DateTimeImmutable((string) $stored), 'the second revocation does not move the timestamp');
+        self::assertEquals($t0, new \DateTimeImmutable(Row::toString($stored, 'revoked_at')), 'the second revocation does not move the timestamp');
         self::assertNull($repository->findActiveByHash($key->getKeyHash(), $t0), 'a revoked key no longer authenticates');
     }
 
@@ -121,7 +122,7 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
 
         $connection->executeStatement('DELETE FROM users WHERE id = :id', ['id' => $owner->getId()->toRfc4122()]);
 
-        self::assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :id', ['id' => $owner->getId()->toRfc4122()]));
+        self::assertSame(0, Row::toInt($connection->fetchOne('SELECT count(*) FROM api_keys WHERE user_id = :id', ['id' => $owner->getId()->toRfc4122()])));
     }
 
     public function testMigrationRoundTrip(): void
@@ -135,11 +136,11 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
         $version = 'DoctrineMigrations\\Version20260912134933';
 
         $this->console(['doctrine:migrations:execute', $version, '--down', '--no-interaction']);
-        self::assertSame(0, (int) $connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'"), 'down drops the table');
+        self::assertSame(0, Row::toInt($connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'")), 'down drops the table');
 
         $this->console(['doctrine:migrations:execute', $version, '--up', '--no-interaction']);
-        self::assertSame(1, (int) $connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'"), 'up recreates it');
-        self::assertSame(1, (int) $connection->fetchOne("SELECT count(*) FROM pg_indexes WHERE tablename = 'api_keys' AND indexdef LIKE 'CREATE UNIQUE INDEX%(key_hash)'"), 'the hash is unique');
+        self::assertSame(1, Row::toInt($connection->fetchOne("SELECT count(*) FROM information_schema.tables WHERE table_name = 'api_keys'")), 'up recreates it');
+        self::assertSame(1, Row::toInt($connection->fetchOne("SELECT count(*) FROM pg_indexes WHERE tablename = 'api_keys' AND indexdef LIKE 'CREATE UNIQUE INDEX%(key_hash)'")), 'the hash is unique');
     }
 
     /**
@@ -168,6 +169,6 @@ final class DoctrineApiKeyRepositoryTest extends KernelTestCase
         self::assertInstanceOf(Connection::class, $connection);
         $value = $connection->fetchOne('SELECT last_used_at FROM api_keys WHERE id = :id', ['id' => $id->toRfc4122()]);
 
-        return null === $value || false === $value ? null : new \DateTimeImmutable((string) $value);
+        return null === $value || false === $value ? null : new \DateTimeImmutable(Row::toString($value, 'last_used_at'));
     }
 }

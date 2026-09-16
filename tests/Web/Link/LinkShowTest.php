@@ -6,6 +6,7 @@ namespace App\Tests\Web\Link;
 
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use App\Tests\Web\WebPageTestCase;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
@@ -82,11 +83,10 @@ final class LinkShowTest extends WebPageTestCase
         $link = LinkFactory::createOne(['owner' => $ann]);
 
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => 'bea@example.com', 'password' => UserFactory::PASSWORD]);
-        $token = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($token);
+        $token = Json::string(Json::decode($client->getResponse()->getContent()), 'token');
 
         $client->request('GET', '/api/v1/links/'.$link->getId(), server: [
-            'HTTP_AUTHORIZATION' => 'Bearer '.$token['token'],
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
             'HTTP_ACCEPT' => 'application/json',
         ]);
 

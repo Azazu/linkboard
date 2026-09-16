@@ -6,6 +6,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\OpenApi\Factory\OpenApiFactoryInterface;
 use App\Shared\Api\CommonErrorResponses;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
@@ -30,27 +31,31 @@ final class OpenApiDocumentTest extends WebTestCase
     public function testEveryErrorResponseIsProblemDetailsAlone(): void
     {
         foreach (self::operations() as $name => $operation) {
-            foreach ($operation['responses'] ?? [] as $status => $response) {
+            $responses = Json::mapAt($operation, 'responses');
+            foreach (array_keys($responses) as $status) {
                 if ((int) $status < 400) {
                     continue;
                 }
-                $types = array_keys($response['content'] ?? []);
-                self::assertSame(['application/problem+json'], $types, "$name answers $status");
-                $properties = $response['content']['application/problem+json']['schema']['properties'] ?? [];
+                $media = Json::mapAt($responses, $status, 'content');
+                self::assertSame(['application/problem+json'], array_keys($media), "$name answers $status");
+                $properties = Json::mapAt($media, 'application/problem+json', 'schema', 'properties');
                 foreach (['type', 'title', 'status', 'detail'] as $member) {
                     self::assertArrayHasKey($member, $properties, "$name $status carries $member");
                 }
-                self::assertArrayHasKey('example', $response['content']['application/problem+json'], "$name $status is shown with values");
+                self::assertArrayHasKey('example', Json::map($media, 'application/problem+json'), "$name $status is shown with values");
             }
         }
     }
 
     public function testAValidationFailureIsDocumentedWithItsViolations(): void
     {
-        $post = self::operations()['POST /api/v1/links'] ?? null;
-        self::assertIsArray($post);
-        $schema = $post['responses']['422']['content']['application/problem+json']['schema'] ?? [];
-        $violation = $schema['properties']['violations']['items']['properties'] ?? [];
+        $operations = self::operations();
+        self::assertArrayHasKey('POST /api/v1/links', $operations);
+        $violation = Json::mapAt(
+            $operations['POST /api/v1/links'],
+            'responses', '422', 'content', 'application/problem+json', 'schema',
+            'properties', 'violations', 'items', 'properties',
+        );
 
         self::assertArrayHasKey('propertyPath', $violation);
         self::assertArrayHasKey('message', $violation);
@@ -60,7 +65,7 @@ final class OpenApiDocumentTest extends WebTestCase
     {
         $without = [];
         foreach (self::operations() as $name => $operation) {
-            if (!isset($operation['responses']['401'])) {
+            if (!Json::hasAt($operation, 'responses', '401')) {
                 $without[] = $name;
             }
         }
@@ -73,18 +78,18 @@ final class OpenApiDocumentTest extends WebTestCase
     public function testEveryRateLimitedOperationDeclaresItsRefusalAndItsHeaders(): void
     {
         foreach (self::operations() as $name => $operation) {
-            $refusal = $operation['responses']['429'] ?? null;
-            self::assertIsArray($refusal, "$name declares 429: every documented operation is covered by a limiter");
-            self::assertArrayHasKey('Retry-After', $refusal['headers'] ?? [], "$name names the delay");
+            self::assertTrue(Json::hasAt($operation, 'responses', '429'), "$name declares 429: every documented operation is covered by a limiter");
+            self::assertArrayHasKey('Retry-After', Json::mapAt($operation, 'responses', '429', 'headers'), "$name names the delay");
 
             // the per-IP limiter on the authentication endpoints names only the
             // delay; the per-identity one also reports the allowance it left
             if (str_starts_with($name, 'POST /api/v1/auth/')) {
                 continue;
             }
-            foreach ($operation['responses'] as $status => $response) {
+            $responses = Json::mapAt($operation, 'responses');
+            foreach (array_keys($responses) as $status) {
                 if ((int) $status < 400) {
-                    self::assertArrayHasKey('X-RateLimit-Remaining', $response['headers'] ?? [], "$name $status names the remaining allowance");
+                    self::assertArrayHasKey('X-RateLimit-Remaining', Json::mapAt($responses, $status, 'headers'), "$name $status names the remaining allowance");
                 }
             }
         }
@@ -99,13 +104,13 @@ final class OpenApiDocumentTest extends WebTestCase
         $silent = [];
         foreach (self::operations() as $name => $operation) {
             $parameters = array_filter(
-                $operation['parameters'] ?? [],
+                Json::objectsAt($operation, 'parameters'),
                 static fn (array $parameter): bool => 'query' === ($parameter['in'] ?? null),
             );
             if ([] === $parameters) {
                 continue;
             }
-            if (!isset($operation['responses']['400']) && !isset($operation['responses']['422'])) {
+            if (!Json::hasAt($operation, 'responses', '400') && !Json::hasAt($operation, 'responses', '422')) {
                 $silent[] = $name;
             }
         }
@@ -117,7 +122,7 @@ final class OpenApiDocumentTest extends WebTestCase
     {
         $with = [];
         foreach (self::operations() as $name => $operation) {
-            if (isset($operation['responses']['409'])) {
+            if (Json::hasAt($operation, 'responses', '409')) {
                 $with[] = $name;
             }
         }
@@ -129,8 +134,9 @@ final class OpenApiDocumentTest extends WebTestCase
     {
         $without = [];
         foreach (self::schemas() as $name => $definition) {
-            foreach ($definition['properties'] ?? [] as $property => $shape) {
-                if (!\array_key_exists('example', $shape)) {
+            $properties = Json::mapAt($definition, 'properties');
+            foreach (array_keys($properties) as $property) {
+                if (!\array_key_exists('example', Json::map($properties, $property))) {
                     $without[] = "$name.$property";
                 }
             }
@@ -166,27 +172,46 @@ final class OpenApiDocumentTest extends WebTestCase
     {
         $wrong = [];
         foreach (self::schemas() as $name => $definition) {
-            foreach ($definition['properties'] ?? [] as $property => $shape) {
+            $properties = Json::mapAt($definition, 'properties');
+            foreach (array_keys($properties) as $property) {
+                $shape = Json::map($properties, $property);
                 if (!\array_key_exists('example', $shape)) {
                     continue;
                 }
                 $example = $shape['example'];
-                /** @var list<string> $types */
-                $types = array_values((array) ($shape['type'] ?? []));
+                $types = self::declaredTypes($shape['type'] ?? null);
                 if ([] !== $types && !self::accepts($types, $example)) {
                     $wrong[] = "$name.$property is ".get_debug_type($example).', declared '.implode('|', $types);
                 }
-                if (isset($shape['enum']) && !\in_array($example, $shape['enum'], true)) {
+                if (Json::hasAt($shape, 'enum') && !\in_array($example, Json::listAt($shape, 'enum'), true)) {
                     $wrong[] = "$name.$property is not one of its enum values";
                 }
-                $format = \is_string($shape['format'] ?? null) ? $shape['format'] : null;
-                if (null !== $format && \is_string($example) && !self::matchesFormat($format, $example)) {
+                $format = $shape['format'] ?? null;
+                if (\is_string($format) && \is_string($example) && !self::matchesFormat($format, $example)) {
                     $wrong[] = "$name.$property is not a $format";
                 }
             }
         }
 
         self::assertSame([], $wrong);
+    }
+
+    /**
+     * A schema's `type`, which OpenAPI allows as a single name or a list of
+     * them; anything else is no declaration at all.
+     *
+     * @return list<string>
+     */
+    private static function declaredTypes(mixed $declared): array
+    {
+        $types = [];
+        foreach (\is_array($declared) ? $declared : [$declared] as $type) {
+            if (\is_string($type)) {
+                $types[] = $type;
+            }
+        }
+
+        return $types;
     }
 
     private static function matchesFormat(string $format, string $example): bool
@@ -209,23 +234,26 @@ final class OpenApiDocumentTest extends WebTestCase
      */
     private static function schemas(): array
     {
-        $document = self::document();
         $schemas = [];
-        foreach ($document['components']['schemas'] ?? [] as $name => $definition) {
-            if (!\in_array($name, self::FRAMEWORK_SCHEMAS, true) && \is_array($definition)) {
-                $schemas[$name] = $definition;
+        $defined = Json::mapAt(self::document(), 'components', 'schemas');
+        foreach (array_keys($defined) as $name) {
+            if (!\in_array($name, self::FRAMEWORK_SCHEMAS, true)) {
+                $schemas[$name] = Json::map($defined, $name);
             }
         }
         foreach (self::operations() as $name => $operation) {
-            foreach ($operation['requestBody']['content'] ?? [] as $type => $media) {
-                if (isset($media['schema']['properties'])) {
-                    $schemas["$name requestBody $type"] = $media['schema'];
+            $requestContent = Json::mapAt($operation, 'requestBody', 'content');
+            foreach (array_keys($requestContent) as $type) {
+                if (Json::hasAt($requestContent, $type, 'schema', 'properties')) {
+                    $schemas["$name requestBody $type"] = Json::mapAt($requestContent, $type, 'schema');
                 }
             }
-            foreach ($operation['responses'] ?? [] as $status => $response) {
-                foreach ($response['content'] ?? [] as $type => $media) {
-                    if (isset($media['schema']['properties'])) {
-                        $schemas["$name $status $type"] = $media['schema'];
+            $responses = Json::mapAt($operation, 'responses');
+            foreach (array_keys($responses) as $status) {
+                $responseContent = Json::mapAt($responses, $status, 'content');
+                foreach (array_keys($responseContent) as $type) {
+                    if (Json::hasAt($responseContent, $type, 'schema', 'properties')) {
+                        $schemas["$name $status $type"] = Json::mapAt($responseContent, $type, 'schema');
                     }
                 }
             }
@@ -246,8 +274,8 @@ final class OpenApiDocumentTest extends WebTestCase
 
         self::assertSame(array_keys($before), array_keys($after), 'no operation is added or lost');
         foreach ($before as $name => $operation) {
-            foreach (array_keys($operation['responses'] ?? []) as $status) {
-                self::assertArrayHasKey($status, $after[$name]['responses'], "$name keeps its $status");
+            foreach (array_keys(Json::mapAt($operation, 'responses')) as $status) {
+                self::assertArrayHasKey($status, Json::mapAt($after[$name], 'responses'), "$name keeps its $status");
             }
         }
     }
@@ -293,11 +321,8 @@ final class OpenApiDocumentTest extends WebTestCase
     {
         $normalizer = self::getContainer()->get('serializer');
         self::assertInstanceOf(NormalizerInterface::class, $normalizer);
-        $document = $normalizer->normalize($openApi, 'json');
-        self::assertIsArray($document);
 
-        /** @var array<string, mixed> $document */
-        return $document;
+        return Json::asMap($normalizer->normalize($openApi, 'json'), 'the normalized document');
     }
 
     /**
@@ -316,12 +341,12 @@ final class OpenApiDocumentTest extends WebTestCase
     private static function indexed(array $document): array
     {
         $operations = [];
-        /** @var array<string, array<string, mixed>> $paths */
-        $paths = $document['paths'] ?? [];
-        foreach ($paths as $path => $item) {
-            foreach ($item as $method => $operation) {
-                if (\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true) && \is_array($operation)) {
-                    $operations[strtoupper($method).' '.$path] = $operation;
+        $paths = Json::mapAt($document, 'paths');
+        foreach (array_keys($paths) as $path) {
+            $item = Json::map($paths, $path);
+            foreach (array_keys($item) as $method) {
+                if (\in_array($method, ['get', 'post', 'patch', 'put', 'delete'], true)) {
+                    $operations[strtoupper($method).' '.$path] = Json::map($item, $method);
                 }
             }
         }
@@ -339,10 +364,7 @@ final class OpenApiDocumentTest extends WebTestCase
             $client = self::createClient();
             $client->request('GET', '/api/docs.json');
             self::assertResponseIsSuccessful();
-            $decoded = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
-            self::assertIsArray($decoded);
-            /** @var array<string, mixed> $decoded */
-            self::$document = $decoded;
+            self::$document = Json::decode($client->getResponse()->getContent());
         }
 
         return self::$document;

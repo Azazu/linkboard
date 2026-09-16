@@ -73,7 +73,9 @@ final class ProbeAuthorizerTest extends TestCase
         foreach ($cases as $case => $plaintext) {
             $this->hashes[] = hash('sha256', $plaintext);
             self::assertFalse($authorizer->authorize('Bearer '.$plaintext), $case);
-            self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', (string) $this->redis->get($this->tokenKey($plaintext)), "$case: the denial token is set");
+            $token = $this->redis->get($this->tokenKey($plaintext));
+            self::assertIsString($token, "$case: the denial token is set");
+            self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $token, "$case: the denial token is a digest");
             self::assertSame(0, $this->redis->exists($this->valueKey($plaintext)), "$case: nothing remembered");
         }
         self::assertSame([], $this->logger->records);

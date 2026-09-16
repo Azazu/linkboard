@@ -2,8 +2,9 @@ schema: spec-driven
 
 context: |
   Linkboard — Short-link service with smart routing (device/geo rules, A/B) and click analytics, built on Symfony 8, API Platform, Doctrine and Messenger over PostgreSQL and Redis.
-  Stage: scaffold; application code arrives through OpenSpec changes
-  listed in openspec/ROADMAP.md.
+  Stage: the service is built and documented; stages 1-4 of
+  docs/explanation/requirements.md are implemented, and openspec/ROADMAP.md
+  carries what is left.
 
   Target stack:
   - PHP 8.4, Symfony 8.1 (symfony/skeleton + flex recipes; ADR-001), API Platform 4,
@@ -15,7 +16,7 @@ context: |
     limiting, hot-report cache, Messenger transport), Docker Compose
   - Tests: PHPUnit + symfony/test-pack (WebTestCase, KernelTestCase),
     API Platform's ApiTestCase for API resources; static analysis: PHPStan
-    (level 8 + phpstan-symfony + phpstan-doctrine); style: PHP-CS-Fixer
+    (level 9 + phpstan-symfony + phpstan-doctrine); style: PHP-CS-Fixer
     (@Symfony + strict_types)
   - Runtime: PHP-FPM behind nginx locally; messenger workers as separate
     processes (`messenger:consume`)

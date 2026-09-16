@@ -10,6 +10,7 @@ use App\Link\LinkRepositoryInterface;
 use App\Link\SlugGenerator;
 use App\Link\SlugGeneratorInterface;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PrePersistEventArgs;
@@ -97,9 +98,8 @@ final class SlugCollisionRecoveryTest extends WebTestCase
         $this->post($client, $token, 'mine-2026');
 
         self::assertResponseStatusCodeSame(422);
-        $problem = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($problem);
-        self::assertSame('slug', $problem['violations'][0]['propertyPath']);
+        $violations = Json::objects(Json::decode($client->getResponse()->getContent()), 'violations');
+        self::assertSame('slug', $violations[0]['propertyPath']);
     }
 
     /**
@@ -153,10 +153,8 @@ final class SlugCollisionRecoveryTest extends WebTestCase
     private function token(\Symfony\Bundle\FrameworkBundle\KernelBrowser $client, string $email): string
     {
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => $email, 'password' => UserFactory::PASSWORD]);
-        $token = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR)['token'] ?? null;
-        self::assertIsString($token);
 
-        return $token;
+        return Json::string(Json::decode($client->getResponse()->getContent()), 'token');
     }
 
     private function post(\Symfony\Bundle\FrameworkBundle\KernelBrowser $client, string $token, ?string $slug = null): void

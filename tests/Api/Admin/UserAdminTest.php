@@ -6,6 +6,7 @@ namespace App\Tests\Api\Admin;
 
 use App\Auth\Entity\User;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -33,14 +34,13 @@ final class UserAdminTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(200);
         $body = (string) $client->getResponse()->getContent();
-        $page = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($page);
+        $page = Json::decode($body);
         self::assertSame(3, $page['totalItems']);
         self::assertSame(1, $page['page']);
         self::assertSame(2, $page['itemsPerPage']);
-        self::assertIsArray($page['items']);
-        self::assertCount(2, $page['items']);
-        self::assertSame(['createdAt', 'email', 'id', 'isBlocked', 'roles'], array_keys($this->sorted($page['items'][0])));
+        $items = Json::objects($page, 'items');
+        self::assertCount(2, $items);
+        self::assertSame(['createdAt', 'email', 'id', 'isBlocked', 'roles'], array_keys($this->sorted($items[0])));
         self::assertStringNotContainsString('password', $body);
     }
 
@@ -97,9 +97,8 @@ final class UserAdminTest extends WebTestCase
         $this->request($client, 'admin@example.com', 'POST', '/api/v1/admin/users/'.$admin->getId().'/block');
 
         self::assertResponseStatusCodeSame(422);
-        $problem = $this->decode($client);
-        self::assertIsArray($problem['violations']);
-        self::assertSame('id', $problem['violations'][0]['propertyPath']);
+        $violations = Json::objects($this->decode($client), 'violations');
+        self::assertSame('id', $violations[0]['propertyPath']);
         self::assertFalse($admin->isBlocked());
     }
 
@@ -133,14 +132,14 @@ final class UserAdminTest extends WebTestCase
         $lines = array_values(array_filter(explode("\n", file_get_contents($log) ?: '')));
         self::assertCount(2, $lines, 'exactly one record per action');
         foreach ([['user.block', $lines[0]], ['user.unblock', $lines[1]]] as [$action, $line]) {
-            $record = json_decode($line, true, 512, \JSON_THROW_ON_ERROR);
-            self::assertIsArray($record);
+            $record = Json::decode($line);
             self::assertSame('audit', $record['channel']);
             self::assertSame('INFO', $record['level_name']);
             self::assertSame($action, $record['message']);
-            self::assertSame($action, $record['context']['action']);
-            self::assertSame((string) $admin->getId(), $record['context']['actor_id']);
-            self::assertSame((string) $user->getId(), $record['context']['target_id']);
+            $context = Json::map($record, 'context');
+            self::assertSame($action, $context['action']);
+            self::assertSame((string) $admin->getId(), $context['actor_id']);
+            self::assertSame((string) $user->getId(), $context['target_id']);
             self::assertStringNotContainsString('@', $line);
         }
     }
@@ -148,10 +147,8 @@ final class UserAdminTest extends WebTestCase
     private function token(KernelBrowser $client, string $email): string
     {
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => $email, 'password' => UserFactory::PASSWORD]);
-        $token = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR)['token'] ?? null;
-        self::assertIsString($token);
 
-        return $token;
+        return Json::string(Json::decode($client->getResponse()->getContent()), 'token');
     }
 
     private function request(KernelBrowser $client, string $asEmail, string $method, string $uri): void
@@ -161,15 +158,11 @@ final class UserAdminTest extends WebTestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     private function decode(KernelBrowser $client): array
     {
-        $decoded = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-
-        /** @var array<string, mixed> $decoded */
-        return $decoded;
+        return Json::decode($client->getResponse()->getContent());
     }
 
     /**

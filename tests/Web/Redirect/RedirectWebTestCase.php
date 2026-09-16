@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Web\Redirect;
 
 use App\Click\Counter\RedisClickCounter;
+use App\Shared\Db\Row;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Env;
+use App\Tests\Support\Json;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -170,12 +173,12 @@ abstract class RedirectWebTestCase extends WebTestCase
 
     protected static function rawClickCountOf(Uuid $linkId): int
     {
-        return (int) self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$linkId->toRfc4122()]);
+        return Row::toInt(self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$linkId->toRfc4122()]));
     }
 
     protected static function redis(): \Redis
     {
-        $redis = RedisAdapter::createConnection((string) ($_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? ''));
+        $redis = RedisAdapter::createConnection(Env::string('REDIS_URL'));
         self::assertInstanceOf(\Redis::class, $redis);
 
         return $redis;
@@ -184,7 +187,7 @@ abstract class RedirectWebTestCase extends WebTestCase
     /** A fresh counter on the test prefix — independent of the container, so a test may replace the service. */
     protected static function counter(): RedisClickCounter
     {
-        return new RedisClickCounter((string) ($_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? ''), self::counterPrefix());
+        return new RedisClickCounter(Env::string('REDIS_URL'), self::counterPrefix());
     }
 
     protected static function counterPrefix(): string
@@ -212,10 +215,8 @@ abstract class RedirectWebTestCase extends WebTestCase
     {
         $client->disableReboot();
         $client->jsonRequest('POST', '/api/v1/auth/token', ['email' => $email, 'password' => UserFactory::PASSWORD]);
-        $token = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR)['token'] ?? null;
-        self::assertIsString($token);
 
-        return $token;
+        return Json::string(Json::decode($client->getResponse()->getContent()), 'token');
     }
 
     /** @return array<string, mixed> */

@@ -6,6 +6,7 @@ namespace App\Tests\Api\Link;
 
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -25,8 +26,9 @@ final class CreateLinkTest extends LinkApiTestCase
 
         self::assertResponseStatusCodeSame(201);
         $link = $this->decode($client);
-        self::assertMatchesRegularExpression('/^[A-Za-z0-9]{7}$/', $link['slug']);
-        self::assertSame('http://localhost:8082/'.$link['slug'], $link['shortUrl']);
+        $slug = Json::string($link, 'slug');
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9]{7}$/', $slug);
+        self::assertSame('http://localhost:8082/'.$slug, $link['shortUrl']);
         self::assertSame(0, $link['clickCount']);
         self::assertTrue($link['isActive']);
         self::assertNull($link['utm']);
@@ -49,7 +51,7 @@ final class CreateLinkTest extends LinkApiTestCase
         self::assertSame('spring-sale_2026', $link['slug']);
         self::assertSame(['utm_source' => 'newsletter', 'utm_campaign' => 'spring'], $link['utm']);
         self::assertSame(100, $link['maxClicks']);
-        self::assertSame((new \DateTimeImmutable($expiry))->getTimestamp(), (new \DateTimeImmutable($link['expiresAt']))->getTimestamp());
+        self::assertSame((new \DateTimeImmutable($expiry))->getTimestamp(), (new \DateTimeImmutable(Json::string($link, 'expiresAt')))->getTimestamp());
     }
 
     /** @return iterable<string, array{array<string, mixed>, list<string>}> */

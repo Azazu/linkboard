@@ -241,7 +241,10 @@ final class DemoSeedCommand
         $ids = array_map(static fn (User $u): string => $u->getId()->toRfc4122(), $users);
         $rows = $this->connection->fetchFirstColumn('SELECT id FROM links WHERE owner_id IN (:ids)', ['ids' => $ids], ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING]);
 
-        return array_map(strval(...), $rows);
+        return array_map(
+            static fn (mixed $id): string => \is_string($id) ? $id : throw new \UnexpectedValueException('A link id was not a string.'),
+            $rows,
+        );
     }
 
     /** 24 hexadecimal characters from a CSPRNG — printed once, stored as a hash. */

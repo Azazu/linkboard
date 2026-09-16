@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Auth;
 
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Yaml\Yaml;
@@ -20,20 +21,21 @@ final class AuditLogWiringTest extends TestCase
 {
     public function testProductionAuditChannelHasAnAlwaysOnStreamHandler(): void
     {
-        /** @var array<string, mixed> $config */
-        $config = Yaml::parseFile(\dirname(__DIR__, 3).'/config/packages/monolog.yaml');
+        $config = Json::asMap(Yaml::parseFile(\dirname(__DIR__, 3).'/config/packages/monolog.yaml'), 'monolog.yaml');
 
-        self::assertContains('audit', $config['monolog']['channels']);
+        self::assertContains('audit', Json::listAt($config, 'monolog', 'channels'));
 
-        $prod = $config['when@prod']['monolog']['handlers'];
-        self::assertSame('stream', $prod['audit']['type']);
-        self::assertSame('php://stderr', $prod['audit']['path']);
-        self::assertSame('info', $prod['audit']['level']);
-        self::assertSame(['audit'], $prod['audit']['channels']);
-        self::assertSame('monolog.formatter.json', $prod['audit']['formatter']);
+        $handlers = Json::mapAt($config, 'when@prod', 'monolog', 'handlers');
+        $audit = Json::map($handlers, 'audit');
+        self::assertSame('stream', $audit['type']);
+        self::assertSame('php://stderr', $audit['path']);
+        self::assertSame('info', $audit['level']);
+        self::assertSame(['audit'], $audit['channels']);
+        self::assertSame('monolog.formatter.json', $audit['formatter']);
 
         // the fingers_crossed main handler must not swallow the channel
-        self::assertSame('fingers_crossed', $prod['main']['type']);
-        self::assertContains('!audit', $prod['main']['channels']);
+        $main = Json::map($handlers, 'main');
+        self::assertSame('fingers_crossed', $main['type']);
+        self::assertContains('!audit', Json::items($main, 'channels'));
     }
 }

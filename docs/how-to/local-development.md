@@ -238,7 +238,8 @@ dashboard URL. In dev the same request works without the header.
 | async worker (foreground) | `make worker` in a second terminal — clicks land in `clicks` only while a worker consumes the `async` transport (see Redirect) |
 | async worker (background) | `docker compose --profile worker up -d` — the `worker` service is a compose profile, so `make up` does not start it unless asked |
 | demo data | `make console ARGS='app:demo:seed'` — two accounts (passwords printed once), ten links with rules, 50 000 clicks over 60 days; `--reset` to start over (see Analytics) |
-| the gate floor | `make check` (php-cs-fixer + PHPStan level 8 + PHPUnit; suites `Unit`, `Integration`, `Api`, `Web`) |
+| the gate floor | `make check` (php-cs-fixer + PHPStan level 9 + PHPUnit; suites `Unit`, `Integration`, `Api`, `Web`) |
+| migrations both ways | `make migrations-roundtrip` — every migration down and up again on a scratch database this run creates and drops, comparing the schema before and after; CI runs it in its own job |
 | one suite | `docker compose exec php vendor/bin/phpunit --testsuite Unit` (also `Integration`, `Api`) |
 
 ## Accounts and the API

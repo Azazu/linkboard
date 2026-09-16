@@ -6,6 +6,7 @@ namespace App\Tests\Api\Analytics;
 
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
@@ -34,7 +35,7 @@ final class LinkReportsTest extends AnalyticsApiTestCase
             $uri = "/api/v1/links/{$link->getId()}/stats/$report";
             $body = $this->get($client, $owner, $uri);
             self::assertSame((string) $link->getId(), $body['linkId'], $report);
-            self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00\z/', (string) $body['generatedAt'], $report);
+            self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00\z/', Json::string($body, 'generatedAt'), $report);
             $this->get($client, $admin, $uri);
 
             $this->api($client, $stranger, 'GET', $uri);
@@ -94,7 +95,7 @@ final class LinkReportsTest extends AnalyticsApiTestCase
 
         $series = $this->get($client, $token, "/api/v1/links/{$link->getId()}/stats/timeseries?".self::PERIOD.'&granularity=hour&includeBots=true');
         self::assertSame(['2026-09-01T00:00:00+00:00', '2026-09-08T00:00:00+00:00', 'hour', true], [$series['from'], $series['to'], $series['granularity'], $series['includeBots']]);
-        self::assertCount(168, $series['buckets']);
+        self::assertCount(168, Json::items($series, 'buckets'));
 
         $countries = $this->get($client, $token, "/api/v1/links/{$link->getId()}/stats/countries?limit=3");
         self::assertSame(3, $countries['limit']);
@@ -165,11 +166,12 @@ final class LinkReportsTest extends AnalyticsApiTestCase
         $withBots = $this->get($client, $token, $base.'summary?'.self::PERIOD.'&includeBots=true');
         self::assertSame([9, 9, 4], [$withBots['clicksInPeriod'], $withBots['totalClicks'], $withBots['uniqueVisitors']]);
 
-        $series = $this->get($client, $token, $base.'timeseries?'.self::PERIOD);
-        self::assertSame([0, 3, 0, 0, 4, 0, 0], array_column($series['buckets'], 'clicks'));
-        self::assertSame([0, 3, 3, 3, 7, 7, 7], array_column($series['buckets'], 'cumulativeClicks'));
-        self::assertSame('2026-09-01T00:00:00+00:00', $series['buckets'][0]['bucket']);
-        self::assertSame(9, array_sum(array_column($this->get($client, $token, $base.'timeseries?'.self::PERIOD.'&includeBots=true')['buckets'], 'clicks')));
+        $buckets = Json::objects($this->get($client, $token, $base.'timeseries?'.self::PERIOD), 'buckets');
+        self::assertSame([0, 3, 0, 0, 4, 0, 0], array_column($buckets, 'clicks'));
+        self::assertSame([0, 3, 3, 3, 7, 7, 7], array_column($buckets, 'cumulativeClicks'));
+        self::assertSame('2026-09-01T00:00:00+00:00', $buckets[0]['bucket']);
+        $withBotBuckets = Json::objects($this->get($client, $token, $base.'timeseries?'.self::PERIOD.'&includeBots=true'), 'buckets');
+        self::assertSame(9, array_sum(array_column($withBotBuckets, 'clicks')));
 
         $countries = $this->get($client, $token, $base.'countries?'.self::PERIOD);
         self::assertSame(7, $countries['total']);
@@ -199,8 +201,9 @@ final class LinkReportsTest extends AnalyticsApiTestCase
 
         $series = $this->get($client, $token, "/api/v1/links/{$link->getId()}/stats/timeseries?from=2026-09-01T12:00:00Z&to=2026-09-02T12:00:00Z");
 
-        self::assertSame(['2026-09-01T00:00:00+00:00', '2026-09-02T00:00:00+00:00'], array_column($series['buckets'], 'bucket'));
-        self::assertSame([1, 1], array_column($series['buckets'], 'clicks'));
+        $buckets = Json::objects($series, 'buckets');
+        self::assertSame(['2026-09-01T00:00:00+00:00', '2026-09-02T00:00:00+00:00'], array_column($buckets, 'bucket'));
+        self::assertSame([1, 1], array_column($buckets, 'clicks'));
         self::assertSame(['2026-09-01T12:00:00+00:00', '2026-09-02T12:00:00+00:00'], [$series['from'], $series['to']], 'the exact bounds are echoed, not the bucket bounds');
     }
 
@@ -209,13 +212,12 @@ final class LinkReportsTest extends AnalyticsApiTestCase
         $client = self::createClient();
         $client->request('GET', '/api/docs.json');
         self::assertResponseStatusCodeSame(200);
-        $paths = $this->decode($client)['paths'];
-        self::assertIsArray($paths);
+        $paths = Json::map($this->decode($client), 'paths');
 
         foreach (self::REPORTS as $report) {
             $path = "/api/v1/links/{id}/stats/$report";
             self::assertArrayHasKey($path, $paths, $report);
-            $names = array_column($paths[$path]['get']['parameters'], 'name');
+            $names = array_column(Json::objectsAt($paths, $path, 'get', 'parameters'), 'name');
             self::assertContains('from', $names, $report);
             self::assertContains('to', $names, $report);
             self::assertContains('includeBots', $names, $report);

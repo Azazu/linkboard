@@ -7,6 +7,7 @@ namespace App\Auth\Repository;
 use App\Auth\ApiKeyRepositoryInterface;
 use App\Auth\Entity\ApiKey;
 use App\Auth\Entity\User;
+use App\Shared\Db\OneResult;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
@@ -29,18 +30,24 @@ final readonly class DoctrineApiKeyRepository implements ApiKeyRepositoryInterfa
 
     public function findByIdAndOwner(Uuid $id, User $owner): ?ApiKey
     {
-        return $this->em->createQuery('SELECT k FROM App\Auth\Entity\ApiKey k WHERE k.id = :id AND k.owner = :owner')
-            ->setParameter('id', $id)
-            ->setParameter('owner', $owner)
-            ->getOneOrNullResult();
+        return OneResult::orNull(
+            $this->em->createQuery('SELECT k FROM App\Auth\Entity\ApiKey k WHERE k.id = :id AND k.owner = :owner')
+                ->setParameter('id', $id)
+                ->setParameter('owner', $owner)
+                ->getOneOrNullResult(),
+            ApiKey::class,
+        );
     }
 
     public function findActiveByHash(string $keyHash, \DateTimeImmutable $now): ?ApiKey
     {
-        return $this->em->createQuery('SELECT k FROM App\Auth\Entity\ApiKey k WHERE k.keyHash = :hash AND k.revokedAt IS NULL AND (k.expiresAt IS NULL OR k.expiresAt > :now)')
-            ->setParameter('hash', $keyHash)
-            ->setParameter('now', $now, Types::DATETIMETZ_IMMUTABLE)
-            ->getOneOrNullResult();
+        return OneResult::orNull(
+            $this->em->createQuery('SELECT k FROM App\Auth\Entity\ApiKey k WHERE k.keyHash = :hash AND k.revokedAt IS NULL AND (k.expiresAt IS NULL OR k.expiresAt > :now)')
+                ->setParameter('hash', $keyHash)
+                ->setParameter('now', $now, Types::DATETIMETZ_IMMUTABLE)
+                ->getOneOrNullResult(),
+            ApiKey::class,
+        );
     }
 
     public function listByOwner(User $owner, int $offset, int $limit): array

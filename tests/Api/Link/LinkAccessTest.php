@@ -6,6 +6,7 @@ namespace App\Tests\Api\Link;
 
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
@@ -55,7 +56,7 @@ final class LinkAccessTest extends LinkApiTestCase
         self::assertResponseStatusCodeSame(200);
         $page = $this->decode($client);
         self::assertSame(2, $page['totalItems']);
-        self::assertEqualsCanonicalizing([(string) $a->getId(), (string) $b->getId()], array_column($page['items'], 'ownerId'));
+        self::assertEqualsCanonicalizing([(string) $a->getId(), (string) $b->getId()], array_column(Json::objects($page, 'items'), 'ownerId'));
 
         $this->api($client, $this->token($client, 'a@example.com'), 'GET', '/api/v1/admin/links');
         self::assertResponseStatusCodeSame(403);

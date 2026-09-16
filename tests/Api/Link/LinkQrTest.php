@@ -9,6 +9,7 @@ use App\Link\Qr\QrCodeRenderer;
 use App\Link\Qr\QrFormat;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\Uid\Uuid;
@@ -164,14 +165,16 @@ final class LinkQrTest extends LinkApiTestCase
         self::assertResponseStatusCodeSame(200);
         $doc = $this->decode($client);
 
-        self::assertIsArray($doc['paths']);
-        self::assertArrayHasKey('/api/v1/links/{id}/qr', $doc['paths']);
-        $get = $doc['paths']['/api/v1/links/{id}/qr']['get'];
-        self::assertIsArray($get);
-        $params = array_filter($get['parameters'], static fn (array $p): bool => 'format' === $p['name'] && 'query' === $p['in']);
+        $paths = Json::map($doc, 'paths');
+        self::assertArrayHasKey('/api/v1/links/{id}/qr', $paths);
+        $get = Json::mapAt($paths, '/api/v1/links/{id}/qr', 'get');
+        $params = array_values(array_filter(
+            Json::objectsAt($get, 'parameters'),
+            static fn (array $p): bool => 'format' === ($p['name'] ?? null) && 'query' === ($p['in'] ?? null),
+        ));
         self::assertCount(1, $params, 'the format query parameter is documented');
-        self::assertSame(['svg', 'png'], array_values($params)[0]['schema']['enum']);
-        $content = array_keys($get['responses']['200']['content']);
+        self::assertSame(['svg', 'png'], Json::listAt($params[0], 'schema', 'enum'));
+        $content = array_keys(Json::mapAt($get, 'responses', '200', 'content'));
         sort($content);
         self::assertSame(['image/png', 'image/svg+xml'], $content);
     }

@@ -8,6 +8,7 @@ use App\Click\Counter\ClickCounterInterface;
 use App\Click\Counter\RedisClickCounter;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Env;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -49,7 +50,7 @@ final class DeleteLinkTest extends LinkApiTestCase
         $counter = self::getContainer()->get(RedisClickCounter::class);
         self::assertInstanceOf(RedisClickCounter::class, $counter);
         $counter->increment($link->getId(), 0, 5); // the key exists, as after a redirect
-        $redis = RedisAdapter::createConnection((string) ($_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL']));
+        $redis = RedisAdapter::createConnection(Env::string('REDIS_URL'));
         self::assertInstanceOf(\Redis::class, $redis);
         self::assertSame('1', $redis->get($counter->key($link->getId())));
         $token = $this->token($client, 'a@example.com');

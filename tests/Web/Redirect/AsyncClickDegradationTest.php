@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Web\Redirect;
 
 use App\Click\Counter\RedisClickCounter;
+use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use App\Tests\Fixture\ThrowingClickCounter;
@@ -184,7 +185,7 @@ final class AsyncClickDegradationTest extends RedirectWebTestCase
         self::assertSame('1', self::counterValue($limited->getId()), 'the limit was enforced before the dispatch failed');
         $errors = $this->records(Logger::ERROR);
         self::assertCount(2, $errors);
-        self::assertSame([(string) $free->getId(), (string) $limited->getId()], array_map(static fn (LogRecord $r): string => (string) $r->context['link_id'], $errors));
+        self::assertSame([(string) $free->getId(), (string) $limited->getId()], array_map(static fn (LogRecord $r): string => Row::toString($r->context['link_id'] ?? null, 'link_id'), $errors));
         self::assertStringNotContainsString('203.0.113.7', $this->logJson());
         self::assertStringNotContainsString('Probe/1.0', $this->logJson());
     }
@@ -233,7 +234,7 @@ final class AsyncClickDegradationTest extends RedirectWebTestCase
         self::assertCount(1, $infos);
         self::assertSame('Click message discarded: the link no longer exists', $infos[0]->message);
         self::assertSame($linkId->toRfc4122(), $infos[0]->context['link_id']);
-        self::assertTrue(Uuid::isValid((string) $infos[0]->context['click_id']));
+        self::assertTrue(Uuid::isValid(Row::toString($infos[0]->context['click_id'] ?? null, 'click_id')));
         self::assertSame([], $this->records(Logger::WARNING), 'no failure record');
         self::assertSame([], $this->records(Logger::ERROR), 'no failure record');
     }

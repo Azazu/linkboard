@@ -6,6 +6,7 @@ namespace App\Tests\Api\Link;
 
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
@@ -31,8 +32,8 @@ final class ListLinksTest extends LinkApiTestCase
         self::assertSame(2, $page['totalItems']);
         self::assertSame(1, $page['page']);
         self::assertSame(30, $page['itemsPerPage']);
-        self::assertSame(['second', 'first'], array_column($page['items'], 'slug'));
-        self::assertSame([(string) $a->getId()], array_values(array_unique(array_column($page['items'], 'ownerId'))));
+        self::assertSame(['second', 'first'], Json::column(Json::objects($page, 'items'), 'slug'));
+        self::assertSame([(string) $a->getId()], array_values(array_unique(Json::column(Json::objects($page, 'items'), 'ownerId'))));
     }
 
     public function testFiltersOrderAndPageSizeCap(): void
@@ -45,10 +46,10 @@ final class ListLinksTest extends LinkApiTestCase
         $token = $this->token($client, 'a@example.com');
 
         $this->api($client, $token, 'GET', '/api/v1/links?isActive=false&slug=promo');
-        self::assertSame(['promo-2'], array_column($this->decode($client)['items'], 'slug'));
+        self::assertSame(['promo-2'], array_column(Json::objects($this->decode($client), 'items'), 'slug'));
 
         $this->api($client, $token, 'GET', '/api/v1/links?order[createdAt]=asc');
-        self::assertSame(['promo-1', 'promo-2', 'other'], array_column($this->decode($client)['items'], 'slug'));
+        self::assertSame(['promo-1', 'promo-2', 'other'], array_column(Json::objects($this->decode($client), 'items'), 'slug'));
 
         $this->api($client, $token, 'GET', '/api/v1/links?itemsPerPage=500');
         self::assertSame(100, $this->decode($client)['itemsPerPage']);
@@ -56,6 +57,14 @@ final class ListLinksTest extends LinkApiTestCase
         $this->api($client, $token, 'GET', '/api/v1/links?isActive=maybe');
         self::assertResponseStatusCodeSame(400);
         $this->api($client, $token, 'GET', '/api/v1/links?order[slug]=asc');
+        self::assertResponseStatusCodeSame(400);
+
+        // an order whose key is not a field name, or whose value is not a
+        // word, is refused rather than stringified into the check above
+        // (change harden-gate-floor)
+        $this->api($client, $token, 'GET', '/api/v1/links?order[0]=desc');
+        self::assertResponseStatusCodeSame(400);
+        $this->api($client, $token, 'GET', '/api/v1/links?order[createdAt][]=desc');
         self::assertResponseStatusCodeSame(400);
     }
 

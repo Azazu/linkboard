@@ -13,6 +13,7 @@ use App\Analytics\Dto\RefererRow;
 use App\Analytics\Dto\TopLinkRow;
 use App\Analytics\Dto\VariantRow;
 use App\Analytics\Report\ReportRequest;
+use App\Shared\Db\Row;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -36,7 +37,7 @@ final readonly class BreakdownQuery
         [$total, $rows] = $this->grouped('country', $request, limit: true);
 
         return new Grouped($total, array_map(static fn (array $r): CountryRow => new CountryRow(
-            null === $r['key'] ? null : (string) $r['key'], (int) $r['clicks'], (float) $r['share'], (int) $r['rank'],
+            Row::nullableString($r, 'key'), Row::int($r, 'clicks'), Row::float($r, 'share'), Row::int($r, 'rank'),
         ), $rows));
     }
 
@@ -48,7 +49,7 @@ final readonly class BreakdownQuery
         [$total, $rows] = $this->grouped("coalesce(referer_host, 'direct')", $request, limit: true);
 
         return new Grouped($total, array_map(static fn (array $r): RefererRow => new RefererRow(
-            (string) $r['key'], (int) $r['clicks'], (float) $r['share'], (int) $r['rank'],
+            Row::string($r, 'key'), Row::int($r, 'clicks'), Row::float($r, 'share'), Row::int($r, 'rank'),
         ), $rows));
     }
 
@@ -59,8 +60,8 @@ final readonly class BreakdownQuery
 
         return new Devices(
             $total,
-            array_map(static fn (array $r): DeviceTypeRow => new DeviceTypeRow(null === $r['key'] ? null : (string) $r['key'], (int) $r['clicks'], (float) $r['share']), $byType),
-            array_map(static fn (array $r): OsRow => new OsRow(null === $r['key'] ? null : (string) $r['key'], (int) $r['clicks'], (float) $r['share']), $byOs),
+            array_map(static fn (array $r): DeviceTypeRow => new DeviceTypeRow(Row::nullableString($r, 'key'), Row::int($r, 'clicks'), Row::float($r, 'share')), $byType),
+            array_map(static fn (array $r): OsRow => new OsRow(Row::nullableString($r, 'key'), Row::int($r, 'clicks'), Row::float($r, 'share')), $byOs),
         );
     }
 
@@ -74,7 +75,7 @@ final readonly class BreakdownQuery
         [$total, $rows] = $this->grouped('variant', $request, limit: false, extraWhere: " AND resolved_by = 'variant'");
 
         return new Grouped($total, array_map(static fn (array $r): VariantRow => new VariantRow(
-            (string) $r['key'], (int) $r['clicks'], (int) $r['uniques'], (float) $r['share'],
+            Row::string($r, 'key'), Row::int($r, 'clicks'), Row::int($r, 'uniques'), Row::float($r, 'share'),
         ), $rows));
     }
 
@@ -116,8 +117,8 @@ final readonly class BreakdownQuery
             SQL;
         $rows = $this->connection->fetchAllAssociative($sql, Sql::params($request) + ['limit' => $request->limit], Sql::types());
 
-        return new Grouped((int) ($rows[0]['total'] ?? 0), array_map(static fn (array $r): TopLinkRow => new TopLinkRow(
-            (string) $r['key'], (string) $r['slug'], (string) $r['owner_id'], (int) $r['clicks'], (int) $r['uniques'], (int) $r['rank'],
+        return new Grouped(self::total($rows), array_map(static fn (array $r): TopLinkRow => new TopLinkRow(
+            Row::string($r, 'key'), Row::string($r, 'slug'), Row::string($r, 'owner_id'), Row::int($r, 'clicks'), Row::int($r, 'uniques'), Row::int($r, 'rank'),
         ), $rows));
     }
 
@@ -147,7 +148,19 @@ final readonly class BreakdownQuery
         }
         $rows = $this->connection->fetchAllAssociative($sql, $params, Sql::types());
 
-        return [(int) ($rows[0]['total'] ?? 0), $rows];
+        return [self::total($rows), $rows];
+    }
+
+    /**
+     * The period's total is carried on every row by `sum(…) OVER ()`, so it is
+     * read from the first one — and no rows means no clicks, which is the one
+     * place a zero is the answer rather than a cast hiding a missing column.
+     *
+     * @param list<array<string, mixed>> $rows
+     */
+    private static function total(array $rows): int
+    {
+        return [] === $rows ? 0 : Row::int($rows[0], 'total');
     }
 
     private function link(ReportRequest $request): string

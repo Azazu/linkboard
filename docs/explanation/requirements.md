@@ -175,7 +175,7 @@ Server-rendered Twig pages using the same application services and voters as the
 
 ## 3. Data model (PostgreSQL 16)
 
-All tables use `timestamptz` in UTC, UUID v7 primary keys generated in PHP (`symfony/uid`) except `clicks`, whose primary key is the message's `click_id` UUID. Every change is a reviewed, reversible Doctrine migration. Names below are the physical names; entity classes live in the bounded-context directories listed in `AGENTS.md`.
+All tables use `timestamptz` in UTC, UUID v7 primary keys generated in PHP (`symfony/uid`) except `clicks`, whose primary key is the message's `click_id` UUID. Every change is a reviewed, reversible Doctrine migration — and reversible is checked rather than asserted: a CI job runs every migration down and up again on a database of its own and compares the schema before and after (`make migrations-roundtrip`), with the one table a `down` deliberately keeps named in the check. Names below are the physical names; entity classes live in the bounded-context directories listed in `AGENTS.md`.
 
 ### 3.1 `users`
 
@@ -300,7 +300,7 @@ Anti-overengineering rule (`openspec/config.yaml`): every component below names 
 | PostgreSQL 16 | JSONB, window functions, partitioning | project premise |
 | Redis 7 | counters, limiter storage, cache, transport | project premise |
 | PHPUnit + `symfony/test-pack`, API Platform's `ApiTestCase`, `dama/doctrine-test-bundle`, `zenstruck/foundry` | tests, per-test transactions, factories | standard Symfony testing set; Foundry replaces hand-written fixture builders |
-| PHPStan (level 8, `phpstan-symfony`, `phpstan-doctrine`), PHP-CS-Fixer (`@Symfony`, `@Symfony:risky`) | static analysis and style | project premise |
+| PHPStan (level 9, `phpstan-symfony`, `phpstan-doctrine`), PHP-CS-Fixer (`@Symfony`, `@Symfony:risky`) | static analysis and style | project premise |
 | Docker Compose (php-fpm, nginx, postgres, redis, worker), GitHub Actions | local environment, CI | project premise |
 
 Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encore/Node), a frontend framework, GraphQL (stretch), Sentry or any SaaS.
@@ -339,7 +339,7 @@ Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encor
 
 ### 6.5 Code quality and process
 
-- **NFR-QA-1** `declare(strict_types=1)` everywhere, `final` by default, readonly value objects, constructor promotion; PHPStan level 8 clean; PHP-CS-Fixer clean; `make check` is the gate floor and runs in CI on every push and pull request.
+- **NFR-QA-1** `declare(strict_types=1)` everywhere, `final` by default, readonly value objects, constructor promotion; PHPStan **level 9** clean over `src` and `tests` alike, with no baseline file (raised from level 8 by the change `harden-gate-floor`, which fixed the 361 findings the level reported); PHP-CS-Fixer clean; `make check` is the gate floor and runs in CI on every push and pull request.
 - **NFR-QA-2** Architecture rules enforced by tests where cheap: `src/Analytics/` does not reference `Click` entities; entities do not depend on `Doctrine\ORM` beyond mapping attributes; controllers contain no queries (a PHPStan rule or a `deptrac` layer file — deptrac is added only if a violation actually occurs twice, per the process rule on evidence).
 - **NFR-QA-3** Every capability in section 2 has an `openspec/specs/<capability>/spec.md` by the time its change is archived; ADRs record the trade-offs listed in section 7 when they are faced.
 
@@ -405,7 +405,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | 11a | `add-web-admin-and-stats` | the rest of FR-WEB-1: `/links/{id}/stats` (every report of 2.6 as charts and tables, period, granularity, bots toggle) and `/admin/users`, `/admin/links`, `/admin/stats` (split out of row 11 by user arbitration, 2026-09-13) | high | admin pages refuse a non-admin; the stats page renders every report |
 | 12 | `polish-api-and-openapi` | OpenAPI descriptions and examples for every operation, filters and ordering, `ApiTestCase` contract tests, error catalogue in `docs/reference/` | medium | OpenAPI validates; contract tests green |
 | 13 | `harden-quality-and-docs` | README with screenshots/diagram/benchmarks (NFR-DOC-1), architecture tests (NFR-QA-2), ADR index and the records still owed | low | README complete; the architecture rules fail on a planted violation |
-| 13a | `harden-gate-floor` | PHPStan level 9 over `src`, migration down/up in CI (split out of row 13 by user arbitration, 2026-09-15: both change the gate floor, which AGENTS.md makes `high`) | high | `make check` green at the raised level; a migration that cannot be reversed fails CI |
+| 13a | `harden-gate-floor` | PHPStan level 9 over `src` **and `tests`** (user decision, 2026-09-16: one level for the whole repository, no baseline), a migration down/up job in CI (split out of row 13 by user arbitration, 2026-09-15: both change the gate floor, which AGENTS.md makes `high`) | high | `make check` green at the raised level; a migration whose `down` is wrong fails CI, named — proven by a fixture suite for the script and by `SchemaFingerprintTest` for the query |
 
 ### Stretch (section 9)
 
@@ -430,7 +430,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | Analytics | Window functions, `date_trunc`, `generate_series`, read model DTOs, tag-aware cache |
 | API keys and limits | Hashing at rest, RateLimiter policies and storage, problem details |
 | Web UI | Twig, Forms, CSRF, Turbo/Stimulus, Chart.js via UX, AssetMapper |
-| Quality | PHPStan level 8 with Symfony/Doctrine extensions, layered test suites, CI with service containers, reversible migrations |
+| Quality | PHPStan level 9 with Symfony/Doctrine extensions, layered test suites, CI with service containers, migrations proven reversible by a round trip in CI |
 | Process | OpenSpec changes, risk tiers, independent review gates, ADRs |
 
 ---

@@ -5,7 +5,11 @@ includes:
     - vendor/phpstan/phpstan-doctrine/rules.neon
 
 parameters:
-    level: 8
+    # 9, not 8: level 9 is the one that refuses `mixed` flowing into a cast.
+    # Raised by change harden-gate-floor over `src` and `tests` together, with
+    # the 361 findings fixed rather than baselined — a level that applies to
+    # half a repository is a level nobody can state in one sentence.
+    level: 9
     paths:
         - src
         - tests

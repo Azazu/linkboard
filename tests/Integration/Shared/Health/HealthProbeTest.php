@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Shared\Health;
 
 use App\Shared\Health\HealthProbe;
+use App\Tests\Support\Env;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -42,8 +43,7 @@ final class HealthProbeTest extends KernelTestCase
 
     public function testUnreachableDatabaseIsReportedAsFailure(): void
     {
-        $redisUrl = $_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'];
-        \assert(\is_string($redisUrl));
+        $redisUrl = Env::string('REDIS_URL');
         $probe = new HealthProbe('postgresql://nobody:nothing@192.0.2.2:5432/nowhere?serverVersion=16', $redisUrl);
 
         $started = microtime(true);

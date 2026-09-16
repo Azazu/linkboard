@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Click;
 
 use App\Click\Counter\RedisClickCounter;
 use App\Click\RecordOutcome;
+use App\Tests\Support\Env;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Cache\Adapter\RedisAdapter;
@@ -29,7 +30,7 @@ final class RedisClickCounterTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->redisUrl = (string) ($_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? '');
+        $this->redisUrl = Env::string('REDIS_URL');
         self::assertNotSame('', $this->redisUrl, 'REDIS_URL is required');
         $redis = RedisAdapter::createConnection($this->redisUrl);
         self::assertInstanceOf(\Redis::class, $redis);

@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Click;
 
 use App\Click\Handler\ClickRecordedHandler;
 use App\Click\Message\ClickRecorded;
+use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use Doctrine\DBAL\Connection;
@@ -134,6 +135,6 @@ final class ClickRecordedHandlerTest extends KernelTestCase
 
     private static function clickCount(Uuid $linkId): int
     {
-        return (int) self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$linkId->toRfc4122()]);
+        return Row::toInt(self::connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$linkId->toRfc4122()]));
     }
 }

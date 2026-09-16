@@ -7,6 +7,7 @@ namespace App\Tests\Api\Analytics;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use App\Tests\Fixture\StatementRecorder;
+use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
 /** Spec analytics "Global statistics for administrators" — over HTTP. */
@@ -45,9 +46,10 @@ final class AdminStatsTest extends AnalyticsApiTestCase
         ], $top['items']);
 
         $series = $this->get($client, $admin, '/api/v1/admin/stats/timeseries?'.self::PERIOD);
-        self::assertSame([0, 8, 0, 0, 4, 0, 0], array_column($series['buckets'], 'clicks'));
-        self::assertSame([0, 8, 8, 8, 12, 12, 12], array_column($series['buckets'], 'cumulativeClicks'));
-        self::assertSame(['bucket', 'clicks', 'cumulativeClicks'], array_keys($series['buckets'][0]), 'no unique visitors in the global timeseries');
+        $buckets = Json::objects($series, 'buckets');
+        self::assertSame([0, 8, 0, 0, 4, 0, 0], array_column($buckets, 'clicks'));
+        self::assertSame([0, 8, 8, 8, 12, 12, 12], array_column($buckets, 'cumulativeClicks'));
+        self::assertSame(['bucket', 'clicks', 'cumulativeClicks'], array_keys($buckets[0]), 'no unique visitors in the global timeseries');
         self::assertSame('day', $series['granularity']);
 
         StatementRecorder::reset();

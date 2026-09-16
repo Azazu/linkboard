@@ -53,14 +53,49 @@ final class RulesDocumentMapper
                 return $data;
             }
             $key = array_key_first($match);
+            $values = self::stringList($match[$key]);
+            if (!\is_string($key) || null === $values) {
+                // the canonical form is `match: {key: [string, …]}`; anything
+                // else is a document these rows cannot hold, and blanking the
+                // values would quietly rewrite the link's rules on save
+                $data->mode = RulesFormData::MODE_RAW;
+                $data->rows = [];
+
+                return $data;
+            }
+
             $row = new RuleRowFormData();
-            $row->matchKey = \is_string($key) ? $key : null;
-            $row->values = implode(', ', array_map(strval(...), \is_array($match[$key]) ? $match[$key] : []));
+            $row->matchKey = $key;
+            $row->values = implode(', ', $values);
             $row->target = \is_array($rule) && \is_string($rule['target'] ?? null) ? $rule['target'] : null;
             $data->rows[] = $row;
         }
 
         return $data;
+    }
+
+    /**
+     * The canonical form of a match's values, or null when the stored document
+     * does not hold that shape — which sends the whole document to raw mode.
+     *
+     * @return list<string>|null
+     */
+    private static function stringList(mixed $values): ?array
+    {
+        if (!\is_array($values) || !array_is_list($values)) {
+            return null;
+        }
+
+        $strings = [];
+        foreach ($values as $value) {
+            if (!\is_string($value)) {
+                return null;
+            }
+
+            $strings[] = $value;
+        }
+
+        return $strings;
     }
 
     /**

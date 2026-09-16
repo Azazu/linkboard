@@ -39,8 +39,17 @@ final class ListQueryFactory
             if (1 !== \count($order)) {
                 throw new BadRequestHttpException('Order by one field only.');
             }
-            $orderField = (string) array_key_first($order);
-            $direction = strtolower((string) reset($order));
+            // a key that is not a field name, or a value that is not a word —
+            // `order[0]=desc`, `order[createdAt][]=desc` — is refused rather
+            // than stringified into something that then fails the check below
+            $field = array_key_first($order);
+            $value = reset($order);
+            if (!\is_string($field) || !\is_string($value)) {
+                throw new BadRequestHttpException('order accepts order[createdAt] or order[clickCount] with asc or desc.');
+            }
+
+            $orderField = $field;
+            $direction = strtolower($value);
             if (!\in_array($orderField, LinkListQuery::ORDER_FIELDS, true) || !\in_array($direction, LinkListQuery::DIRECTIONS, true)) {
                 throw new BadRequestHttpException('order accepts order[createdAt] or order[clickCount] with asc or desc.');
             }

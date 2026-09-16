@@ -13,12 +13,13 @@ Authoritative live source: `make help`.
 | `make console ARGS='…'` | `bin/console` inside the container |
 | `make migrate` / `make migration` | apply migrations / generate a diff migration |
 | `make test-db` | create and migrate the test database (`<DATABASE_URL db>_test`); called by `make init` |
+| `make migrations-roundtrip` | every migration down and up again on a database this run creates and drops (`<DATABASE_URL db>_roundtrip_<random>`), comparing the schema before and after with `scripts/schema-fingerprint.sql`; fails naming the object that differs or the table a `down` left behind. Its own CI job |
 | `make jwt-keys` | generate the dev and test JWT keypairs under `config/jwt/<env>/`; the dev one is skipped when it exists, the test one is replaced unless it is encrypted with the passphrase `.env.test` (then `.env.test.local`) declares and matches its public key (`scripts/test-jwt-keys.sh`, with the passphrase resolved by `scripts/test-jwt-passphrase.php` — which calls the same code `tests/bootstrap.php` runs, so the generator and the suite cannot resolve different values). Called by `make init` and CI |
 | `make console ARGS='app:user:promote <email>'` / `app:user:demote` | grant / remove `ROLE_ADMIN`; exit 1 for an unknown email |
 | `make console ARGS='app:demo:seed [--clicks=50000] [--days=60] [--reset]'` | demo dataset: two accounts (generated passwords printed once), ten links with rules, synthetic clicks; exit 1 in `prod` or when the demo accounts exist without `--reset` |
 | `make worker` | consume the async Messenger transport (foreground) |
 | `docker compose --profile worker up -d` | the same consumer as a background compose service (profile `worker`, not started by `make up`) |
-| `make test` / `make stan` / `make cs` / `make cs-fix` | PHPUnit / PHPStan / style check / style fix |
+| `make test` / `make stan` / `make cs` / `make cs-fix` | PHPUnit / PHPStan (level 9 over `src` and `tests`) / style check / style fix |
 | `make check` | style + static analysis + tests — the gate floor |
 
 ## Workflow scripts
@@ -32,6 +33,8 @@ Authoritative live source: each script's header comment.
 | `scripts/gate-run.sh` | THE Codex review step, in the mode AGENTS.md declares. `auto`: lock, floor, hermetic `codex exec`, output verification, commit of `review.md`. `manual`: `request` = floor + printed prompt for the user (writes nothing); `record` = verification + commit of the record the user's Codex left | `<id> <1\|2> full` · `<id> <1\|2> confirm <round>` · `<id> <1\|2> request [<round>]` · `<id> <1\|2> record`; 0 committed/printed, 1 not passed, 2 usage, 3 locked |
 | `scripts/workflow_verify_test.sh` | fixture suite for the verifier | no arguments; non-zero on any failing case |
 | `scripts/gate_run_test.sh` | fixture suite for the gate runner (both review modes) and the pre-gate floor (stubbed `codex`/`openspec` on PATH, throwaway repository) | no arguments; non-zero on any failing case |
+| `scripts/migrations-roundtrip.sh` | the work behind `make migrations-roundtrip`; reads `bin/console` and `scripts/schema-fingerprint.sql` from the working directory | no arguments; `DATABASE_URL` must be set; 0 pass, 1 FAIL |
+| `scripts/migrations_roundtrip_test.sh` | fixture suite for the round trip (stubbed `bin/console`, throwaway repository, no database): ordering, exit codes, ownership, cleanup, a create collision, two overlapping runs | no arguments; non-zero on any failing case |
 
 ## Agent slash commands (Claude Code)
 
