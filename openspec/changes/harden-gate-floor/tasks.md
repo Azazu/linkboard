@@ -32,7 +32,7 @@ them to make its own check pass would prove nothing.
 
 ## 4. The level
 
-- [ ] 4.1 `phpstan.dist.neon` moves to `level: 9` over `src` and `tests`, with no baseline file and no new `ignoreErrors` entry (design decision 1). Verify: `make stan` green at the new level, and `rg -n 'level' phpstan.dist.neon` shows one level.
+- [x] 4.1 `phpstan.dist.neon` moves to `level: 9` over `src` and `tests`, with no baseline file and no new `ignoreErrors` entry (design decision 1), and the reason for the number is a comment beside it. Verify, executed: `make stan` reports `No errors` at the new level; `phpstan-baseline.neon` does not exist; the config's only `ignoreErrors` entry is the one it had before this change (the Symfony 8 reflection hook on `src/Kernel.php`).
 
 ## 5. The migration round trip
 
