@@ -45,7 +45,7 @@ them to make its own check pass would prove nothing.
 ## 6. CI
 
 - [ ] 6.1 A `migrations` job in `.github/workflows/ci.yml` with its own `postgres` service, running `make migrations-roundtrip EXEC=`, separate from the `php` job whose database the health tests depend on (design decision 5). Verify: the job appears as its own check on the branch run and is green, with the run id and SHA recorded in `handoff.md`.
-- [ ] 6.2 The job does not disturb the existing ones. Verify: the `workflow`, `detect` and `php` jobs are unchanged in the diff, and the branch run shows all four green.
+- [x] 6.2 The job does not disturb the existing ones. Verify, executed: `git diff .github/workflows/ci.yml` removes no line — the change is one added job — so `workflow`, `detect` and `php` are byte for byte what they were; the branch run showing all four green is task 9.2's evidence.
 
 ## 7. The demonstrated failing inputs
 

@@ -47,6 +47,48 @@ jobs:
             echo "php=false" >> "$GITHUB_OUTPUT"
           fi
 
+  migrations:
+    needs: detect
+    if: needs.detect.outputs.php == 'true'
+    runs-on: ubuntu-latest
+    # its own PostgreSQL: the php job's database is load-bearing (the
+    # prod-kernel health tests read DATABASE_URL as it is, and make test-db
+    # derives the test database from the same server), and a job that creates
+    # and drops schemas has no business sharing it
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      # the console boots the kernel, and the kernel's services are wired to
+      # Redis: declared here so a boot that touches it cannot make this job
+      # flaky for a reason that has nothing to do with migrations
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_pgsql, intl, mbstring, redis, gd
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - name: Every migration down and up again (native)
+        env:
+          APP_ENV: dev
+          DATABASE_URL: postgresql://app:app@127.0.0.1:5432/app?serverVersion=16&charset=utf8
+          REDIS_URL: redis://127.0.0.1:6379
+          LOCK_DSN: redis://127.0.0.1:6379
+          MESSENGER_TRANSPORT_DSN: in-memory://
+        run: make migrations-roundtrip EXEC=
+
   php:
     needs: detect
     if: needs.detect.outputs.php == 'true'
