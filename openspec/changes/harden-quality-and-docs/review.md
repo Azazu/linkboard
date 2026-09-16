@@ -117,3 +117,23 @@
 - Checked the benchmark sequence against Compose configuration and the seed command's production guard. Executed the script's exact ID-extraction pipeline on the disposable JSON above; it returned `least-clicked`. Checked related benchmark claims in the documentation, tasks and handoff.
 - `git diff --check` for the requested commit range and `sh -n scripts/report-benchmark.sh scripts/test-jwt-keys.sh` passed. Host PHP is unavailable, and `docker compose exec -T php php --version` failed because access to `/var/run/docker.sock` is denied. Consequently authentication, `make check` and the live benchmark were not independently rerun; executor-recorded runs were considered as supplied evidence.
 - Modified only `review.md`; no git write commands, fixture resets, environment-file edits or key replacements were performed.
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-16
+**Reviewed-Commit:** bdba7ee89c6d934cff6bcb012451319e086d78e1
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The shell no longer parses dotenv files. Both `tests/bootstrap.php` and `scripts/test-jwt-passphrase.php` call `App\Tests\TestEnvironment::apply()`, which retains `bootEnv()` and publishes each parsed file to `$_ENV`, `$_SERVER` and `putenv()` before parsing the next. This resolves the comment-parsing defect and the cross-file expansion counterexample from confirmation 1. The subprocess regression pins `base-tail` with an initially empty process passphrase; tasks 8.5 and 9.6 record its failing mutation and successful expansion, key generation, byte-for-byte preservation and authentication with the cross-file override. Related command and design documentation now points to the shared implementation. |
+| 2 | confirmed — The published sequence explicitly restores the dev container before seeding and switches to prod for measurement, including production key generation and cache warmup. The report script runs inside the PHP container, obtains owner and admin tokens, selects the highest-click-count link structurally from the JSON collection, prints its identity and count, derives the period, clears the report cache before each sample, rejects non-200 report responses and aggregates all nine endpoints with nearest-rank percentiles. This removes both remaining reproducibility defects from confirmation 1. The rerun evidence in tasks 2.2–2.5, the benchmark table and README consistently report the 220,000-click link, the device report's 324.3 ms p95 miss and the global top-links report's 299.2 ms p95. |
+
+### Validation
+
+- Reviewed only the requested diff from `c69f769782ee9688d5092ae4e3a5b74d25bef826` to the Reviewed-Commit and collateral effects relevant to source-round major findings 1 and 2. Both are marked `fixed`; there are no blockers or open source-round findings. No unrelated minor findings were introduced.
+- Verified branch `change/harden-quality-and-docs`, HEAD equal to the requested target and an initially clean working tree. Read the review protocol, OpenSpec configuration and relevant proposal, design, task and handoff evidence.
+- Traced the shared environment implementation against the previous bootstrap, installed Symfony Dotenv variable resolution, PHPUnit configuration, Composer development autoloading and the Makefile invocation. Checked the benchmark sequence against Compose configuration, the seed command's production guard, the collection response format and ordering, and the report cache's environment-specific configuration.
+- `git diff --check` for the requested range and `sh -n scripts/report-benchmark.sh scripts/test-jwt-keys.sh` passed. Host PHP is unavailable; `docker compose exec -T php php --version` failed because access to `/var/run/docker.sock` is denied. Authentication, regression execution, `make check` and live benchmark timings were therefore not independently rerun. The executor's recorded mutation, authentication, benchmark and green-check runs were considered as supplied evidence, not independently reproduced results.
+- Modified only `review.md`; ran no git write commands and did not reset fixtures, edit environment files or replace keys.
