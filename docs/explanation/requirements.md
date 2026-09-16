@@ -404,7 +404,8 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | 11 | `add-web-ui` | Twig + UX + AssetMapper shell, security headers and CSP, forms, and the owner-facing pages of FR-WEB-1: login/register in the shell, dashboard, links list, create, details with QR, edit with the rules editor, API keys | high | `WebTestCase` suite; screenshots for README produced from seeded data |
 | 11a | `add-web-admin-and-stats` | the rest of FR-WEB-1: `/links/{id}/stats` (every report of 2.6 as charts and tables, period, granularity, bots toggle) and `/admin/users`, `/admin/links`, `/admin/stats` (split out of row 11 by user arbitration, 2026-09-13) | high | admin pages refuse a non-admin; the stats page renders every report |
 | 12 | `polish-api-and-openapi` | OpenAPI descriptions and examples for every operation, filters and ordering, `ApiTestCase` contract tests, error catalogue in `docs/reference/` | medium | OpenAPI validates; contract tests green |
-| 13 | `harden-quality-and-docs` | README with screenshots/diagram/benchmarks, PHPStan strictness sweep, migration down/up in CI, architecture tests (NFR-QA-2), ADR index | low | README complete; CI matrix green |
+| 13 | `harden-quality-and-docs` | README with screenshots/diagram/benchmarks (NFR-DOC-1), architecture tests (NFR-QA-2), ADR index and the records still owed | low | README complete; the architecture rules fail on a planted violation |
+| 13a | `harden-gate-floor` | PHPStan level 9 over `src`, migration down/up in CI (split out of row 13 by user arbitration, 2026-09-15: both change the gate floor, which AGENTS.md makes `high`) | high | `make check` green at the raised level; a migration that cannot be reversed fails CI |
 
 ### Stretch (section 9)
 
