@@ -22,6 +22,11 @@ use App\Shared\Api\RefusedParameters;
  */
 #[ApiResource(
     shortName: 'ApiKey',
+    // Deliberately out of the GraphQL schema (change stretch-graphql): an
+    // empty list is the exclusion, because a resource that declares none
+    // receives the framework's default set — two queries AND the mutations
+    // that create, update and delete it.
+    graphQlOperations: [],
     normalizationContext: ['skip_null_values' => false],
     operations: [
         new GetCollection(

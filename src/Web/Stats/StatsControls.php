@@ -59,7 +59,7 @@ final readonly class StatsControls
 
         try {
             $request = $factory->parse(
-                new Request($query),
+                $query,
                 $linkId,
                 withGranularity: true,
                 withLimit: true,

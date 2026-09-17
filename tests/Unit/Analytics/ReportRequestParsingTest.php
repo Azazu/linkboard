@@ -11,7 +11,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Parsing raises the refusal naming the parameter that carried it, so a caller
@@ -44,7 +43,7 @@ final class ReportRequestParsingTest extends TestCase
     public function testARefusedParameterNamesItself(array $query, string $parameter): void
     {
         try {
-            $this->factory()->parse(Request::create('/', 'GET', $query), null, withGranularity: true, withLimit: true);
+            $this->factory()->parse($query, null, withGranularity: true, withLimit: true);
             self::fail('the parameter should have been refused');
         } catch (InvalidReportParameter $e) {
             self::assertSame($parameter, $e->parameter);
@@ -56,7 +55,7 @@ final class ReportRequestParsingTest extends TestCase
     {
         // the flags say which parameters the operation takes; the rest are
         // ignored rather than refused, exactly as the API behaves today
-        $request = $this->factory()->parse(Request::create('/', 'GET', ['granularity' => 'week', 'limit' => 'ten']), null);
+        $request = $this->factory()->parse(['granularity' => 'week', 'limit' => 'ten'], null);
 
         self::assertSame(Granularity::Day, $request->granularity);
         self::assertSame(10, $request->limit);

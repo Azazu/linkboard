@@ -20,6 +20,11 @@ use App\Shared\Api\RefusedParameters;
  */
 #[ApiResource(
     shortName: 'AdminUser',
+    // Deliberately out of the GraphQL schema (change stretch-graphql): an
+    // empty list is the exclusion, because a resource that declares none
+    // receives the framework's default set — two queries AND the mutations
+    // that create, update and delete it.
+    graphQlOperations: [],
     security: 'is_granted("ROLE_ADMIN")',
     operations: [
         new GetCollection(

@@ -7,6 +7,7 @@ namespace App\Auth\Api;
 use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GraphQl\Query as QueryOperation;
 use App\Auth\Entity\User;
 
 /**
@@ -14,6 +15,15 @@ use App\Auth\Entity\User;
  */
 #[ApiResource(
     shortName: 'Me',
+    // Read-only through GraphQL (change stretch-graphql), same provider and
+    // same security expression as the REST operation.
+    graphQlOperations: [
+        new QueryOperation(
+            provider: MeProvider::class,
+            security: 'is_granted("ROLE_USER")',
+            description: 'The authenticated account.',
+        ),
+    ],
     operations: [
         new Get(
             uriTemplate: '/me',

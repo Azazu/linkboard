@@ -7,6 +7,7 @@ namespace App\Analytics\Api;
 use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GraphQl\Query as QueryOperation;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
 use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
 use App\Analytics\Api\Parameter\FromParameter;
@@ -22,6 +23,18 @@ use App\Shared\Api\RefusedParameters;
 #[ApiResource(
     shortName: 'AdminTopLinksReport',
     security: 'is_granted("ROLE_ADMIN")',
+    // Read-only through GraphQL (change stretch-graphql): the same provider,
+    // which resolves the link and checks the voter before it reads anything,
+    // and the same parameters — supplied as arguments here and as a query
+    // string over REST, parsed by one factory into one cache key. Declared
+    // explicitly because a resource that declares no GraphQL operations
+    // receives the default set, mutations on a read model included.
+    graphQlOperations: [
+        new QueryOperation(
+            provider: AdminStatsProvider::class,
+            security: 'is_granted("ROLE_ADMIN")',
+        ),
+    ],
     operations: [
         new Get(
             uriTemplate: '/admin/stats/top-links',

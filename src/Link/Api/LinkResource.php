@@ -9,6 +9,8 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\GraphQl\Query as QueryOperation;
+use ApiPlatform\Metadata\GraphQl\QueryCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\QueryParameter;
@@ -28,6 +30,25 @@ use Symfony\Component\Validator\Constraints as Assert;
     shortName: 'Link',
     // nullable fields (utm, rules, expiresAt, maxClicks) are part of the contract: emit them as null
     normalizationContext: ['skip_null_values' => false],
+    // Read-only through GraphQL (change stretch-graphql): the same providers
+    // and the same voter as the REST operations, listed explicitly because a
+    // resource that declares none receives the default set with three
+    // mutations. Writing stays REST's.
+    graphQlOperations: [
+        new QueryOperation(
+            provider: LinkItemProvider::class,
+            security: 'is_granted("LINK_VIEW", object)',
+            description: 'One link the caller may view.',
+        ),
+        new QueryCollection(
+            provider: OwnLinksProvider::class,
+            security: 'is_granted("ROLE_USER")',
+            paginationItemsPerPage: 30,
+            paginationMaximumItemsPerPage: 100,
+            paginationClientItemsPerPage: true,
+            description: 'The caller\'s links, newest first.',
+        ),
+    ],
     operations: [
         new Post(
             uriTemplate: '/links',

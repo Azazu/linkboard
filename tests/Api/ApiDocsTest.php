@@ -70,12 +70,29 @@ final class ApiDocsTest extends WebTestCase
         self::assertResponseHeaderSame('Content-Type', 'application/problem+json; charset=utf-8');
     }
 
-    public function testGraphQlEndpointIsAbsent(): void
+    public function testTheUnversionedGraphQlPathIsTheFrameworksAndIsGuardedLikeEverythingElse(): void
     {
+        // Until change stretch-graphql this path was 404 and the scenario said
+        // so. GraphQL is now served, and API Platform registers its entrypoint
+        // there — under the `/api` import prefix — beside the versioned
+        // `/api/v1/graphql` this repository declares, exactly as `/api/docs`
+        // sits beside `/api/v1`. What the capability promises about it is that
+        // it is not the REST documentation, not a resource representation, and
+        // behind the same firewall: measured, an anonymous GET is 401 problem
+        // details, refused before any GraphQL executor runs.
         $client = self::createClient();
         $client->request('GET', '/api/graphql');
 
-        self::assertResponseStatusCodeSame(404);
+        self::assertResponseStatusCodeSame(401);
+        self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
+    }
+
+    public function testTheDocumentedGraphQlPathTakesPostOnly(): void
+    {
+        $client = self::createClient();
+        $client->request('GET', '/api/v1/graphql');
+
+        self::assertResponseStatusCodeSame(405);
     }
 
     /**
