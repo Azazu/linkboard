@@ -32,12 +32,15 @@ visible action.
   build from the check. They move to the entrypoint, which runs after the
   settings have been accepted. The build therefore requires no secret by
   construction and bakes no placeholder.
-- **Two named volumes carry what the image deliberately does not.** The compiled
-  assets, written at start by the application and served directly by the proxy —
+- **Two named volumes carry what the image deliberately does not, and one
+  service writes them.** The compiled assets, served directly by the proxy —
   PHP-FPM cannot serve static files and the proxy has no copy of the application.
   And the JWT keypair, generated only when absent, so that replacing a container
   does not invalidate every token in the wild; the private key stays out of every
-  image layer and out of the repository.
+  image layer and out of the repository. Both are written by a **one-shot init
+  service** the other containers wait for, because generating a keypair is not
+  atomic and three containers starting together on a clean host could otherwise
+  leave one run's private key beside another's public key.
 - **A production compose profile** (`docker-compose.prod.yml`): Caddy terminating
   TLS, the application, the Messenger worker as a supervised service, a scheduler
   for the periodic commands, Postgres and Redis. The development stack is
@@ -55,8 +58,11 @@ visible action.
   `APP_SECRET`, `JWT_PASSPHRASE`, `VISITOR_HASH_SALT`, `DATABASE_URL`,
   `REDIS_URL`, `LOCK_DSN` and `MESSENGER_TRANSPORT_DSN` — the last three because
   Redis is reached through three independent settings and checking one would
-  leave two carrying committed values. Each must be set, non-empty, and **not
-  equal to the value committed in `.env`**; otherwise the boot fails naming the
+  leave two carrying committed values. The production compose takes **one
+  authoritative credential per store** and derives those connection strings from
+  it, so the database server and the application cannot end up holding different
+  passwords. Each effective setting must be set, non-empty, and **not equal to
+  the value committed in `.env`**; otherwise the boot fails naming the
   setting, in the web process, the worker and the scheduler alike. It reuses the
   existing `app.startup_check` tag rather than adding a mechanism.
 - **Registration closed on a public instance.** One configuration switch,

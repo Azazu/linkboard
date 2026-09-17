@@ -39,8 +39,14 @@ Record `4e14959`, Reviewed-Commit `e516e99`. Three of the blockers were contradi
 8. **major — the documented build command could not run.** A `.docker/php` context cannot reach the application it must copy. One exact command from the repository root with `-f`, plus a `.dockerignore` that this change now owns.
 9. **major — the CI evidence required me to push.** An agent may not, so "the job appears green" is not evidence I can produce. Replaced with the local reproducible form (break the stage, run the documented command, record the failure, restore) plus the assertion that the job's step is byte-identical to the documented command, so the two cannot drift.
 
+## Gate 1 Confirmation 1 — seven confirmed, two returned
+Record `d24ed52`, Reviewed-Commit `ccd45f8`. Findings 1, 2, 3, 6, 7, 8 and 9 confirmed; 4 and 5 came back, each because my fix stopped at the sequential case and the concurrent one was the one that bites.
+
+- **4 — the keypair race I did not close.** I made provisioning idempotent and verified it across a *sequential* replacement, but every application container runs the entrypoint and on a clean host the web process, the worker and the scheduler start in the same moment against the same empty volume. `lexik:jwt:generate-keypair --skip-if-exists` builds a candidate pair **before** deciding whether one exists and writes the two files separately, so two of them can leave one run's private key beside another's public key — an instance signing tokens nothing can verify. Provisioning is now a **one-shot init service** the three long-running services wait for (`condition: service_completed_successfully`): one writer by construction, and the ordering is in the compose file rather than in a shell script. Verified by bringing the whole stack up on empty volumes five times and diffing the derived public key against the stored one; the failing input is moving provisioning back into the three entrypoints and watching a mismatched pair appear.
+- **5 — naming the settings did not stop two of them disagreeing.** The Postgres *server* takes `POSTGRES_PASSWORD` from `DB_PASSWORD` while Doctrine connects with `DATABASE_URL`: change only the second and the check passes while the server still holds the committed password; change both differently and the stack starts and then cannot query. The production compose now takes **one authoritative credential per store** and derives every connection string from it by interpolation, so a mismatch cannot be introduced through configuration at all; the check still examines the effective values. A hand-override is out of contract and surfaces through the deep dependency probe rather than at an arbitrary later request.
+
 ## Next step
-Gate 1 confirmation: `scripts/gate-run.sh stretch-public-hosting 1 confirm 1`.
+Gate 1 confirmation 2: `scripts/gate-run.sh stretch-public-hosting 1 confirm 1`.
 
 ## Blockers
 None. `main` merged into this branch on 2026-09-17 (rows 14 and 15 landed), so the branch contains current `main`.

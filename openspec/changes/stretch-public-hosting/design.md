@@ -100,7 +100,7 @@ needs no environment (rejected as a partial answer — the asset compile and the
 key generation still boot, so the entrypoint is needed anyway, and having two
 mechanisms would be worse than one).
 
-### 3. One volume carries the assets to the proxy, another carries the keys
+### 3. One volume carries the assets to the proxy, another carries the keys — written by a single provisioner
 
 PHP-FPM cannot serve static files and the proxy has no copy of the application
 (Gate 1 round 1, finding 3). The application container writes its compiled assets
@@ -118,10 +118,33 @@ log (Gate 1 round 1, finding 4).
 and losing it means re-issuing tokens. The deploy document says which volumes
 matter and why, and that backing them up is the operator's step.
 
-*Alternative considered.* Copying the public tree into a second image built for
-the proxy — rejected because two images must then be built and deployed from one
-commit, and a mismatch between them is a class of bug that is invisible until a
-page renders unstyled.
+*One writer, by construction.* Three containers run from this image — the web
+application, the worker and the scheduler — and on a clean host they start at the
+same moment against the same empty volumes. `lexik:jwt:generate-keypair
+--skip-if-exists` builds a candidate pair **before** it checks whether the files
+exist and writes the private and public keys separately, so concurrent first
+starts can leave one run's private key beside another run's public key: an
+instance that signs tokens nothing can verify (Gate 1 confirmation 1, finding 4).
+So provisioning is not in the application containers' entrypoint at all. A
+one-shot **init service** compiles the assets and generates the keypair, and the
+three long-running services declare `depends_on: { init: { condition:
+service_completed_successfully } }`. There is then exactly one writer and the
+ordering is visible in the compose file rather than buried in a shell script; the
+application containers warm only their own cache, which is private to each of
+them. `--skip-if-exists` still covers the ordinary restart, where the keys are
+already there.
+
+*What that does not guarantee.* Two *stacks* started against one volume — two
+`docker compose up` runs racing on the same host — are outside this: compose
+serialises the services of one project, not two projects. The deploy document
+says the stack is started once.
+
+*Alternatives considered.* A `flock` around the provisioning step inside each
+entrypoint (works, since the containers share the volume's filesystem, but hides
+the ordering in a script where the next reader will not look for it); copying the
+public tree into a second image built for the proxy — rejected because two images
+must then be built and deployed from one commit, and a mismatch between them is a
+class of bug that is invisible until a page renders unstyled.
 
 ### 4. Caddy, not nginx plus certbot
 
@@ -191,9 +214,29 @@ salt and a published database password and no complaint from anything. The
 committed values are read from `.env` itself rather than copied into PHP, so the
 check cannot fall out of step with the file it is about.
 
+**One credential per store, and the connection strings derived from it.** Naming
+the settings is not enough on its own, because two of them can disagree: the
+Postgres *server* takes its password from `DB_PASSWORD` while Doctrine connects
+with `DATABASE_URL`, so an operator who changes only the second passes the check
+while the server still holds the committed password — and an operator who changes
+both, differently, gets a stack that starts and then cannot query (Gate 1
+confirmation 1, finding 5). Redis has the same shape three times over.
+
+So the production compose takes **one** authoritative input per store —
+`DB_PASSWORD` and `REDIS_PASSWORD` — and *derives* every connection string from
+it by interpolation, rather than letting a second literal exist:
+`DATABASE_URL` from the user, password and database name; `REDIS_URL`, `LOCK_DSN`
+and `MESSENGER_TRANSPORT_DSN` from the Redis password. A mismatch is then not
+something an operator can introduce through configuration, and the check still
+examines the effective connection strings, so a stack that somehow has a
+committed one still refuses to boot.
+
 *What it does not guarantee.* It cannot tell a weak value from a strong one, only
-a changed one from an unchanged one; and it says nothing about the host's file
-permissions. The message names the setting and never the value.
+a changed one from an unchanged one; it says nothing about the host's file
+permissions; and someone who overrides a derived connection string by hand is
+outside the contract. That last case is not silent, though: the deep dependency
+probe reports the store unreachable, which is what the deploy document tells an
+operator to look at.
 
 ### 7. The demo guard is an instance property; the seed locks; the password is the instance's
 
@@ -254,9 +297,9 @@ item delivered in `docs/explanation/requirements.md` §9.
 |---|---|
 | Authorization boundary | Registration is a public surface being closed on two entry points; decision 5 makes them one mechanism, and the failing input is reaching the surface the fix did not cover. The demo account is an ordinary `ROLE_USER`; nothing here grants a role. |
 | Deletion/expiry | The scheduled reload runs `--reset`, which **deletes** the demo accounts and everything owned by them. Its all-or-nothing transaction is already specified and tested (capability `demo-data`); what is new is that it can run in `prod`, which is why decision 7 makes the opt-in an instance property. |
-| Concurrent writers | **Applicable, and it was wrong to call it n/a.** `app:demo:seed` takes no lock today, and one host does not prevent a slow scheduled reload from overlapping the next: two runs would delete and recreate the same accounts. Decision 7 gives the command a non-blocking lock, and the capability carries a scenario for the second run being refused rather than queued. |
+| Concurrent writers | **Applicable twice, and it was wrong to call it n/a.** First, `app:demo:seed` takes no lock today, and one host does not prevent a slow scheduled reload from overlapping the next: two runs would delete and recreate the same accounts. Decision 7 gives the command a non-blocking lock, and the capability carries a scenario for the second run being refused rather than queued. Second, the three containers of one stack start together against the same empty volumes on a clean host, and the keypair generator is not atomic — decision 3 makes provisioning a single one-shot service the others wait for, and the capability carries a scenario for a concurrent clean start producing one matching pair. |
 | Empty/zero/null inputs | The setting check treats unset, empty **and the committed default** alike (decision 6) — the third is the one a naive check misses and the one that actually happens. |
-| Crash before/after an external effect | The entrypoint's provisioning is idempotent by construction: the keypair is generated only when absent, so a crash between generating and serving leaves the next start correct rather than issuing a second keypair that would invalidate live tokens. The scheduled reload's crash behaviour is the existing transaction guarantee. Certificate issuance is external, idempotent and owned by Caddy. |
+| Crash before/after an external effect | Provisioning is idempotent and single-writer: the keypair is generated only when absent and by one service, so a crash between generating and serving leaves the next start correct rather than issuing a second keypair that would invalidate live tokens. A crash *between* the two key files is the case decision 3's single writer exists for, and the verification asserts the pair matches rather than that both files exist. The scheduled reload's crash behaviour is the existing transaction guarantee. Certificate issuance is external, idempotent and owned by Caddy. |
 | Idempotency of retries | A repeated reload is a further `--reset`: it converges on the seeded dataset rather than accumulating. A repeated partition run is already idempotent (capability `click-logging`). A repeated container start recompiles the assets and keeps the keys. |
 | Money rounding | n/a. |
 
@@ -271,6 +314,9 @@ item delivered in `docs/explanation/requirements.md` §9.
   request. What remains unproven is the publicly trusted certificate, which needs
   a public host name — and the document says that plainly rather than implying it
   was tested.
+- **A second stack started against the same volumes is out of contract** → the
+  deploy document says the stack is started once, and the single writer covers
+  the services of that one stack rather than two racing projects.
 - **Start-time provisioning makes the first request of a cold container slow** →
   measured and recorded rather than estimated; the trade-off is decision 2's, and
   the alternative was a bypassable check.
