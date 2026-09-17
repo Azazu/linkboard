@@ -7,6 +7,7 @@ namespace App\Analytics\Api;
 use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GraphQl\Query as QueryOperation;
 use ApiPlatform\Metadata\Link;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
 use ApiPlatform\OpenApi\Model\Response as OpenApiResponse;
@@ -23,6 +24,31 @@ use App\Shared\Api\RefusedParameters;
 #[ApiResource(
     shortName: 'LinkDevicesReport',
     normalizationContext: ['skip_null_values' => false],
+    // Read-only through GraphQL (change stretch-graphql): the same provider,
+    // which resolves the link and checks the voter before it reads anything,
+    // and the same parameters — supplied as arguments here and as a query
+    // string over REST, parsed by one factory into one cache key. Declared
+    // explicitly because a resource that declares no GraphQL operations
+    // receives the default set, mutations on a read model included.
+    graphQlOperations: [
+        new QueryOperation(
+            provider: LinkReportProvider::class,
+            security: 'is_granted("ROLE_USER")',
+            // The report's parameters, declared again: API Platform's
+            // `parameters:` are a REST concept and do not become GraphQL
+            // arguments — measured, the schema exposed `id` alone, so a
+            // client could not have asked for a period and would have been
+            // answered with the default one silently. Same names, same rules,
+            // same cache key; `ReportParameters` reads them from the
+            // operation's arguments here and from the query string over REST.
+            args: [
+                'id' => ['type' => 'ID!'],
+                'from' => ['type' => 'String'],
+                'to' => ['type' => 'String'],
+                'includeBots' => ['type' => 'Boolean'],
+            ],
+        ),
+    ],
     operations: [
         new Get(
             uriTemplate: '/links/{id}/stats/devices',

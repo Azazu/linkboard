@@ -21,6 +21,18 @@ api_v1_docs:
         _format: null
         _api_respond: true
 
+# The versioned GraphQL entrypoint. API Platform registers its own route as
+# `/graphql`, which the `/api` import prefix publishes at `/api/graphql`; the
+# `route_prefix: /v1` default governs resource operations, not that static
+# route. So the versioned path is declared here on the same public controller,
+# exactly as `api_v1_docs` above declares `/api/v1` on the documentation one
+# (change stretch-graphql). POST only: this is the contract this repository
+# owns, and a GET here is 405.
+api_v1_graphql:
+    path: /api/v1/graphql
+    controller: api_platform.graphql.action.entrypoint
+    methods: [POST]
+
 when@test:
     # Throws on purpose so tests can assert the 500 problem-details shape
     # (tests/Api/ProblemDetailsTest). Never registered outside the test env.

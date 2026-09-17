@@ -15,6 +15,11 @@ use ApiPlatform\Metadata\Post;
  */
 #[ApiResource(
     shortName: 'Registration',
+    // Deliberately out of the GraphQL schema (change stretch-graphql): an
+    // empty list is the exclusion, because a resource that declares none
+    // receives the framework's default set — two queries AND the mutations
+    // that create, update and delete it.
+    graphQlOperations: [],
     operations: [
         new Post(
             uriTemplate: '/auth/register',

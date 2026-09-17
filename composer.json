@@ -11,6 +11,7 @@
         "ext-pdo_pgsql": "*",
         "ext-redis": "*",
         "api-platform/doctrine-orm": "*",
+        "api-platform/graphql": "^4.3",
         "api-platform/symfony": "*",
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/doctrine-migrations-bundle": "^4.0",

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Click\Handler;
 
 use App\Click\Message\ClickRecorded;
+use App\Click\Retention\ClickRetention;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Types\Types;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -23,6 +25,21 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * failed transport by Messenger's failure listener. Anything else propagates to
  * the retry strategy and, after the last retry, to `failed`. No entities: the
  * write path never hydrates (CQRS-lite).
+ *
+ * One guard runs before the insert, inside the same transaction: a click older
+ * than the retention boundary is acknowledged and discarded, exactly as one for
+ * a deleted link is. Without it, a redelivery whose month retention had dropped
+ * would hit a missing partition and be parked — against the promise that a
+ * redelivery is always acknowledged — and recreating that month to absorb it
+ * would destroy the only evidence the click was already counted (change
+ * stretch-partition-clicks, design decision 5b).
+ *
+ * The decision and the insert are one transaction holding a SHARED advisory
+ * lock, because they are otherwise two moments: a handler could decide a click
+ * is still recordable, pause, and insert after retention had dropped its month
+ * and a later run re-provisioned it — counting the same click twice in the
+ * link's lifetime counter (Gate 2 round 1, finding 2). Retention takes the same
+ * lock exclusively.
  */
 #[AsMessageHandler]
 final readonly class ClickRecordedHandler
@@ -30,13 +47,24 @@ final readonly class ClickRecordedHandler
     public function __construct(
         private Connection $connection,
         private LoggerInterface $logger,
+        private ClickRetention $retention,
+        private ClockInterface $clock,
     ) {
     }
 
     public function __invoke(ClickRecorded $message): void
     {
         try {
-            $this->connection->transactional(static function (Connection $connection) use ($message): void {
+            $discarded = $this->connection->transactional(function (Connection $connection) use ($message): bool {
+                // shared: many handlers run at once, but none of them runs
+                // while retention is dropping a month, so the decision below
+                // cannot be invalidated between here and the insert
+                $connection->executeStatement('SELECT pg_advisory_xact_lock_shared(?)', [ClickRetention::LOCK_KEY]);
+
+                if ($this->retention->isExpired($message->occurredAt, $this->clock->now())) {
+                    return true;
+                }
+
                 $connection->insert('clicks', [
                     'id' => $message->clickId,
                     'link_id' => $message->linkId,
@@ -55,11 +83,21 @@ final readonly class ClickRecordedHandler
                     'is_bot' => Types::BOOLEAN,
                 ]);
                 $connection->executeStatement('UPDATE links SET click_count = click_count + 1 WHERE id = :id', ['id' => $message->linkId]);
+
+                return false;
             });
         } catch (UniqueConstraintViolationException) {
             $this->logger->debug('Click message redelivered; the click is already recorded', ['click_id' => $message->clickId]);
+
+            return;
         } catch (ForeignKeyConstraintViolationException) {
             $this->logger->info('Click message discarded: the link no longer exists', ['link_id' => $message->linkId, 'click_id' => $message->clickId]);
+
+            return;
+        }
+
+        if (true === $discarded) {
+            $this->logger->info('Click message discarded: older than the retention boundary', ['link_id' => $message->linkId, 'click_id' => $message->clickId]);
         }
     }
 }

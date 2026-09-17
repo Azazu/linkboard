@@ -8,7 +8,6 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
 use App\Analytics\Report\GlobalReports;
 use App\Analytics\Report\ReportRequest;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * The three global reports (spec analytics "Global statistics for
@@ -36,10 +35,9 @@ final readonly class AdminStatsProvider implements ProviderInterface
      */
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): object
     {
-        $request = $context['request'] ?? null;
         $class = $operation->getClass() ?? throw new \LogicException('Report operations declare their class.');
-        $report = $this->requests->fromRequest(
-            $request instanceof Request ? $request : null,
+        $report = $this->requests->fromValues(
+            ReportParameters::fromContext($context),
             null,
             withGranularity: AdminTimeseriesReport::class === $class,
             withLimit: AdminTopLinksReport::class === $class,

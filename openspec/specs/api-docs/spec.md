@@ -28,7 +28,7 @@ The system SHALL serve an OpenAPI 3.1 document at `GET /api/docs.json` (`applica
 - **THEN** the response status is 200 with content type `text/html` and the page loads the OpenAPI document from `/api/docs.json`
 
 ### Requirement: JSON-only content negotiation
-The API SHALL accept and produce `application/json` (plus `application/problem+json` for errors) and SHALL NOT expose JSON-LD, Hydra, HAL or GraphQL endpoints. The one declared exception is the QR code operation `GET /api/v1/links/{id}/qr` (capability `qr-codes`), which produces `image/svg+xml` or `image/png` and, for its errors, `application/problem+json` like every other operation; the OpenAPI document SHALL list both image content types and the `format` parameter of that operation.
+The REST API SHALL accept and produce `application/json` (plus `application/problem+json` for errors) and SHALL NOT expose JSON-LD, Hydra or HAL representations. Two declared exceptions: the QR code operation `GET /api/v1/links/{id}/qr` (capability `qr-codes`), which produces `image/svg+xml` or `image/png` and, for its errors, `application/problem+json` like every other operation — the OpenAPI document SHALL list both image content types and the `format` parameter of that operation; and the GraphQL endpoint (capability `graphql-api`), which answers at `/api/v1/graphql` and at the framework's unversioned `/api/graphql`, in GraphQL's own response shape for everything its executor decides.
 
 #### Scenario: JSON-LD is not available
 - **WHEN** a client requests `GET /api/v1` with `Accept: application/ld+json`
@@ -36,11 +36,15 @@ The API SHALL accept and produce `application/json` (plus `application/problem+j
 
 #### Scenario: GraphQL endpoint is absent
 - **WHEN** a client requests `GET /api/graphql`
-- **THEN** the response status is 404
+- **THEN** the response is not this API's REST documentation and not a resource representation — the GraphQL entrypoint the framework registers lives there, as `/api/docs` does beside `/api/v1`, and the documented GraphQL path is the versioned `/api/v1/graphql`, which takes `POST` only
 
 #### Scenario: The QR operation is documented with its image types
 - **WHEN** a client requests `GET /api/docs.json`
 - **THEN** `paths` contains `/api/v1/links/{id}/qr` with a `get` operation whose 200 response lists `image/svg+xml` and `image/png` content and whose parameters include `format` in `query`
+
+#### Scenario: The REST document describes the REST API only
+- **WHEN** a client requests `GET /api/docs.json`
+- **THEN** the document describes every REST operation as before and names no GraphQL path, because the two protocols publish their shapes separately
 
 ### Requirement: Every operation documents the statuses it can answer
 The OpenAPI document SHALL declare, for each operation, every response status that operation can return: the success statuses it produces, and the failure statuses its firewall, its authorization, its validation, its rate limiter and its content negotiation can produce. An operation behind a firewall SHALL document 401; an operation the rate limiter covers SHALL document 429; an operation that refuses a request at a resource limit SHALL document 409. A status the operation cannot answer SHALL NOT be documented for it.

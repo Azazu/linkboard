@@ -58,6 +58,39 @@ X-RateLimit-Limit: 600
 X-RateLimit-Remaining: 0
 ```
 
+## GraphQL answers in two shapes, and the boundary is where the refusal happens
+
+The GraphQL endpoint (`/api/v1/graphql`, and the framework's `/api/graphql`
+beside it) does **not** answer every refusal in problem details, and that is a
+decision rather than an oversight. Three of them never reach the GraphQL
+executor at all — the firewall and the rate limiter run first, and they are the
+same firewall and the same limiter the REST API uses. Duplicating them for one
+endpoint would have been a worse cost than two shapes.
+
+| Refusal | Decided by | Shape |
+|---|---|---|
+| No credential, an invalid one, or a blocked account | the firewall | `application/problem+json`, 401 or 403 |
+| Over the per-identity budget | the rate limiter | `application/problem+json`, 429 |
+| A body or document that cannot be priced | the rate limiter | `application/problem+json`, 400 |
+| A voter refusing a resource | the GraphQL executor | 200 with `errors` |
+| A refused report parameter | the GraphQL executor | 200 with `errors` |
+| Depth or complexity exceeded | the GraphQL executor | 200 with `errors` |
+| An unexpected internal failure | the GraphQL executor | 200 with `errors`, message generic outside `dev` |
+
+A document that cannot be priced is one whose body is not a JSON object, whose
+`query` is not a string, whose `variables` is present and is not a JSON
+*object* (a list is not one, `[]` included; `{}` is), that does not parse, that
+carries no operation, that carries several without naming one, whose root
+fragments form a cycle, or that asks for more than 1000 reads — the ceiling
+above which the price is not computed at all, because a document nobody could
+pay for is not worth counting. Each is refused before a token is spent and
+before anything is resolved.
+
+A document that *can* be priced but asks for more reads than the whole rate-limit
+window holds is a 429 rather than a 400: it is a legible request for more than
+the budget can grant, and the `Retry-After` tells the caller when to ask for
+less.
+
 ## Keeping this file honest
 
 `tests/Api/ErrorCatalogueTest.php` enumerates the error types the application

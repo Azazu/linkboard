@@ -55,8 +55,27 @@ api_platform:
     # Not part of the specification; off to keep the surface minimal.
     mcp:
         enabled: false
+    # A read-only GraphQL surface over links, the nine reports and `me`
+    # (change stretch-graphql). Every resource declares its operations — the
+    # excluded three with an empty list — because a resource that declares
+    # none receives the default set, mutations included.
     graphql:
-        enabled: false
+        enabled: true
+        # The schema is published like the OpenAPI document is: a client that
+        # cannot discover it is worse off than one that can.
+        introspection:
+            enabled: true
+        # A development IDE mounted in production is a surface with no owner.
+        graphiql:
+            enabled: false
+        graphql_playground:
+            enabled: false
+        # Lowered from the framework's 20 and 500, chosen against what this
+        # schema can usefully express rather than against the default: the
+        # deepest legitimate query — a link's collection with a report — is far
+        # under ten.
+        max_query_depth: 10
+        max_query_complexity: 200
 
     # Uniform error type URIs; validation errors get their own resource
     # class when the first validated input arrives (add-link-crud).

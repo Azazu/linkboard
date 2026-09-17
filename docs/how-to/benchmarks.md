@@ -113,11 +113,19 @@ Seed a million clicks in `dev`, then measure prod-like:
 ```bash
 docker compose up -d php
 docker compose exec php bin/console app:demo:seed --clicks=1000000 --days=60 --reset
+docker compose exec php bin/console dbal:run-sql -- 'ANALYZE clicks'
 docker compose -f docker-compose.yml -f docker-compose.bench.yml up -d php
 docker compose exec php sh -c 'APP_ENV=prod APP_DEBUG=0 bin/console cache:warmup'
 docker compose exec php sh scripts/report-benchmark.sh \
     demo@example.com '<demo password>' admin@example.com '<admin password>'
 ```
+
+The `ANALYZE` is not decoration. `clicks` is partitioned by month, so the
+planner keeps statistics per partition, and a bulk load leaves them empty until
+autovacuum gets round to it — measured: the same benchmark run immediately after
+the seed reported the global top-links report at p95 **426.8 ms**, and 251.0 ms
+once the statistics existed. Loading a partition and measuring it in the same
+breath measures the planner's ignorance.
 
 The seed prints both passwords once; both accounts are needed, because the
 three global reports require `ROLE_ADMIN` and answer 403 for the owner account.
@@ -140,40 +148,55 @@ over its links and rounds each share up, and the figure is identical after
 every `--reset`. The link it selected holds 220 000 of them.
 
 ```
-link=01a0a92e-5be4-756f-8e24-f817ab4f10e6 (220000 clicks, the account's most-clicked)  period=2026-08-18T00:00:00Z..2026-09-17T00:00:00Z  samples=20  clicks in table=1020279
 report                  p50      p95      max
-link/summary         260.8   282.2   321.7
-link/timeseries      138.3   165.9   166.5
-link/countries       157.7   171.3   174.3
-link/devices         312.8   324.3   324.9
-link/referrers       165.8   194.8   199.2
-link/variants         50.0    56.4    58.5
-admin/summary         75.0    81.6    90.0
-admin/timeseries     186.6   192.2   200.6
-admin/top-links      281.0   299.2   323.3
+link/summary         251.7   269.1   277.5
+link/timeseries      134.9   167.2   172.5
+link/countries       157.8   171.7   179.2
+link/devices         303.9   316.8   331.6
+link/referrers       166.0   171.8   172.3
+link/variants         48.5    63.5    63.6
+admin/summary         74.3    80.1    83.0
+admin/timeseries     158.2   171.2   185.9
+admin/top-links      277.4   300.0   303.8
 ```
 
-**Eight of the nine meet the target. `link/devices` does not:** p95 324.3 ms
-against 300 ms. Running the same command again gives 325.3 ms, and a run before
-it 339.8 ms, so the miss is consistent rather than noise — it is the report that
-groups a single link's 220 000 clicks by device *and* by operating system over
-the period, the heaviest of the per-link reports.
+**Eight of the nine meet the target. `link/devices` does not:** p95 316.8 ms
+against 300 ms. It is the report that groups a single link's 220 000 clicks by
+device *and* by operating system over the period, the heaviest of the per-link
+reports, and it missed before the table was partitioned too (324.3 ms).
 
-`admin/top-links` sits on the line: 299.2 ms here, 294.8 ms and 298.1 ms in the
-other two runs. It is published as met, with the number, because that is what it
-measured — and it is the one to watch, since it ranks every link in the service
-by clicks in the period, so it grows with the service rather than with a link.
+`admin/top-links` sits on the line at 300.0 ms and is the noisy one: three runs
+of the same command gave 426.8 ms (unanalyzed), 251.0 ms and 300.0 ms. It ranks
+every link in the service by clicks in the period, so it is the report that
+grows with the service rather than with a link.
 
-What to do about either is a separate decision with its own evidence: the
-specification already names the `click_daily` aggregate as the answer if report
-latency fails its target (stretch, section 9). Nothing here was tuned to make a
-number look better.
+### What partitioning did to these numbers, measured rather than assumed
 
-Two defects of this recipe are worth naming, because the numbers moved when
-they were fixed: the commands published before it could not be executed at all,
-and the script then selected the *last* link in the collection rather than the
-most-clicked one — so the per-link reports had been timed against a link with
-almost no clicks.
+Very little, and the reason is worth stating. The table was partitioned by month
+for **storage** — so that retention can drop a month instead of rewriting the
+table ([ADR-006](../adr/ADR-006-clicks-partitioning-and-retention.md)) — and
+partition pruning only pays when the table holds much more history than the
+period being read. Here the whole dataset is 60 days: of seventeen partitions
+only three hold rows, and a 30-day period touches two of them. There was almost
+nothing to prune.
+
+| report | before partitioning | after |
+|---|---|---|
+| link/summary | 282.2 | 269.1 |
+| link/timeseries | 165.9 | 167.2 |
+| link/countries | 171.3 | 171.7 |
+| link/devices | **324.3** | **316.8** |
+| link/referrers | 194.8 | 171.8 |
+| link/variants | 56.4 | 63.5 |
+| admin/summary | 81.6 | 80.1 |
+| admin/timeseries | 192.2 | 171.2 |
+| admin/top-links | 299.2 | 300.0 |
+
+No report improved beyond its own run-to-run spread, and the one that missed
+still misses. The answer to report latency is the one the specification already
+named and this plan deliberately left out: the `click_daily` aggregate
+(stretch, section 9). Nothing here was tuned to make a number look better, and
+nothing here is claimed to have made one better.
 
 ## 3. Worker throughput (NFR-PERF-3, target ≥ 500 clicks/s, 10 000 in ≤ 20 s)
 

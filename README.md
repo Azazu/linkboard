@@ -21,6 +21,7 @@ UI over the same services and the same security voters.
 | **Routing rules as validated JSONB** — device, country and language matching in an explicit order, plus deterministic A/B without cookies | [`src/Link/Rules/`](src/Link/Rules), [ADR-003](docs/adr/ADR-003-deterministic-ab-bucket.md) |
 | **Two firewalls, one authorization model** — session login for the pages, JWT and hashed API keys for the API, the same voters behind both | [`src/Auth/`](src/Auth), [ADR-005](docs/adr/ADR-005-pages-answer-404.md) |
 | **An OpenAPI document that is checked, not decorated** — every operation declares the statuses it can answer, and contract tests compare the document with real responses | [`tests/Api/Contract/`](tests/Api/Contract), [`docs/reference/api-errors.md`](docs/reference/api-errors.md) |
+| **A second protocol that keeps the first one's rules** — a read-only GraphQL surface over links, the reports and `me`: the same voters, a cost model that charges per root selection rather than per request, and an exclusion that is an explicit empty list because silence would have published mutations | [`docs/how-to/graphql.md`](docs/how-to/graphql.md), [`tests/Api/GraphQl/`](tests/Api/GraphQl) |
 | **A web UI that works without JavaScript** — including the routing-rules editor; charts are an enhancement over tables that are always there | [`src/Web/`](src/Web), [`templates/`](templates) |
 | **An AI-assisted workflow with independent review** — every change proposed, reviewed at risk-tiered gates by a second agent, and archived with its record | [AGENTS.md](AGENTS.md), [`openspec/changes/archive/`](openspec/changes/archive) |
 
@@ -58,15 +59,17 @@ enforced.
 | Target | Measured | |
 |---|---|---|
 | Redirect p95 ≤ 50 ms server time | **p50 20.4 ms, p95 23.0 ms** | met |
-| Report p95 ≤ 300 ms uncached on 1 M clicks | **8 of 9 reports, p95 56–299 ms** | met |
-| — a link's device breakdown | **p95 324 ms** | missed |
+| Report p95 ≤ 300 ms uncached on 1 M clicks | **8 of 9 reports, p95 64–300 ms** | met |
+| — a link's device breakdown | **p95 317 ms** | missed |
 | Worker ≥ 500 clicks/s | **10 000 messages in 11.65 s → 858/s** | met |
 
 [`docs/how-to/benchmarks.md`](docs/how-to/benchmarks.md) carries the commands,
 the machine and the full distributions — including what the redirect's numbers
 look like when the PHP-FPM pool, rather than the application, is the
-bottleneck, and which report sits within five milliseconds of its target. All
-three runs are prod-like. One target is missed and is published as missed.
+bottleneck, which report sits on its target exactly, and what monthly
+partitioning did to these numbers: nothing beyond their own run-to-run spread,
+because a 60-day dataset has almost nothing to prune. All three runs are
+prod-like. One target is missed and is published as missed.
 
 ## Security notes
 

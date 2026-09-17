@@ -12,7 +12,6 @@ use App\Link\Api\PublicUrl;
 use App\Link\LinkRepositoryInterface;
 use App\Link\Security\LinkVoter;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Uid\Uuid;
@@ -56,10 +55,9 @@ final readonly class LinkReportProvider implements ProviderInterface
             throw new AccessDeniedException('Only the owner or an admin may view a link\'s reports.');
         }
 
-        $request = $context['request'] ?? null;
         $class = $operation->getClass() ?? throw new \LogicException('Report operations declare their class.');
-        $report = $this->requests->fromRequest(
-            $request instanceof Request ? $request : null,
+        $report = $this->requests->fromValues(
+            ReportParameters::fromContext($context),
             $link->getId(),
             withGranularity: LinkTimeseriesReport::class === $class,
             withLimit: \in_array($class, [LinkCountriesReport::class, LinkReferrersReport::class], true),

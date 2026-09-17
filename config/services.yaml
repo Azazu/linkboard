@@ -19,6 +19,12 @@ parameters:
     # Anchored, without delimiters; each reader wraps them as it needs.
     app.api.path.auth: '^/api/v1/auth/'
     app.api.path.docs: '^/api/docs'
+    # Both GraphQL entrypoints: the one this repository declares and the one
+    # API Platform registers. A path that is rate-limited differently from its
+    # alias is the bug naming them together prevents (change stretch-graphql).
+    app.api.graphql_paths:
+        - '^/api/v1/graphql$'
+        - '^/api/graphql$'
     app.api.path.base: '^/api/v1$'
     # The json_login check path of the api firewall: the one public operation
     # that authenticates, so the one that answers 401 without a firewall
@@ -75,6 +81,12 @@ services:
     # (design decision 8); the chain itself is a startup check.
     App\Redirect\Geo\CountryResolverInterface: '@App\Redirect\Geo\ChainCountryResolver'
 
+    # The retention policy validates its two settings on every boot: a window
+    # the application cannot parse must stop it starting, not reach the click
+    # handler (change stretch-partition-clicks).
+    App\Click\Retention\ClickRetention:
+        tags: ['app.startup_check']
+
     # Run from App\Kernel::boot() on every boot, hence public: constructs the
     # tagged app.startup_check services so a misconfiguration fails before
     # anything is served.
@@ -107,6 +119,11 @@ when@test:
         # Throws on an armed SQL needle so a test can fail a multi-statement
         # transaction at a chosen point (the demo seed's rollback guarantee)
         App\Tests\Fixture\FailingStatement:
+            tags: ['doctrine.middleware']
+        # Runs a callback on an armed SQL needle so a test can stop the world
+        # between the click handler's eligibility decision and its insert, and
+        # run the real maintenance command there (stretch-partition-clicks)
+        App\Tests\Fixture\InterruptingStatement:
             tags: ['doctrine.middleware']
         # Fixed IP→country map for the test suite (COUNTRY_RESOLVERS=fixed)
         App\Tests\Fixture\FixedMapCountryResolver:
