@@ -32,16 +32,22 @@ The API SHALL serve GraphQL at `/api/v1/graphql`, accepting **`POST` only** with
 - **WHEN** a client posts a valid query to any path other than those two
 - **THEN** the response status is 404
 
-### Requirement: The schema exposes only the declared resources
-The schema SHALL contain types for links, the nine analytics reports and the current user, and SHALL NOT contain types or queries for user administration, registration or API keys. A resource that is not declared for GraphQL SHALL NOT appear in the schema merely because it is an API resource.
+### Requirement: Every API resource declares what it exposes to GraphQL
+The schema SHALL contain types for links, the nine analytics reports and the current user, and SHALL NOT contain types or queries for user administration, registration or API keys.
+
+Exclusion SHALL be **explicit**: a resource that is meant to stay out of the schema SHALL declare an empty GraphQL operation list. Silence is not exclusion — a resource that declares no GraphQL operations receives the framework's default set, which includes the mutations that create, update and delete it. Every API resource SHALL therefore carry a declaration, and the check that the schema holds only what is intended SHALL be automatic rather than a matter of review.
 
 #### Scenario: The excluded resources are absent
 - **WHEN** a client introspects the schema
 - **THEN** it contains no type or query whose name derives from user administration, registration or API keys
 
-#### Scenario: A newly added API resource is not exposed by accident
-- **WHEN** a resource class carries an API resource declaration without a GraphQL operation
-- **THEN** it does not appear in the GraphQL schema
+#### Scenario: An undeclared resource is caught, because silence would expose it
+- **WHEN** a resource class carries an API resource declaration and no GraphQL operation list
+- **THEN** it appears in the schema with the framework's default operations, mutations included, and the automatic check fails naming that type — so the resource cannot reach production undeclared
+
+#### Scenario: An explicitly excluded resource stays out
+- **WHEN** a resource class declares an empty GraphQL operation list
+- **THEN** neither a query nor a mutation for it appears in the schema
 
 ### Requirement: Authorization is the same as the REST API's
 Every GraphQL query SHALL require the same credential and SHALL be subject to the same voters as the REST operation serving the same data. A caller SHALL NOT be able to read through GraphQL anything the REST API would refuse them, and the refusal SHALL NOT reveal whether the resource exists where the REST API would not.
