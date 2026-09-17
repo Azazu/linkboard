@@ -56,3 +56,22 @@
 | 7 | confirmed |
 | 8 | confirmed |
 | 9 | confirmed |
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** 7ca512838966380e437d4eac758fcc33d85a2555
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed |
+| 2 | confirmed |
+| 3 | confirmed |
+| 4 | changes-requested — The partial-pair repair path is now specified, but the artifacts also require atomic publication without defining an operation that can provide it. `design.md` and task 2.2 say the two generated files are moved into their final location once both exist; two file moves are still separate operations, so a crash between them exposes exactly the partial final state the new requirement says SHALL never become visible. The task's verification starts with a pre-existing lone `private.pem`, which exercises restart repair but does not interrupt the proposed publication step. Either specify a genuinely atomic directory/symlink switch and verify interruption at that switch, or state the actual safety mechanism consistently — dependants remain stopped after a partial move and the next init removes and regenerates the pair — and verify an interruption between the two final moves followed by a successful repair before dependants start. |
+| 5 | changes-requested — The authoritative interpolation source is now specified, but task 2.4 still runs the production-stack check as `docker compose exec php ...` without `--env-file .env.local` or the production compose files. That contradicts design decision 6 and task 3.9's claim that every production invocation uses the single documented form; indeed, the exact `rg` verification in 3.9 will report this line. Use the documented production invocation for this check as well (and keep the planned repository-wide assertion), so the command targets the same rendered stack and credentials it is meant to verify. |
+| 6 | confirmed |
+| 7 | confirmed |
+| 8 | confirmed |
+| 9 | confirmed |
