@@ -249,7 +249,8 @@ No materialized views in the core stages; a `click_daily` aggregate is listed as
 
 ## 4. API
 
-- Base path `/api/v1`; all API Platform resources are registered under it. `/api/docs` (Swagger UI) and `/api/docs.json` (OpenAPI 3.1) are generated. JSON only (`application/json` request, `application/json` and `application/problem+json` responses); JSON-LD/Hydra and GraphQL are disabled (GraphQL is stretch).
+- Base path `/api/v1`; all API Platform resources are registered under it. `/api/docs` (Swagger UI) and `/api/docs.json` (OpenAPI 3.1) are generated. JSON only (`application/json` request, `application/json` and `application/problem+json` responses); JSON-LD and Hydra are disabled.
+- **GraphQL** is served, read-only, at `/api/v1/graphql` — `POST` only, with the framework's unversioned `/api/graphql` beside it as `/api/docs` sits beside `/api/v1` (change `stretch-graphql`, capability `graphql-api`). The schema exposes queries for links, the nine analytics reports and the current user, and **no mutation at all**; administration, registration and API keys are excluded by an explicit empty operation list on each, because a resource that declares none receives the framework's default set with three mutations. The same firewall and the same voters apply, a document costs one token of the per-identity budget per root selection, and depth and complexity are capped at 10 and 200.
 - Errors: RFC 9457 problem details for every non-2xx, including 404/405/429 and framework exceptions; validation errors are 422 with a `violations[]` array of `{propertyPath, message, code}`; no stack traces outside `APP_ENV=dev`.
 - Pagination: page-based (`page`, `itemsPerPage` ≤ 100), response carries `totalItems`, `page`, `itemsPerPage`, `items`.
 - Authentication as in FR-AUTH-3. Anonymous access only to `/api/v1/auth/*` and the docs.
@@ -303,7 +304,7 @@ Anti-overengineering rule (`openspec/config.yaml`): every component below names 
 | PHPStan (level 9, `phpstan-symfony`, `phpstan-doctrine`), PHP-CS-Fixer (`@Symfony`, `@Symfony:risky`) | static analysis and style | project premise |
 | Docker Compose (php-fpm, nginx, postgres, redis, worker), GitHub Actions | local environment, CI | project premise |
 
-Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encore/Node), a frontend framework, GraphQL (stretch), Sentry or any SaaS.
+Explicitly not used: RabbitMQ, Elasticsearch, a JS build pipeline (Webpack Encore/Node), a frontend framework, Sentry or any SaaS.
 
 ---
 
@@ -440,7 +441,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 Taken only after stages 1–4 are archived, each as its own change:
 
 - ~~**Monthly partitioning and retention of `clicks`**~~ — done in `stretch-partition-clicks` ([ADR-006](../adr/ADR-006-clicks-partitioning-and-retention.md)): monthly range partitions on `occurred_at`, a 13-month window enforced only by `app:clicks:partitions --retention`, and the effect on unique-visitor counts stated where the numbers are defined.
-- **GraphQL** through API Platform, reusing voters and rate limits.
+- ~~**GraphQL** through API Platform, reusing voters and rate limits.~~ — done in `stretch-graphql`: a read-only surface over links, the reports and `me`, with the voters carried over, a per-root-selection cost model and declared depth and complexity ceilings.
 - **Public hosting** of a demo instance (HTTPS, seeded data, reset job).
 - **`click_daily` aggregate** (materialized view or table refreshed by the worker) if report latency on large fixtures warrants it.
 - **Link-page metadata** (title, favicon of the target fetched asynchronously by the worker) — only with an explicit SSRF-safe fetcher design.
@@ -458,7 +459,7 @@ Fixed for the portfolio scope; each would be a separate specification change:
 - Per-rule A/B variants, scheduled rules, weighted geo fallbacks, IP allow/deny lists.
 - Real-time (WebSocket/Mercure) dashboards; exports (CSV) — the API is the export.
 - Browser extensions, mobile apps, a JavaScript SPA.
-- Multi-region deployment, click retention policy in the core stages (stretch), GraphQL in the core stages (stretch).
+- Multi-region deployment, click retention policy in the core stages (stretch), GraphQL in the core stages (stretch — delivered as row 15, outside them).
 - Any naming of the author's employer or its internal systems anywhere in the repository.
 
 ---
@@ -485,5 +486,5 @@ Fixed for the portfolio scope; each would be a separate specification change:
 | D16 retention is stretch | §3.4, §9, §7 change 14 |
 | D17 rate limits | §2.8 FR-KEY-4, §2.1 FR-AUTH-4, §2.4 FR-RED-6 |
 | D18 QR SVG/PNG, owner-only | §2.7 FR-QR-1 |
-| D19 GraphQL stretch | §4, §9, §7 change 15 |
+| D19 GraphQL stretch — delivered as row 15, read-only | §4, §9, §7 change 15 |
 | D20 Docker + CI in scope, hosting stretch | §6.7 NFR-DOC-3, §9, §7 change 16 |

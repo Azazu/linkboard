@@ -58,6 +58,31 @@ X-RateLimit-Limit: 600
 X-RateLimit-Remaining: 0
 ```
 
+## GraphQL answers in two shapes, and the boundary is where the refusal happens
+
+The GraphQL endpoint (`/api/v1/graphql`, and the framework's `/api/graphql`
+beside it) does **not** answer every refusal in problem details, and that is a
+decision rather than an oversight. Three of them never reach the GraphQL
+executor at all — the firewall and the rate limiter run first, and they are the
+same firewall and the same limiter the REST API uses. Duplicating them for one
+endpoint would have been a worse cost than two shapes.
+
+| Refusal | Decided by | Shape |
+|---|---|---|
+| No credential, an invalid one, or a blocked account | the firewall | `application/problem+json`, 401 or 403 |
+| Over the per-identity budget | the rate limiter | `application/problem+json`, 429 |
+| A body or document that cannot be priced | the rate limiter | `application/problem+json`, 400 |
+| A voter refusing a resource | the GraphQL executor | 200 with `errors` |
+| A refused report parameter | the GraphQL executor | 200 with `errors` |
+| Depth or complexity exceeded | the GraphQL executor | 200 with `errors` |
+| An unexpected internal failure | the GraphQL executor | 200 with `errors`, message generic outside `dev` |
+
+A document that cannot be priced is one whose body is not a JSON object, whose
+`query` is not a string, whose `variables` is not an object, that does not
+parse, that carries no operation, that carries several without naming one, or
+whose root fragments form a cycle. Each is refused before a token is spent and
+before anything is resolved.
+
 ## Keeping this file honest
 
 `tests/Api/ErrorCatalogueTest.php` enumerates the error types the application

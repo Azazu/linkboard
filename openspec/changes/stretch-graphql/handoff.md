@@ -1,7 +1,7 @@
 # Handoff — stretch-graphql
 
 **Updated:** 2026-09-17 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/stretch-graphql
 
 ## Done this session
@@ -37,8 +37,18 @@
 - Gate 1 Confirmation 3 (`a12e840`, Reviewed-Commit `90b77ec`): **confirmed — Gate 1 passed.** All four closed.
 - **The lesson this change cost three confirmations to learn**, recorded because it is the same defect AGENTS.md already names: I fixed each mechanism correctly and then left the superseded claim standing somewhere else — in the design's context paragraph, in the proposal's impact list, in the handoff, and finally in the capability spec. The sweep has to include the artifact that becomes the living requirement, first rather than last.
 
+- **Implemented after the gate, in the task order.** The schema is `link`, `links`, `me`, the six per-link reports and the three global ones, plus the framework's `node` — and no mutation type at all.
+- **Gate 1's first finding was confirmed by the machine, not by argument**: with the nine report classes still undeclared, `api:graphql:export` carried `createAdminSummaryReport`, `updateAdminSummaryReport` and `deleteAdminSummaryReport` — mutations on read models. Declaring all fourteen (eleven with queries, three with an empty list) removed the mutation type entirely.
+- **Two things the design had not foreseen, both found by measuring:**
+  1. API Platform's `parameters:` are a REST concept and **do not become GraphQL arguments**. The schema exposed `id` alone, so no client could have asked for a period. Each report now declares its own `args`. The failing input is vivid: with `ReportParameters` not reading them, a query for 14–17 September answers `clicksInPeriod=42, from=2026-08-19` — the default period, 200, no hint to the caller.
+  2. `Me` is a singleton whose provider ignores the identifier, so an item query demanded an `id` that changes nothing and invited a client to send somebody else's. It has a resolver now and takes no arguments.
+- **A latent fault of my own, surfaced by a mutation**: `GraphQlCost::isAllIntrospection()` walked fragments with no cycle guard, protected only by `count()` running first and throwing. Removing fragment expansion exhausted 512 MB instead of failing an assertion. It carries its own guard now — a defence that depends on the order two private methods are called in is not a defence.
+- **A requirement of mine was wrong and is corrected**: I had given GraphQL the *pages'* property of answering alike to "not yours" and "does not exist", but ADR-005 keeps 403 for the API deliberately. GraphQL mirrors the API, so it distinguishes them, and the capability says why.
+- **Measured, both environments**: in `dev` a depth refusal carries `extensions.file` naming a vendor path; in `prod` the same request answers with the message alone. The test asserts the absence of `/app/`, `vendor/`, `.php`, `SELECT ` and `App\`.
+- **The cost model in the wild**: one root selection leaves 599 of 600, three aliases leave 596, introspection alone leaves 595, a malformed body is 400 before a token is spent. Twenty-three unit cases pin the algorithm; three mutations (operation selection, fragment expansion, the cycle guard) each turn it red.
+
 ## Next step
-`/opsx:apply stretch-graphql`. Section order is the task order: the dependency and the endpoint, the parameter refactor whose guard is that the REST suites do not change, the declared surface, authorization, the cost model with its algorithm, the error boundary, the documents. `make check` green at each commit.
+The user pushes the branch; the executor records the green Actions run on the new head (four jobs) and then requests Gate 2 per the lifecycle section of `tasks.md`.
 
 ## Blockers
 None.
