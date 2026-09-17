@@ -155,10 +155,10 @@ two files, or a pair whose public key is not the one derived from its private
 key, is removed and regenerated rather than trusted (Gate 1 confirmation 3,
 finding 4).
 
-*What that does not guarantee.* Two *stacks* started against one volume — two
-`docker compose up` runs racing on the same host — are outside this: compose
-serialises the services of one project, not two projects. The deploy document
-says the stack is started once. And a keypair that is complete and self-
+*What that does not guarantee.* Two production *stacks* brought up against one
+volume, racing on the same host, are outside this: compose serialises the
+services of one project, not two projects. The deploy document says the stack is
+started once. And a keypair that is complete and self-
 consistent but *older* than the tokens in flight is indistinguishable from the
 right one; that is what keeping the volume is for.
 
@@ -376,9 +376,12 @@ item delivered in `docs/explanation/requirements.md` §9.
 
 Nothing to migrate: the change adds files and settings whose defaults reproduce
 current behaviour. The deploy document is the forward path; the rollback for the
-demo instance is `docker compose down` plus the host, since it holds no data that
-the seed does not regenerate — except the JWT volume, whose loss only means
-re-issuing tokens.
+demo instance is the documented invocation's own teardown —
+`docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.prod.yml down` —
+plus the host, since it holds no data that the seed does not regenerate, except
+the JWT volume, whose loss only means re-issuing tokens. The flag matters for a
+teardown exactly as it does for a start: without it compose resolves a different
+project and interpolation source from the one that was brought up (decision 6).
 
 ## Open Questions
 

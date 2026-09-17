@@ -57,8 +57,16 @@ Record `d8a0cc8`, Reviewed-Commit `7ca5128`. Seven confirmed again; 4 and 5 stil
 - **4 — I claimed atomicity I had not built.** Moving two files is two operations, so "published atomically" was false however the writes were staged; a symlink switch could provide it and buys nothing here. The artifacts now state the guarantee the stack really gives: a run that dies leaves the init service non-zero, so `service_completed_successfully` is false and **no dependant starts** — the partial state exists on disk and nothing serves with it — and the next run discards and regenerates it before anything starts. The verification interrupts **between the two final moves** and records four states: init non-zero, the three services not started, the partial pair gone, a matching pair in place before the dependants come up.
 - **5 — the rule I had just written caught me.** Task 2.4's key check ran `docker compose exec php …` with neither `--env-file` nor the production compose files, which is exactly what the repository-wide assertion in 3.9 would have reported. Fixed, and the sweep now says explicitly that it covers invocations that only `exec` into a running container.
 
+## Gate 1 Confirmation 4 — both findings were my own stale claims, again
+Record `cf94a73`, Reviewed-Commit `7bcd4fd`. Seven confirmed; 4 and 5 open only because I had fixed the design and the capability and left the *older* wording standing elsewhere — the exact defect AGENTS.md's "fix the CLAIM, not the line" rule names, and the fourth time this project has caught me at it.
+
+- **4** — `proposal.md` still said provisioning "moves to the entrypoint" one bullet before saying the init service is the only writer, and still said the pair is published by moving both files "at once". Both reconciled with what the design and the capability now say: two moves are two operations, nothing claims atomicity, and the guarantee is that a dead run leaves init non-zero so nothing starts and the next run repairs.
+- **5** — `design.md`'s Migration Plan gave the rollback as a bare `docker compose down`, against decision 6's own rule that every production invocation carries `--env-file .env.local` and both compose files. A teardown that resolves a different project and interpolation source from the start is the same bug in the other direction.
+
+This time the sweep was done across the whole change directory rather than at the two lines the reviewer named, and the repository-wide assertion in task 3.9 exists precisely so the next occurrence is caught mechanically.
+
 ## Next step
-Gate 1 confirmation 4: `scripts/gate-run.sh stretch-public-hosting 1 confirm 1`.
+Gate 1 confirmation 5: `scripts/gate-run.sh stretch-public-hosting 1 confirm 1`.
 
 ## Blockers
 None. `main` merged into this branch on 2026-09-17 (rows 14 and 15 landed), so the branch contains current `main`.

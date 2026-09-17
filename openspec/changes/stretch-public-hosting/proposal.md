@@ -29,9 +29,11 @@ visible action.
   Warming the cache, compiling the asset map and generating the JWT keypair are
   all kernel boots, and the boot is where the new setting check lives — so doing
   them at build time would mean handing the build real secrets or exempting the
-  build from the check. They move to the entrypoint, which runs after the
-  settings have been accepted. The build therefore requires no secret by
-  construction and bakes no placeholder.
+  build from the check. They move to container start, after the settings have
+  been accepted — the shared artefacts to a one-shot init service the other
+  containers wait for (next bullet), and each container's own private cache warm
+  to its entrypoint. The build therefore requires no secret by construction and
+  bakes no placeholder.
 - **Two named volumes carry what the image deliberately does not, and one
   service writes them.** The compiled assets, served directly by the proxy —
   PHP-FPM cannot serve static files and the proxy has no copy of the application.
@@ -41,9 +43,13 @@ visible action.
   service** the other containers wait for, because generating a keypair is not
   atomic and three containers starting together on a clean host could otherwise
   leave one run's private key beside another's public key. One writer is not
-  enough on its own: the pair is published by moving both files into place at
-  once, and a run first repairs a half-written or mismatched pair rather than
-  accepting it, because the generator treats either file's presence as success.
+  enough on its own, and writing two files is two operations however they are
+  staged — so nothing here claims an atomic publication. The guarantee is the
+  ordering: a run that dies leaves the init service non-zero, so no dependant
+  starts and nothing serves with a half-written pair, and the next run discards
+  and regenerates a partial or mismatched one rather than accepting it — the
+  generator treats either file's presence as success, so it cannot be trusted to
+  notice.
 - **A production compose profile** (`docker-compose.prod.yml`): Caddy terminating
   TLS, the application, the Messenger worker as a supervised service, a scheduler
   for the periodic commands, Postgres and Redis. The development stack is
@@ -115,10 +121,10 @@ visible action.
 
 ## Impact
 
-- **New**: a production stage in `.docker/php/Dockerfile`, a `.dockerignore`, an
-  entrypoint, a Caddy configuration, `docker-compose.prod.yml`, a startup check
-  for the required settings, a registration listener, `docs/how-to/deploy.md`, an
-  ADR, a CI job.
+- **New**: a production stage in `.docker/php/Dockerfile`, a `.dockerignore`, a
+  one-shot init service and a container entrypoint, a Caddy configuration,
+  `docker-compose.prod.yml`, a startup check for the required settings, a
+  registration listener, `docs/how-to/deploy.md`, an ADR, a CI job.
 - **Changed**: `.env` gains the new settings with development defaults;
   `framework.yaml` for the proxy; `DemoSeedCommand` (environment guard, lock,
   password source); the sign-in template; README; `openspec/ROADMAP.md`.
