@@ -1,7 +1,7 @@
 # Handoff — stretch-graphql
 
 **Updated:** 2026-09-17 · claude
-**State:** fixing-g2
+**State:** ready-to-merge
 **Branch:** change/stretch-graphql
 
 ## Done this session
@@ -66,8 +66,12 @@
 - The pattern in all three: I fixed the instance the finding named and left the claim's other half — one more walk, one more shape of the same value, one more branch of the same refusal. Same class as the Gate 1 sweeps, one level down.
 - `make check` green after these fixes: **1015 tests, 22 916 assertions**. `openspec validate stretch-graphql --strict` passes.
 
+- Branch run on `6bec8d6` green: run 35218496115, all four jobs.
+- Gate 2 Confirmation 2 (`2567315`, Reviewed-Commit `6bec8d6`): **confirmed — Gate 2 passed.** All five closed.
+- Cost of the round, recorded because it was paid on the user's machine and not only in tokens: demonstrating finding 1 meant running the unguarded 40-fragment document, which is 2^40 traversals. It was wrapped in `timeout 300`, but `timeout` kills the `docker compose exec` client and not the PHP process inside the container, so the process outlived it and pegged a core until the machine was rebooted. A mutation that by construction does not terminate is run **inside** the container's own `timeout`, and at a size where the unguarded case finishes in seconds (26 fragments, not 40).
+
 ## Next step
-Push `change/stretch-graphql`, verify the Actions run on the exact head, then `scripts/gate-run.sh stretch-graphql 2 confirm 2`.
+`/git:merge stretch-graphql` (the user's call), then `/opsx:archive stretch-graphql` — `graphql-api` is a new capability, `api-docs` a modified one, and roadmap row 15 comes out.
 
 ## Blockers
 None.
