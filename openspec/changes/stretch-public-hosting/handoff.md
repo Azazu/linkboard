@@ -1,7 +1,7 @@
 # Handoff — stretch-public-hosting
 
 **Updated:** 2026-09-17 · claude
-**State:** awaiting-gate-1
+**State:** fixing-g1
 **Branch:** change/stretch-public-hosting
 
 ## Done this session
@@ -26,8 +26,21 @@
 - **The rate limits are already specified as configurable with defaults**, so the public instance's values are configuration and need no delta. What does need one is the **trusted proxy**: two capabilities require the per-IP limits to count the client, and the shipped `TRUSTED_PROXIES=127.0.0.1` behind Caddy would collapse every visitor into one bucket. Task 7.3 measures that failure deliberately.
 - **Registration has two entry points** — a Twig controller and an API Platform `Post`. Both a routing `condition` (Symfony resolves `routing.condition_service` functions; API Platform's `HttpOperation` carries `condition`) and a per-surface check were considered and rejected for one listener, because "one rule, two implementations" is the defect class this repository has already paid for twice.
 
+## Gate 1 round 1 — nine findings, four blockers, all nine real
+Record `4e14959`, Reviewed-Commit `e516e99`. Three of the blockers were contradictions I had written into the artifacts and could have caught by reading my own two guarantees side by side.
+
+1. **blocker — the scheduled reload would invalidate the published demo credentials.** `app:demo:seed` generates a fresh random password per run and prints it to the operator's console, so the first reload orphans whatever a visitor was given, and the README deliberately carries nothing. Fixed in three places: the password comes from a **setting of the instance** so it survives a re-seed, the demo instance publishes it on **its own sign-in page** (so it stays out of the repository entirely), and the capability carries a scenario for signing in *after* a reload.
+2. **blocker — "the build needs no secret" and "a missing setting stops the boot" met at cache warm.** `cache:warmup` and `asset-map:compile` are console commands, so both boot the kernel, and `StartupChecks` runs on **every** boot. The only ways to keep a build-time warm are to hand the build real secrets or to exempt it — a log leak or a bypass. So **the build boots nothing**: it installs and copies, and the entrypoint warms, compiles and generates keys at container start, after the settings have been accepted. The failing input is adding `cache:warmup` back to the stage and watching the build fail.
+3. **blocker — nothing carried the compiled assets to the proxy.** PHP-FPM cannot serve static files and Caddy has no copy of the application, so the web UI would have rendered unstyled. A named volume, written by the application at start and mounted read-only by the proxy; a task fetches an asset through HTTPS and asserts every asset the dashboard references answers 200.
+4. **blocker — a clean host has no JWT keypair.** `config/jwt/` is gitignored, so the image cannot carry one and `JWT_PASSPHRASE` alone signs nothing. The entrypoint generates it only when absent, into a volume that outlives a container — otherwise every replacement would invalidate every token in the wild. Verified on a clean stack by issuing a token and by using a pre-restart token after a forced recreate.
+5. **major — "the database and Redis credentials" was not a specification.** Postgres is reached through `DATABASE_URL` and Redis through **three** independent settings (`REDIS_URL`, `LOCK_DSN`, `MESSENGER_TRANSPORT_DSN`). The set is now enumerated by consumer, and the test boots once per setting so that adding one without a case fails a count assertion.
+6. **major — the applicability table's "concurrent writers: n/a" was factually false.** `app:demo:seed` takes no lock, and a slow scheduled reload would meet the next one deleting the accounts it is recreating. The command takes a non-blocking lock, and the capability has a scenario for the second run being refused rather than queued.
+7. **major — the scope contradicted itself about the demo URL.** The change cannot produce a link nobody can visit while also declaring nothing is deployed. Roadmap row 16 is therefore **split**: row 16 is the deployment configuration this change delivers, a new row records publishing the instance and adding its link — the user's step — and §9 is not marked delivered here.
+8. **major — the documented build command could not run.** A `.docker/php` context cannot reach the application it must copy. One exact command from the repository root with `-f`, plus a `.dockerignore` that this change now owns.
+9. **major — the CI evidence required me to push.** An agent may not, so "the job appears green" is not evidence I can produce. Replaced with the local reproducible form (break the stage, run the documented command, record the failure, restore) plus the assertion that the job's step is byte-identical to the documented command, so the two cannot drift.
+
 ## Next step
-Gate 1: `scripts/gate-run.sh stretch-public-hosting 1 full` — tier `high`, so the artifacts are reviewed before any implementation.
+Gate 1 confirmation: `scripts/gate-run.sh stretch-public-hosting 1 confirm 1`.
 
 ## Blockers
 None. `main` merged into this branch on 2026-09-17 (rows 14 and 15 landed), so the branch contains current `main`.
