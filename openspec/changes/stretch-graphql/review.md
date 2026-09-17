@@ -86,3 +86,18 @@
 | 3 | changes-requested — The new test with a three-token document and a two-token whole window covers `consume()` throwing for a charge larger than the limiter's total capacity, not the requested case where root cost exceeds the caller's remaining budget; that response asserts only `Retry-After`, not `X-RateLimit-Limit` or `X-RateLimit-Remaining`. The separate exhausted-remaining-budget test asserts only 429 and does not assert problem details, rate-limit headers, or the resolver-visible no-execution proof. No single regression therefore establishes the refusal contract named in the finding. |
 | 4 | confirmed — The API test now causes a real report resolver's database statement to throw a recognizable exception under the non-debug test environment, and asserts the response uses the fixed generic message while omitting the injected detail, SQL, class, file, and vendor-path markers. The decorated error handler is also covered directly, including a control assertion that API Platform's undecorated runtime normalizer exposes the injected message. |
 | 5 | confirmed — The design now states that a stranger and a missing link remain distinguishable as `Access Denied` versus `No such link`, ties that behavior to the API rather than the page-specific ADR rule, and records that `security.yaml` is unchanged because the existing `^/api(/|$)` firewall covers both GraphQL paths. |
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** 6bec8d6c3e19f7b24c1821304d40de32e8e3c1e2
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — Pricing now applies the saturated `MAX_TOKENS` ceiling before the introspection-only traversal, and that traversal independently memoizes fragment verdicts. The regression uses the same linear doubling-fragment shape ending in `__typename`, asserts prompt refusal, and retains an under-ceiling shared-fragment case that still costs one; neither traversal re-expands the hostile document exponentially. |
+| 2 | confirmed — The request body is decoded as objects, so `variables: {}` remains a `stdClass` while `variables: []` remains a list and is refused. Unit coverage distinguishes the two empty shapes and covers non-empty lists, and the pre-executor API provider now verifies both an empty and a non-empty JSON list receive 400 problem details. |
+| 3 | confirmed — A dedicated integration test first spends two tokens from a five-token window, then submits a four-root document against the three tokens remaining. It asserts 429 problem details, `Retry-After`, both rate-limit headers with the unchanged remaining balance, no SQL touching `links`, and a successful three-root request immediately afterward, establishing both whole-document refusal before resolution and that rejection reserves no tokens. The separate over-capacity branch now reports the same limit headers. |
+| 4 | confirmed — The real resolver-failure regression and the decorated error-boundary coverage remain intact in the reviewed diff: an injected database failure is reduced to the fixed generic message outside development while SQL, exception, class, file, and vendor-path detail are excluded. |
+| 5 | confirmed — The reviewed design remains reconciled with the implemented contract: missing and unauthorized links are deliberately distinguishable, and both GraphQL paths use the existing `^/api(/|$)` firewall without a `security.yaml` change. |
