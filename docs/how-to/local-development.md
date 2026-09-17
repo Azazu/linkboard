@@ -240,6 +240,8 @@ dashboard URL. In dev the same request works without the header.
 | demo data | `make console ARGS='app:demo:seed'` — two accounts (passwords printed once), ten links with rules, 50 000 clicks over 60 days; `--reset` to start over (see Analytics) |
 | the gate floor | `make check` (php-cs-fixer + PHPStan level 9 + PHPUnit; suites `Unit`, `Integration`, `Api`, `Web`) |
 | migrations both ways | `make migrations-roundtrip` — every migration down and up again on a scratch database this run creates and drops, comparing the schema before and after; CI runs it in its own job |
+| click partitions | `make console ARGS='app:clicks:partitions'` — creates the months a click may fall in (`CLICK_RETENTION_MONTHS` back, `CLICK_PARTITION_HORIZON_MONTHS` forward). A click whose month has no partition cannot be stored, so this belongs in cron: `0 3 * * * … app:clicks:partitions` |
+| click retention | `make console ARGS='app:clicks:partitions --retention'` — the same run, also dropping every month entirely outside the window. **The only thing in this project that deletes click data**, and only when you run it |
 | one suite | `docker compose exec php vendor/bin/phpunit --testsuite Unit` (also `Integration`, `Api`) |
 
 ## Accounts and the API

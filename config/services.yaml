@@ -75,6 +75,12 @@ services:
     # (design decision 8); the chain itself is a startup check.
     App\Redirect\Geo\CountryResolverInterface: '@App\Redirect\Geo\ChainCountryResolver'
 
+    # The retention policy validates its two settings on every boot: a window
+    # the application cannot parse must stop it starting, not reach the click
+    # handler (change stretch-partition-clicks).
+    App\Click\Retention\ClickRetention:
+        tags: ['app.startup_check']
+
     # Run from App\Kernel::boot() on every boot, hence public: constructs the
     # tagged app.startup_check services so a misconfiguration fails before
     # anything is served.
@@ -107,6 +113,11 @@ when@test:
         # Throws on an armed SQL needle so a test can fail a multi-statement
         # transaction at a chosen point (the demo seed's rollback guarantee)
         App\Tests\Fixture\FailingStatement:
+            tags: ['doctrine.middleware']
+        # Runs a callback on an armed SQL needle so a test can stop the world
+        # between the click handler's eligibility decision and its insert, and
+        # run the real maintenance command there (stretch-partition-clicks)
+        App\Tests\Fixture\InterruptingStatement:
             tags: ['doctrine.middleware']
         # Fixed IP→country map for the test suite (COUNTRY_RESOLVERS=fixed)
         App\Tests\Fixture\FixedMapCountryResolver:

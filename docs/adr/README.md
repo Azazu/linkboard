@@ -13,3 +13,4 @@ here.
 | [ADR-003](ADR-003-deterministic-ab-bucket.md) | The A/B bucket is `crc32(link ‖ address ‖ agent) mod 100` — deterministic per visitor, no cookie and no stored assignment |
 | [ADR-004](ADR-004-report-cache-staleness.md) | Reports are cached 300 s with tag invalidation on link writes, and the staleness is published rather than hidden |
 | [ADR-005](ADR-005-pages-answer-404.md) | The pages answer 404 where the API answers 403: one voter, two renderings of a denial |
+| [ADR-006](ADR-006-clicks-partitioning-and-retention.md) | `clicks` is partitioned by month and retention drops whole months — with what that does to the all-time figures |

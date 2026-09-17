@@ -60,9 +60,19 @@ migrate: ## Apply migrations
 migration: ## Generate a migration from the mapping diff (review it before committing)
 	$(EXEC) bin/console doctrine:migrations:diff --no-interaction
 
+# The suite's click fixtures use fixed dates — the oldest is 2026-03-28 — while
+# the schema provisions months relative to today, so a retention window would
+# eventually leave them behind and the suite would start failing on a calendar
+# date. The test database therefore provisions its own declared range, through
+# the same function the migration and app:clicks:partitions use
+# (change stretch-partition-clicks).
+CLICK_FIXTURE_FROM ?= 2026-01-01
+CLICK_FIXTURE_TO   ?= 2027-01-01
+
 test-db: ## Create and migrate the test database (DATABASE_URL's database + _test)
 	$(EXEC) bin/console doctrine:database:create --if-not-exists --env=test
 	$(EXEC) bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration
+	$(EXEC) bin/console dbal:run-sql --env=test -- "SELECT clicks_ensure_partition(generate_series('$(CLICK_FIXTURE_FROM)'::date, '$(CLICK_FIXTURE_TO)'::date, interval '1 month')::date)" >/dev/null
 
 # The test keypair does not go through the console command: inside the
 # container that command takes JWT_PASSPHRASE from .env, not from .env.test,

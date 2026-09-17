@@ -6,14 +6,20 @@ namespace App\Tests\Integration\Click;
 
 use App\Click\Handler\ClickRecordedHandler;
 use App\Click\Message\ClickRecorded;
+use App\Click\Retention\ClickRetention;
 use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Psr\Clock\ClockInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -25,6 +31,7 @@ use Zenstruck\Foundry\Test\ResetDatabase;
  * the Web suite.
  */
 #[CoversClass(ClickRecordedHandler::class)]
+#[CoversClass(ClickRetention::class)]
 final class ClickRecordedHandlerTest extends KernelTestCase
 {
     use Factories;
@@ -102,6 +109,182 @@ final class ClickRecordedHandlerTest extends KernelTestCase
         self::assertCount(0, $this->log->getRecords());
     }
 
+    public function testAMessageFromAnEarlierMonthIsRecordedInThatMonthsPartition(): void
+    {
+        // the redelivery guarantee now rests on (click_id, occurred_at): two
+        // rows with one id would land in different partitions if it were lost
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $earlier = new \DateTimeImmutable('-2 months');
+        $message = self::messageAt((string) $link->getId(), $earlier);
+
+        $this->handler()($message);
+        $this->handler()($message);
+
+        self::assertSame(1, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$message->linkId])));
+        self::assertSame(1, self::clickCount($link->getId()));
+        self::assertSame(
+            'clicks_'.$earlier->format('Y_m'),
+            self::connection()->fetchOne('SELECT tableoid::regclass::text FROM clicks WHERE id = ?', [$message->clickId]),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function expiredArrivals(): iterable
+    {
+        yield 'a first delivery dated before the window' => ['-20 months'];
+        yield 'a retry from the failed transport long after the fact' => ['-14 months'];
+    }
+
+    #[DataProvider('expiredArrivals')]
+    public function testAMessageOlderThanTheBoundaryIsDiscardedNotParked(string $age): void
+    {
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $message = self::messageAt((string) $link->getId(), new \DateTimeImmutable($age));
+
+        $this->handler()($message);
+
+        self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$message->linkId])));
+        self::assertSame(0, self::clickCount($link->getId()), 'no increment either');
+        self::assertTrue($this->log->hasInfoThatContains('older than the retention boundary'));
+        self::assertSame(['link_id' => $message->linkId, 'click_id' => $message->clickId], $this->log->getRecords()[0]->context);
+    }
+
+    public function testARedeliveryAfterTheRecordsMonthWasDroppedIsDiscarded(): void
+    {
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $month = new \DateTimeImmutable('-3 months');
+        $message = self::messageAt((string) $link->getId(), $month);
+        $this->handler()($message);
+        self::assertSame(1, self::clickCount($link->getId()));
+
+        // retention removes that month and records how far it removed
+        self::connection()->executeStatement('DROP TABLE clicks_'.$month->format('Y_m'));
+        $retention = new ClickRetention(self::connection(), '13', '3');
+        $retention->recordDroppedThrough(new \DateTimeImmutable('-2 months'));
+
+        $this->handler($retention)($message);
+
+        self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$message->linkId])));
+        self::assertSame(1, self::clickCount($link->getId()), 'the counter keeps the one increment it earned');
+        self::assertTrue($this->log->hasInfoThatContains('older than the retention boundary'));
+    }
+
+    public function testWideningTheWindowDoesNotResurrectADroppedClick(): void
+    {
+        // the demonstrated failing input for the durable boundary: with a guard
+        // that knew only the window, this records the click a second time
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $month = new \DateTimeImmutable('-3 months');
+        $message = self::messageAt((string) $link->getId(), $month);
+        $this->handler()($message);
+
+        // dropped under a short window, which records the boundary...
+        self::connection()->executeStatement('DROP TABLE clicks_'.$month->format('Y_m'));
+        new ClickRetention(self::connection(), '2', '3')->recordDroppedThrough(new \DateTimeImmutable('-2 months'));
+        // ...and the window is then lengthened, so the month is provisioned again
+        self::connection()->executeStatement('SELECT clicks_ensure_partition(?)', [$month->format('Y-m-01')]);
+
+        $this->handler(new ClickRetention(self::connection(), '13', '3'))($message);
+
+        self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$message->linkId])));
+        self::assertSame(1, self::clickCount($link->getId()), 'the lifetime counter is not incremented twice');
+    }
+
+    public function testAClickInsideTheWindowWithNoPartitionIsRetriedNotSwallowed(): void
+    {
+        // neither of the handler's two exception guards covers this: it must
+        // reach the transport's retry policy
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $month = new \DateTimeImmutable('-4 months');
+        self::connection()->executeStatement('DROP TABLE clicks_'.$month->format('Y_m'));
+        $message = self::messageAt((string) $link->getId(), $month);
+
+        try {
+            $this->handler()($message);
+            self::fail('the missing partition was swallowed');
+        } catch (\Doctrine\DBAL\Exception $e) {
+            self::assertStringContainsString('no partition of relation', $e->getMessage());
+        }
+
+        self::assertSame(0, self::clickCount($link->getId()), 'the increment was rolled back');
+        self::assertCount(0, $this->log->getRecords(), 'and nothing was logged as discarded');
+    }
+
+    public function testADeletedLinkWithNoPartitionIsRetriedThenDiscardedOnceThePartitionExists(): void
+    {
+        // the FK guard fires on the insert, so it cannot fire when there is no
+        // partition to insert into
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $month = new \DateTimeImmutable('-4 months');
+        $message = self::messageAt((string) $link->getId(), $month);
+        self::connection()->executeStatement('DELETE FROM links WHERE id = ?', [$message->linkId]);
+        self::connection()->executeStatement('DROP TABLE clicks_'.$month->format('Y_m'));
+
+        try {
+            $this->handler()($message);
+            self::fail('the missing partition was swallowed');
+        } catch (\Doctrine\DBAL\Exception $e) {
+            self::assertStringContainsString('no partition of relation', $e->getMessage());
+        }
+
+        self::connection()->executeStatement('SELECT clicks_ensure_partition(?)', [$month->format('Y-m-01')]);
+        $this->handler()($message);
+
+        self::assertTrue($this->log->hasInfoThatContains('the link no longer exists'));
+    }
+
+    public function testTheHandlerWaitsWhileRetentionIsDroppingRatherThanDecidingAgainstAStaleSchema(): void
+    {
+        // Finding 2 of Gate 2 round 1: the eligibility decision and the insert
+        // must not straddle a drop. Proven without timing or threads — a second
+        // connection holds retention's exclusive lock, and the handler is given
+        // a lock timeout, so "it waits" becomes an observable failure instead
+        // of a race nobody can reproduce.
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne()]);
+        $message = self::messageAt((string) $link->getId(), new \DateTimeImmutable('-1 day'));
+
+        $maintenance = DriverManager::getConnection(self::connection()->getParams());
+        $maintenance->beginTransaction();
+        $maintenance->executeStatement('SELECT pg_advisory_xact_lock(?)', [ClickRetention::LOCK_KEY]);
+
+        try {
+            self::connection()->executeStatement("SET lock_timeout = '250ms'");
+            $this->handler()($message);
+            self::fail('the handler decided and inserted while retention held the lock');
+        } catch (DriverException $e) {
+            self::assertStringContainsString('lock timeout', strtolower($e->getMessage()));
+        } finally {
+            self::connection()->executeStatement('SET lock_timeout = 0');
+            $maintenance->rollBack();
+            $maintenance->close();
+        }
+
+        self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$message->linkId])));
+        self::assertSame(0, self::clickCount($link->getId()), 'and nothing was counted');
+    }
+
+    public static function messageAt(string $linkId, \DateTimeImmutable $at): ClickRecorded
+    {
+        $message = self::message($linkId);
+
+        return new ClickRecorded(
+            $message->clickId,
+            $message->linkId,
+            $at,
+            $message->country,
+            $message->deviceType,
+            $message->os,
+            $message->browser,
+            $message->isBot,
+            $message->resolvedBy,
+            $message->variant,
+            $message->refererHost,
+            $message->visitorHash,
+        );
+    }
+
     public static function message(string $linkId, string $visitorHash = ''): ClickRecorded
     {
         return new ClickRecorded(
@@ -120,9 +303,19 @@ final class ClickRecordedHandlerTest extends KernelTestCase
         );
     }
 
-    private function handler(): ClickRecordedHandler
+    private function handler(?ClickRetention $retention = null, ?ClockInterface $clock = null): ClickRecordedHandler
     {
-        return new ClickRecordedHandler(self::connection(), new Logger('test', [$this->log]));
+        return new ClickRecordedHandler(
+            self::connection(),
+            new Logger('test', [$this->log]),
+            $retention ?? self::retention(),
+            $clock ?? new NativeClock(),
+        );
+    }
+
+    private static function retention(string $months = '13', string $horizon = '3'): ClickRetention
+    {
+        return new ClickRetention(self::connection(), $months, $horizon);
     }
 
     private static function connection(): Connection
