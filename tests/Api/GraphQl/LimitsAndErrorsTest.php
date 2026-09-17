@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Api\GraphQl;
 
+use App\Shared\Api\GraphQlErrorBoundary;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Fixture\FailingStatement;
 use App\Tests\Support\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -103,21 +105,39 @@ final class LimitsAndErrorsTest extends GraphQlTestCase
         self::assertStringStartsWith('application/json', (string) $client->getResponse()->headers->get('Content-Type'));
     }
 
-    public function testAnErrorCarriesNoInternalDetailOutsideDev(): void
+    public function testAnUnexpectedInternalFailureLeaksNothing(): void
     {
+        // Gate 2 round 1, finding 4: this used to trigger the same depth
+        // refusal as the test above, so its assertions about SQL and class
+        // names proved nothing. It now fails a real statement of a real
+        // resolver, with a message carrying detail a caller must never see —
+        // and that is how the leak it asserts against was found.
         $client = self::createClient();
-        UserFactory::createOne(['email' => 'a@example.com']);
+        $owner = UserFactory::createOne(['email' => 'a@example.com']);
+        $link = LinkFactory::createOne(['owner' => $owner]);
+        $token = $this->token($client, 'a@example.com');
 
-        // any executor-decided refusal will do; the point is what it does not say
-        $inner = 'name';
-        for ($i = 0; $i < 14; ++$i) {
-            $inner = 'ofType { '.$inner.' }';
+        // one kernel for the whole test: the middleware is armed on the
+        // container the next request will use, not on a rebuilt one
+        $client->disableReboot();
+        FailingStatement::failOn('FROM links t0');
+
+        try {
+            $this->post($client, $token, \sprintf('{ linkSummaryReport(id: "/api/v1/links/%s/stats/summary") { totalClicks } }', $link->getId()));
+        } finally {
+            FailingStatement::reset();
         }
-        $this->post($client, $this->token($client, 'a@example.com'), '{ __type(name: "Link") { fields { type { '.$inner.' } } } }');
+
+        $errors = $this->errors($client);
+        self::assertCount(1, $errors, 'the resolver failed rather than answering');
+        self::assertSame(['linkSummaryReport' => null], Json::decode($client->getResponse()->getContent())['data'] ?? null, 'nothing was resolved');
 
         $body = (string) $client->getResponse()->getContent();
-        foreach (['/app/', 'vendor/', '.php', 'SELECT ', 'App\\'] as $leak) {
-            self::assertStringNotContainsString($leak, $body, "the error leaked $leak");
+        self::assertSame(GraphQlErrorBoundary::GENERIC_MESSAGE, $errors[0]['message']);
+        foreach (['Injected failure', 'SELECT ', 'FROM links', 'RuntimeException', 'App\\\\', '.php', '/vendor/'] as $leak) {
+            self::assertStringNotContainsString($leak, $body, "the error leaked: $leak");
         }
+        // the caller still learns which part of its own document failed
+        self::assertSame(['linkSummaryReport'], $errors[0]['path'] ?? null);
     }
 }
