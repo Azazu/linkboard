@@ -10,7 +10,7 @@ is a second way to ask, not a second set of rules.
 ## ADDED Requirements
 
 ### Requirement: A read-only GraphQL endpoint
-The API SHALL serve GraphQL at `/api/v1/graphql`, accepting `POST` with a JSON body carrying `query` and optional `variables`. The same endpoint SHALL also answer at the unversioned `/api/graphql`, which the framework registers, exactly as `/api/docs` answers beside `/api/v1`; both paths SHALL be covered by the same firewall and the same rate budget, and the versioned one SHALL be the documented one. The schema SHALL expose queries only: an item and a collection query for links, an item query for each of the nine analytics reports, and a query for the current user. The schema SHALL contain **no mutation type**, so no data can be created, changed or deleted through it.
+The API SHALL serve GraphQL at `/api/v1/graphql`, accepting **`POST` only** with a JSON body carrying `query` and optional `variables`; another method at that path SHALL be refused as method not allowed. The same endpoint SHALL also answer a `POST` at the unversioned `/api/graphql`, which the framework registers, exactly as `/api/docs` answers beside `/api/v1`; both paths SHALL be covered by the same firewall and the same rate budget, and the versioned one SHALL be the documented one. The schema SHALL expose queries only: an item and a collection query for links, an item query for each of the nine analytics reports, and a query for the current user. The schema SHALL contain **no mutation type**, so no data can be created, changed or deleted through it.
 
 #### Scenario: A link is readable through GraphQL
 - **WHEN** the owner of a link posts `{ link(id: "<iri>") { slug targetUrl clickCount } }` with a valid credential
@@ -20,9 +20,13 @@ The API SHALL serve GraphQL at `/api/v1/graphql`, accepting `POST` with a JSON b
 - **WHEN** a client introspects the schema
 - **THEN** the schema declares no mutation type, and a document containing a mutation is rejected
 
-#### Scenario: Both paths answer, and identically
+#### Scenario: Both paths answer a POST, and identically
 - **WHEN** the same query with the same credential is posted to `/api/v1/graphql` and to `/api/graphql`
 - **THEN** both answer with the same data, and an unauthenticated post to either is refused the same way
+
+#### Scenario: The documented path takes POST only
+- **WHEN** a client sends `GET` to `/api/v1/graphql`
+- **THEN** the response status is 405
 
 #### Scenario: No other path answers
 - **WHEN** a client posts a valid query to any path other than those two
@@ -58,6 +62,14 @@ Every GraphQL query SHALL require the same credential and SHALL be subject to th
 - **WHEN** a client posts any query without a credential
 - **THEN** the request is refused by the firewall with 401 and a problem-details body, before the executor runs — the credential requirement is the firewall's, not a resolver's
 
+#### Scenario: An invalid credential reads nothing
+- **WHEN** a client posts a query with a malformed token, an expired token or an unknown API key
+- **THEN** the request is refused with 401 and a problem-details body, at both paths, and no field is resolved
+
+#### Scenario: A blocked account reads nothing
+- **WHEN** the holder of a valid credential whose account is blocked posts a query
+- **THEN** the request is refused before the executor runs, exactly as the REST API refuses that account, and no field is resolved
+
 ### Requirement: Report parameters are the same parameters
 A report queried through GraphQL SHALL accept the same parameters as its REST operation — the period, the bucket size, the top-N limit and the bot flag — SHALL validate them by the same rules, and SHALL produce the same figures and the same cached entry as the REST call with those parameters. A report SHALL NOT silently answer with default parameters when the caller supplied others.
 
@@ -76,15 +88,19 @@ A report queried through GraphQL SHALL accept the same parameters as its REST op
 ### Requirement: A GraphQL document costs what the work costs
 A GraphQL request SHALL consume one token of the caller's per-identity rate budget for each **root selection** of the executed operation, so that asking for ten reports in one document costs what ten REST calls cost. When the budget cannot cover the document the request SHALL be refused before any field is resolved.
 
-The count SHALL be taken from the document as parsed, not from its text: fragment spreads at the root SHALL contribute the selections they name, aliases of one field SHALL count separately, and `@skip`/`@include` SHALL NOT reduce the count, because a directive evaluated at execution time cannot lower a price charged before execution. A document whose root selections are all introspection SHALL cost one, whatever their number.
+The count SHALL be taken from the document as parsed, not from its text: named spreads and inline fragments at the root SHALL contribute the selections they name, aliases of one field SHALL count separately, two selections sharing one response key SHALL count twice, and `@skip`/`@include` SHALL NOT reduce the count, because a directive evaluated at execution time cannot lower a price charged before execution. The operation SHALL be the one `operationName` names, and an `operationName` naming no definition SHALL be refused rather than ignored. A document whose root selections are all introspection SHALL cost one, whatever their number.
 
 #### Scenario: A document with several root selections costs several tokens
 - **WHEN** a caller posts a document with three root selections
 - **THEN** three tokens are consumed from that caller's budget
 
 #### Scenario: Aliases and fragments are counted
-- **WHEN** a document asks for one field twice under two aliases, and a document spreads a root fragment naming two fields
-- **THEN** the first costs two and the second costs two
+- **WHEN** a document asks for one field twice under two aliases, a document spreads a named root fragment naming two fields, and a document carries an inline root fragment naming two fields
+- **THEN** each costs two
+
+#### Scenario: The named operation is the one charged
+- **WHEN** a document carries two operations and the body names one of them
+- **THEN** the cost is that operation's root selections, not the other's
 
 #### Scenario: A skipped field is still paid for
 - **WHEN** a document's root selection carries `@skip(if: true)`
@@ -109,9 +125,13 @@ A request whose body is not a JSON object with a string `query`, whose `variable
 - **WHEN** a client posts a `query` that does not parse
 - **THEN** the request is refused and no token is consumed
 
-#### Scenario: An ambiguous operation is refused
-- **WHEN** a document carries two operations and the body names neither, or carries none
+#### Scenario: An ambiguous or unmatched operation is refused
+- **WHEN** a document carries two operations and the body names neither, or carries none, or the body names an operation the document does not define
 - **THEN** the request is refused and no token is consumed
+
+#### Scenario: A fragment cycle is refused rather than followed
+- **WHEN** a document's root fragments refer to one another in a cycle
+- **THEN** the request is refused and no token is consumed, because a counter that follows the cycle never returns
 
 ### Requirement: The schema bounds what one document may ask
 The endpoint SHALL refuse a document exceeding a declared query depth or a declared query complexity, before executing it. Both limits SHALL be configuration with stated defaults.

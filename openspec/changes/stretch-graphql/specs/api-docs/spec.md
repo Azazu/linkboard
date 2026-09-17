@@ -11,7 +11,7 @@ The REST API SHALL accept and produce `application/json` (plus `application/prob
 
 #### Scenario: GraphQL endpoint is absent
 - **WHEN** a client requests `GET /api/graphql`
-- **THEN** the response status is 405, because the endpoint exists there and accepts POST only — the versioned `/api/v1/graphql` is the documented path, and the unversioned one is the framework's, kept as `/api/docs` is kept beside `/api/v1`
+- **THEN** the response is not this API's REST documentation and not a resource representation — the GraphQL entrypoint the framework registers lives there, as `/api/docs` does beside `/api/v1`, and the documented GraphQL path is the versioned `/api/v1/graphql`, which takes `POST` only
 
 #### Scenario: The QR operation is documented with its image types
 - **WHEN** a client requests `GET /api/docs.json`

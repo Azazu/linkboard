@@ -9,11 +9,18 @@ rather than remembered:
   `bin/console debug:config api_platform graphql` reports the knobs that come
   with it: `introspection.enabled: true`, `max_query_depth: 20`,
   `max_query_complexity: 500`, `graphiql.enabled: false`.
-- **Fourteen** classes carry `#[ApiResource]`. API Platform exposes a resource
-  to GraphQL only when the resource declares `graphQlOperations`, **but**
-  enabling the flag without declaring anything gives every resource the default
-  set. The surface is therefore chosen by declaring operations on the five
-  exposed classes and by a test over the schema, not by hoping.
+- **Fourteen** classes carry `#[ApiResource]`, and a class that declares no
+  `graphQlOperations` gets the **default** set — two queries and the three
+  mutations `create`, `update`, `delete` (`OperationDefaultsTrait`). So the flag
+  alone publishes all fourteen with writes; the surface is chosen by declaring
+  operations on **all fourteen** — queries on eleven, an explicit empty list on
+  three — and by a test over the schema, not by hoping.
+- **The GraphQL package is not installed**: `vendor/api-platform/` holds
+  thirteen directories and none is `graphql`. So nothing about the entrypoint's
+  runtime behaviour — what it answers to a `GET`, for instance — can be stated
+  here; it is measured in the tasks once the dependency exists, which is why
+  this design claims a status for the route it declares and none for the
+  framework's.
 - `ApiRateLimitListener` consumes one token on `LoginSuccessEvent` of the `api`
   firewall — once per HTTP request, before access control, fail-open, with the
   accepted `RateLimit` stashed for the response headers.
@@ -107,16 +114,21 @@ bypass hides (Gate 1 round 1, finding 4):
    token and without resolving anything.
 2. The document is parsed with the same parser that will execute it
    (`GraphQL\Language\Parser`). A parse error is refused.
-3. The operation is selected: `operationName` when given; otherwise the single
-   operation definition in the document. **No operation, or more than one
-   without `operationName`, is refused** — GraphQL itself refuses these, and
-   charging for an ambiguous document would charge for work nobody asked for.
+3. The operation is selected: `operationName` when given — and an
+   `operationName` matching **no** definition is refused, not silently ignored;
+   otherwise the single operation definition in the document. **No operation, or
+   more than one without `operationName`, is refused** — GraphQL itself refuses
+   these, and charging for an ambiguous document would charge for work nobody
+   asked for.
 4. The cost is the number of selections in that operation's root selection set,
-   counted **after resolving fragment spreads at the root** (a spread
-   contributes its own root selections, a cycle is refused), with **aliases
-   counted separately** (two aliases of one field are two reads) and
-   `@skip`/`@include` **not** evaluated — a directive decided at execution time
-   cannot lower a price charged before execution.
+   counted **after resolving both named spreads and inline fragments at the
+   root** — each contributes its own root selections, and a fragment cycle is
+   refused rather than followed, because a counter that recurses for ever is a
+   denial of service written by the defence. **Aliases count separately** (two
+   aliases of one field are two reads), two selections sharing one response key
+   count **twice** (the price is per selection asked for, not per key returned),
+   and `@skip`/`@include` are **not** evaluated — a directive decided at
+   execution time cannot lower a price charged before execution.
 5. A document whose root selections are all introspection (`__schema`,
    `__type`, `__typename`) costs **one**, whatever their number: introspection
    reads the schema, not the database.
@@ -152,10 +164,18 @@ precedent exactly — a declared route `api_v1_graphql` at `/api/v1/graphql` on
 
 *So both paths answer*, `/api/graphql` and `/api/v1/graphql`, exactly as both
 `/api/docs` and `/api/v1` answer today. The versioned one is the documented one;
-the unversioned one is API Platform's, kept rather than fought. The
-specification says so instead of claiming a single path, and the firewall and
+the unversioned one is API Platform's, kept rather than fought. The firewall and
 the rate limiter cover **both** — a path that authenticates differently from its
 alias is the bug this note exists to prevent.
+
+*The declared route restricts its methods; the framework's is not ours to
+describe.* `api_v1_graphql` declares `methods: [POST]`, so a `GET` there is 405 —
+a contract this change owns and tests. API Platform's own route declares no
+method restriction (read in `routing/graphql/graphql.php`), and what its action
+does with a `GET` cannot be stated here because the package is not installed
+yet: it is **measured and recorded** in the tasks once it is, rather than
+asserted now (Gate 1 confirmation 1, finding 2). The specification therefore
+promises a status only for the path this change declares.
 
 ### 4. Introspection on, GraphiQL off, depth and complexity lowered
 

@@ -104,8 +104,10 @@ from the source before this was written:
   instead of a `Request`. The queries, the cache keys and the DTOs are
   untouched, and the REST providers keep their behaviour.
 - **`src/Auth/`**: the rate-limit listener learns what a GraphQL document costs.
-- **Resources**: `graphQlOperations` declared on the exposed classes; the other
-  five left alone, which is what keeps them out.
+- **Resources**: `graphQlOperations` declared on **all fourteen** — queries on
+  the eleven exposed (links, `me`, the nine reports), an explicit empty list on
+  the three excluded (`UserAdmin`, `Registration`, `ApiKeyOutput`). Silence is
+  not an exclusion here: it grants the default set, mutations included.
 - **Security surface**: a second entry point to the same voters. That, the new
   dependency and the denial-of-service shape of an unbounded query language are
   why this is `high` rather than the roadmap's `medium`.
