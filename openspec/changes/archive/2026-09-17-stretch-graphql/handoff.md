@@ -1,7 +1,7 @@
 # Handoff — stretch-graphql
 
 **Updated:** 2026-09-17 · claude
-**State:** ready-to-merge
+**State:** merged
 **Branch:** change/stretch-graphql
 
 ## Done this session
@@ -70,8 +70,10 @@
 - Gate 2 Confirmation 2 (`2567315`, Reviewed-Commit `6bec8d6`): **confirmed — Gate 2 passed.** All five closed.
 - Cost of the round, recorded because it was paid on the user's machine and not only in tokens: demonstrating finding 1 meant running the unguarded 40-fragment document, which is 2^40 traversals. It was wrapped in `timeout 300`, but `timeout` kills the `docker compose exec` client and not the PHP process inside the container, so the process outlived it and pegged a core until the machine was rebooted. A mutation that by construction does not terminate is run **inside** the container's own `timeout`, and at a size where the unguarded case finishes in seconds (26 fragments, not 40).
 
+- Merged into `main` as `5d74d13` (`merge --no-ff`, verifier green, no conflicts); `main` pushed and its run started.
+
 ## Next step
-`/git:merge stretch-graphql` (the user's call), then `/opsx:archive stretch-graphql` — `graphql-api` is a new capability, `api-docs` a modified one, and roadmap row 15 comes out.
+`/opsx:archive stretch-graphql` — sync `graphql-api` (new) and `api-docs` (modified), take roadmap row 15 out, then row 16 `stretch-public-hosting` on its parked branch.
 
 ## Blockers
 None.

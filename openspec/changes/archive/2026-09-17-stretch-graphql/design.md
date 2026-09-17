@@ -283,7 +283,7 @@ requirement is the firewall's, matched by path.
 an anonymous caller and as a non-admin, and assert that the answer carries no
 data. The two refusals stay **distinguishable**: a stranger's link answers
 `Access Denied`, an identifier no link has answers `No such link`. That is the
-REST contract this surface mirrors — [ADR-005](../../../docs/adr/ADR-005-pages-answer-404.md)
+REST contract this surface mirrors — [ADR-005](../../../../docs/adr/ADR-005-pages-answer-404.md)
 made the *pages* answer 404 to both and deliberately left the API at 403/404,
 and GraphQL is the API.
 
