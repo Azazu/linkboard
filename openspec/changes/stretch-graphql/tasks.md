@@ -70,7 +70,7 @@ changes, the refactor of section 3 is wrong.
 ## 9. Wrap-up
 
 - [x] 9.1 `make check` green inside the container with no environment override — **994 tests, 22 787 assertions**; `openspec validate stretch-graphql --strict` passes; commits per logical block with the agent trailer; `handoff.md` updated with the schema's query list and the recorded failing inputs.
-- [ ] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/stretch-graphql` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify: all four jobs green.
+- [x] 9.2 Green Actions run on the exact branch head: the user pushes; the executor queries `https://api.github.com/repos/Azazu/linkboard/actions/runs?branch=change/stretch-graphql` until the run for `git rev-parse HEAD` is `completed` / `success`; URL and SHA recorded in `handoff.md`. Verify, executed: run **35209737312** on `459837f`, `completed`/`success`, all four jobs green — which is also what proves the new dependency installs and the schema builds on a machine that did not build it here.
 
 ## After every task above is complete — the gate, not a task
 

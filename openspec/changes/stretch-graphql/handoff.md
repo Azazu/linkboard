@@ -47,8 +47,10 @@
 - **Measured, both environments**: in `dev` a depth refusal carries `extensions.file` naming a vendor path; in `prod` the same request answers with the message alone. The test asserts the absence of `/app/`, `vendor/`, `.php`, `SELECT ` and `App\`.
 - **The cost model in the wild**: one root selection leaves 599 of 600, three aliases leave 596, introspection alone leaves 595, a malformed body is 400 before a token is spent. Twenty-three unit cases pin the algorithm; three mutations (operation selection, fragment expansion, the cycle guard) each turn it red.
 
+- Branch run on the exact head (`459837f`) is green: run 35209737312 (2026-09-17), all four jobs — which is also what proves the new dependency installs and the schema builds on a machine that did not build it here.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head (four jobs) and then requests Gate 2 per the lifecycle section of `tasks.md`.
+Gate 2: `scripts/gate-run.sh stretch-graphql 2 full`, per the lifecycle section at the end of `tasks.md`.
 
 ## Blockers
 None.
