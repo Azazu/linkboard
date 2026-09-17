@@ -37,3 +37,22 @@
 | 7 | confirmed |
 | 8 | confirmed |
 | 9 | confirmed |
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** c3f631ab77dd9664427e71d4ef21301695edce8f
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed |
+| 2 | confirmed |
+| 3 | confirmed |
+| 4 | changes-requested — The one-shot init service resolves the concurrent-writer race, but the specified lifecycle still cannot recover from a crash between the key generator's two file writes. The installed `lexik:jwt:generate-keypair --skip-if-exists` treats either file existing as success, so a restart after only `private.pem` was written leaves the pair incomplete while dependents are allowed to start. This contradicts the new requirement that provisioning not leave half-written assets, and `design.md`'s applicability claim that the next start repairs this case; no task interrupts generation between the writes and verifies recovery. The design also still says in decision 2 and the opening of decision 3 that each entrypoint/application container generates the keypair, before later saying provisioning is not in those entrypoints. Specify crash-safe publication or cleanup/regeneration of a partial pair, add the corresponding interrupted-run verification, and reconcile the stale entrypoint statements. |
+| 5 | changes-requested — The authoritative inputs are now named, but the planned derivation does not receive them through the documented commands. Compose interpolation reads the shell, its project `.env`, or `--env-file`; a service-level `env_file: .env.local` only populates the already-created container. Tasks 2.1, 3.8, 4.1 and the surrounding design use `docker compose -f docker-compose.yml -f docker-compose.prod.yml ...` without `--env-file`, while the credentials are generated into `.env.local`. The derived DSNs and the Postgres/Redis server settings can therefore still resolve from committed defaults instead of the claimed authoritative production credentials. Define one exact interpolation source/invocation used by deploy and verification, and verify the rendered server settings and every derived consumer come from it. |
+| 6 | confirmed |
+| 7 | confirmed |
+| 8 | confirmed |
+| 9 | confirmed |
