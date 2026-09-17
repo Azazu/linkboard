@@ -18,3 +18,22 @@
 | 7 | major | `proposal.md` Why and Non-goals; `specs/deployment/spec.md` public-demo requirement; `tasks.md` 9.3–9.4 | The declared scope says no host/domain is provisioned and nothing becomes externally visible, but task 9.3 requires the README to contain “the demo link” and task 9.4 records roadmap row 16—whose stated outcome is a deployed public host—as delivered. No real URL can be produced or verified within the declared lifecycle. Reconcile the requirement/roadmap with the user's deployment-ready decision, or make the user's deployment and resulting URL an explicit feasible prerequisite with verification. | fixed |
 | 8 | major | `tasks.md` 1.1 | The exact image-build command uses `.docker/php` as its build context, but the production stage is required to copy the repository source; Docker cannot copy files outside that context. The parenthetical “with the build context the stage needs” does not make the documented command runnable. Specify one exact command (and matching Compose build configuration) whose context includes the application while still using `.docker/php/Dockerfile`. | fixed |
 | 9 | major | `tasks.md` 8.1–8.2 | Gate 2 evidence is not feasible as assigned: “the job appears in the run” and a deliberately red scratch-commit run require publishing commits to GitHub, but agents may not push and no user/manual prerequisite is named. Replace this with an in-scope reproducible verification or explicitly assign and order the external user action so the task can be completed before Gate 2. | fixed |
+
+## Confirmation 1 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** ccd45f8b775f08db4be403dc619c4bfbd72bc89a
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed |
+| 2 | confirmed |
+| 3 | confirmed |
+| 4 | changes-requested — The volume and clean-host token checks cover sequential replacement, but the lifecycle is still unsafe on the clean start that matters: design decision 2 says every application container runs the entrypoint, while tasks 2.1 and 4.1 start PHP, worker, and scheduler against the same key volume. `lexik:jwt:generate-keypair --skip-if-exists` generates a candidate pair before checking whether either file exists and writes the two files separately, so concurrent first starts can both observe an empty volume and leave a private key from one run with a public key from another. Specify single-writer ordering or locking around first-time provisioning, and verify a concurrent clean-stack start produces one matching pair before dependent processes serve work. |
+| 5 | changes-requested — The application-side set is now enumerated, but the PostgreSQL credential contract remains incomplete. The shipped stack supplies the server through `DB_PASSWORD`/`POSTGRES_PASSWORD` while Doctrine consumes `DATABASE_URL`; the revised artifacts neither name an authoritative derivation between them nor test their mismatch/default cases. A changed `DATABASE_URL` can therefore pass the startup check while PostgreSQL still receives the committed `DB_PASSWORD`, or the two can disagree and make the stack fail later. Define the production Compose inputs/derivation and verify both effective consumers and mismatch handling. |
+| 6 | confirmed |
+| 7 | confirmed |
+| 8 | confirmed |
+| 9 | confirmed |
