@@ -66,6 +66,8 @@ final class LimitsAndErrorsTest extends GraphQlTestCase
         yield 'a body that is not a JSON object' => ['"a string"', 400, 'JSON object'];
         yield 'a query that is not a string' => ['{"query": 42}', 400, '"query" string'];
         yield 'variables that are not an object' => ['{"query":"{ me { email } }","variables":"x"}', 400, '"variables"'];
+        yield 'variables that are a JSON list' => ['{"query":"{ me { email } }","variables":[1]}', 400, '"variables"'];
+        yield 'variables that are an empty JSON list' => ['{"query":"{ me { email } }","variables":[]}', 400, '"variables"'];
         yield 'an unparseable document' => ['{"query":"{ me { email "}', 400, 'parsed'];
         yield 'two operations and no name' => ['{"query":"query A { me { email } } query B { me { email } }"}', 400, 'exactly one operation'];
     }

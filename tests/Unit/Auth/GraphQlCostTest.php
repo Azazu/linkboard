@@ -71,6 +71,7 @@ final class GraphQlCostTest extends TestCase
         yield 'variables that are not an object' => [['query' => '{ me { email } }', 'variables' => 'nope'], '"variables"'];
         yield 'variables that are a JSON list' => ['{"query":"{ me { email } }","variables":[1]}', '"variables"'];
         yield 'variables that are a list of objects' => ['{"query":"{ me { email } }","variables":[{"n":1}]}', '"variables"'];
+        yield 'variables that are an empty JSON list' => ['{"query":"{ me { email } }","variables":[]}', '"variables"'];
         yield 'an operationName that is not a string' => [['query' => '{ me { email } }', 'operationName' => 7], '"operationName"'];
         yield 'a document that does not parse' => [['query' => '{ me { email '], 'parsed'];
         yield 'a document with no operation' => [['query' => 'fragment f on Query { me { email } }'], 'exactly one operation'];
@@ -94,11 +95,25 @@ final class GraphQlCostTest extends TestCase
         self::assertSame(0, $cost->tokens, 'a refused request consumes nothing');
     }
 
-    public function testAnEmptyVariableSetIsAccepted(): void
+    public function testAnEmptyVariableObjectIsAcceptedAndAnEmptyListIsNot(): void
     {
-        // `{}` and `[]` decode to the same PHP array, and an empty variable
-        // set is a legitimate thing to send: there is nothing to misread in it
-        foreach (['{"query":"{ me { email } }","variables":{}}', '{"query":"{ me { email } }","variables":[]}'] as $body) {
+        // Gate 2 confirmation 1, finding 2: `{}` and `[]` are different
+        // requests and the decoder has to keep them apart. An empty variable
+        // set is a legitimate thing to send; an empty JSON *list* is the same
+        // wrong shape as `[1]`, and accepting it only because it is empty is
+        // the ambiguity the finding was about.
+        $accepted = GraphQlCost::of(self::request('{"query":"{ me { email } }","variables":{}}'));
+        self::assertFalse($accepted->isRefused(), (string) $accepted->refusal);
+        self::assertSame(1, $accepted->tokens);
+
+        $refused = GraphQlCost::of(self::request('{"query":"{ me { email } }","variables":[]}'));
+        self::assertTrue($refused->isRefused(), 'an empty JSON list is still a list');
+        self::assertSame(0, $refused->tokens);
+    }
+
+    public function testVariablesMayBeAbsentOrNull(): void
+    {
+        foreach (['{"query":"{ me { email } }"}', '{"query":"{ me { email } }","variables":null}'] as $body) {
             $cost = GraphQlCost::of(self::request($body));
             self::assertFalse($cost->isRefused(), (string) $cost->refusal);
         }
@@ -125,6 +140,41 @@ final class GraphQlCostTest extends TestCase
         self::assertTrue($cost->isRefused(), 'a document asking for more reads than the budget can cover is refused');
         self::assertStringContainsString('more than '.GraphQlCost::MAX_TOKENS, (string) $cost->refusal);
         self::assertLessThan(1.0, $elapsed, \sprintf('pricing took %.2fs: the counter is expanding every occurrence again', $elapsed));
+    }
+
+    public function testAnIntrospectionOnlyFragmentTreeIsAlsoPricedPromptly(): void
+    {
+        // Gate 2 confirmation 1, finding 1: the memoised counter made the
+        // `me`-ending version of this prompt, but the introspection walk that
+        // runs after it had neither memo nor ceiling — and it only traverses
+        // the whole expansion when every leaf IS introspection, so the same
+        // hostile shape ending in `__typename` still cost 2^n.
+        $fragments = '';
+        $levels = 40;
+        for ($i = 0; $i < $levels; ++$i) {
+            $next = $i === $levels - 1 ? '__typename' : \sprintf('...F%d ...F%d', $i + 1, $i + 1);
+            $fragments .= \sprintf(' fragment F%d on Query { %s }', $i, $next);
+        }
+
+        $started = microtime(true);
+        $cost = GraphQlCost::of(self::request(['query' => '{ ...F0 }'.$fragments]));
+        $elapsed = microtime(true) - $started;
+
+        self::assertTrue($cost->isRefused(), 'it asks for more reads than the ceiling allows, introspection or not');
+        self::assertLessThan(1.0, $elapsed, \sprintf('pricing took %.2fs: a walk over this document is still expanding it', $elapsed));
+    }
+
+    public function testAnIntrospectionOnlyDocumentUnderTheCeilingStillCostsOne(): void
+    {
+        // the guard above must not have turned every introspection document
+        // into a refusal: a shared fragment is counted once and still priced
+        // at one token, which is the rule it exists to keep
+        $document = '{ ...a ...a } fragment a on Query { __schema { queryType { name } } __typename }';
+
+        $cost = GraphQlCost::of(self::request(['query' => $document]));
+
+        self::assertFalse($cost->isRefused(), (string) $cost->refusal);
+        self::assertSame(1, $cost->tokens);
     }
 
     public function testACostAtTheCeilingIsStillPriced(): void

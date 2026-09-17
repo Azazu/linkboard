@@ -71,16 +71,26 @@ final readonly class GraphQlCost
      */
     public static function of(Request $request): self
     {
-        $body = json_decode($request->getContent(), true);
-        if (!\is_array($body)) {
+        // Decoded as objects rather than associative arrays: with `true` as the
+        // second argument `{}` and `[]` both become an empty PHP array, and
+        // telling a JSON object from a JSON list is exactly what this has to
+        // do. `array_is_list()` cannot recover the difference once it is gone
+        // (Gate 2 confirmation 1, finding 2).
+        try {
+            $body = json_decode($request->getContent(), false, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
             return self::refused('The request body must be a JSON object.');
         }
-        $query = $body['query'] ?? null;
+        if (!$body instanceof \stdClass) {
+            return self::refused('The request body must be a JSON object.');
+        }
+        $query = $body->query ?? null;
         if (!\is_string($query)) {
             return self::refused('The request body must carry a "query" string.');
         }
-        if (\array_key_exists('variables', $body) && null !== $body['variables'] && !self::isJsonObject($body['variables'])) {
-            return self::refused('"variables" must be an object.');
+        $variables = $body->variables ?? null;
+        if (null !== $variables && !$variables instanceof \stdClass) {
+            return self::refused('"variables" must be a JSON object, and a JSON list is not one.');
         }
 
         try {
@@ -89,7 +99,7 @@ final readonly class GraphQlCost
             return self::refused('The query could not be parsed.');
         }
 
-        $name = $body['operationName'] ?? null;
+        $name = $body->operationName ?? null;
         if (null !== $name && !\is_string($name)) {
             return self::refused('"operationName" must be a string.');
         }
@@ -103,17 +113,19 @@ final readonly class GraphQlCost
 
         $fragments = self::fragments($document);
         $memo = [];
+        $introspectionMemo = [];
         try {
             $selections = self::count($operation->selectionSet, $fragments, [], $memo);
+            // the ceiling is applied BEFORE the second walk, so a document
+            // refused for its size is never traversed again
+            if ($selections > self::MAX_TOKENS) {
+                return self::refused(\sprintf('The document asks for more than %d reads.', self::MAX_TOKENS));
+            }
             // introspection reads the schema, not the database: one token
             // however many of these a document asks for
-            $introspectionOnly = self::isAllIntrospection($operation->selectionSet, $fragments, []);
+            $introspectionOnly = self::isAllIntrospection($operation->selectionSet, $fragments, [], $introspectionMemo);
         } catch (\OverflowException $e) {
             return self::refused($e->getMessage());
-        }
-
-        if ($selections > self::MAX_TOKENS) {
-            return self::refused(\sprintf('The document asks for more than %d reads.', self::MAX_TOKENS));
         }
 
         if (0 === $selections) {
@@ -121,21 +133,6 @@ final readonly class GraphQlCost
         }
 
         return new self(null, $introspectionOnly ? 1 : $selections);
-    }
-
-    /**
-     * Whether a decoded value was a JSON **object** rather than a list.
-     *
-     * `json_decode(…, true)` maps both to PHP arrays, so `is_array()` accepted
-     * `"variables": [1]` — a request the capability says is refused before
-     * pricing, which instead consumed a token and reached the executor (Gate 2
-     * round 1, finding 2). An empty JSON object decodes to `[]` and so does an
-     * empty list; `[]` is accepted, because an empty variable set is a
-     * legitimate thing to send and there is nothing to misread in it.
-     */
-    private static function isJsonObject(mixed $value): bool
-    {
-        return \is_array($value) && ([] === $value || !array_is_list($value));
     }
 
     private static function select(DocumentNode $document, ?string $name): ?OperationDefinitionNode
@@ -235,14 +232,18 @@ final readonly class GraphQlCost
      * Carries its own cycle guard rather than relying on `count()` having run
      * first and thrown: a defence that depends on the order two private
      * methods are called in is a defence that breaks when somebody reorders
-     * them.
+     * them. It memoises for the same reason `count()` does — an
+     * introspection-only document of the doubling shape would otherwise walk
+     * every expanded occurrence here instead, which is the same denial of
+     * service one method further along (Gate 2 confirmation 1, finding 1).
      *
      * @param array<string, FragmentDefinitionNode> $fragments
      * @param list<string>                          $expanding
+     * @param array<string, bool>                   $memo      each fragment's verdict, decided once
      *
      * @throws \OverflowException on a fragment cycle
      */
-    private static function isAllIntrospection(SelectionSetNode $set, array $fragments, array $expanding): bool
+    private static function isAllIntrospection(SelectionSetNode $set, array $fragments, array $expanding, array &$memo): bool
     {
         foreach ($set->selections as $selection) {
             if ($selection instanceof FragmentSpreadNode) {
@@ -251,13 +252,19 @@ final readonly class GraphQlCost
                     throw new \OverflowException(\sprintf('The fragment "%s" spreads itself.', $name));
                 }
                 $fragment = $fragments[$name] ?? null;
-                if (null === $fragment || !self::isAllIntrospection($fragment->selectionSet, $fragments, [...$expanding, $name])) {
+                if (null === $fragment) {
+                    return false;
+                }
+                if (!\array_key_exists($name, $memo)) {
+                    $memo[$name] = self::isAllIntrospection($fragment->selectionSet, $fragments, [...$expanding, $name], $memo);
+                }
+                if (!$memo[$name]) {
                     return false;
                 }
                 continue;
             }
             if ($selection instanceof InlineFragmentNode) {
-                if (!self::isAllIntrospection($selection->selectionSet, $fragments, $expanding)) {
+                if (!self::isAllIntrospection($selection->selectionSet, $fragments, $expanding, $memo)) {
                     return false;
                 }
                 continue;
