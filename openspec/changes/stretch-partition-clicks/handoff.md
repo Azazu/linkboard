@@ -53,8 +53,10 @@
 - Gate 2 Confirmation 1 (`b56e494`, Reviewed-Commit `8b2ef07`): finding 1 **confirmed**; finding 2 came back on the evidence rather than the fix, and correctly. My two lock tests called PostgreSQL's advisory-lock functions by hand and never touched the maintenance command — **removing the exclusive lock from production would have left them green**. Replaced by one test that runs production code on both sides: `tests/Fixture/InterruptingStatement.php` (a middleware in the shape of the existing `FailingStatement`) stops the handler between its eligibility decision and its `INSERT INTO clicks`, and the real `ClickPartitionsCommand` runs at that instant on a second connection with a 250 ms `lock_timeout` — the worker on the thirteen-month window, maintenance on two, which is the reviewer's scenario verbatim. It asserts the command was blocked, then lets it drop and re-provision for real and replays the message: no row, lifetime counter still 1. Both mutations are executed: removing either production lock turns it red with `no partition of relation "clicks" found`, because the command drops the month mid-handler and the insert lands in nothing.
 - My own error in writing it, worth recording: the first version gave the handler the two-month window, so it discarded the four-month-old message before ever reaching the insert and the interrupt never fired. A test that cannot reach the code it is about passes for the wrong reason.
 
+- Branch run on the head that carries the confirmation 1 fixes (`ea2bd20`) is green: run 35192108153 (2026-09-17), all four jobs.
+
 ## Next step
-The user pushes the branch; the executor records the green Actions run on the new head and re-reviews round 1 with `scripts/gate-run.sh stretch-partition-clicks 2 confirm 1`. **This is the second confirmation of round 1 — if finding 2 comes back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
+Re-review round 1: `scripts/gate-run.sh stretch-partition-clicks 2 confirm 1`. **Second confirmation of round 1 — if finding 2 comes back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
 
 ## Blockers
 None.
