@@ -55,7 +55,18 @@ Every `GET /api/v1/links/{id}/stats/{report}` SHALL be served to the link's owne
 - **THEN** the response status is 200 and `totalClicks` counts the existing clicks
 
 ### Requirement: Summary report
-`GET /api/v1/links/{id}/stats/summary` SHALL return `linkId`; `totalClicks`, `uniqueVisitors` (distinct `visitor_hash`), `firstClickAt` and `lastClickAt` over all of the link's clicks regardless of the period (null timestamps when the link has none); `clicksToday` (clicks of the current UTC day); `clicksInPeriod` (clicks with `from` ≤ `occurred_at` < `to`); `clicksInPreviousPeriod` (clicks in the period of the same length ending at `from`); and `deltaPercent`, the change from the previous period to the period as a percentage rounded to one decimal, null when the previous period has no clicks. Bots are excluded from every number unless `includeBots` is true.
+`GET /api/v1/links/{id}/stats/summary` SHALL return `linkId`; `totalClicks`, `uniqueVisitors` (distinct `visitor_hash`), `firstClickAt` and `lastClickAt` over all of the link's **retained** clicks regardless of the period (null timestamps when the link has none retained); `clicksToday` (clicks of the current UTC day); `clicksInPeriod` (clicks with `from` ≤ `occurred_at` < `to`); `clicksInPreviousPeriod` (clicks in the period of the same length ending at `from`); and `deltaPercent`, the change from the previous period to the period as a percentage rounded to one decimal, null when the previous period has no clicks. Bots are excluded from every number unless `includeBots` is true.
+
+Retained means: still present. Click records leave only when a run of the
+maintenance command drops the month they are in (`click-logging`, "Retention
+drops whole months, and only when asked"); the configured window decides which
+months become eligible, not which rows are visible. So a month that straddles
+the boundary keeps its older rows, and a deployment where the command has never
+run retains everything. While no month has been dropped these figures are over
+every click the link ever received; once one has been, they are over what
+survives, and a visitor whose only earlier clicks were dropped counts as new when
+they return. A period that reaches into a dropped month is answered from what
+remains rather than refused.
 
 #### Scenario: Numbers
 - **WHEN** a link has 4 clicks (2 distinct visitors) between 2026-09-01 and 2026-09-08 UTC, 2 clicks (1 visitor) between 2026-08-25 and 2026-09-01, 1 click on 2026-07-01 and 1 click today, and the owner requests `.../stats/summary?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z`
@@ -68,6 +79,10 @@ Every `GET /api/v1/links/{id}/stats/{report}` SHALL be served to the link's owne
 #### Scenario: Link without clicks
 - **WHEN** the owner requests the summary of a link that was never redirected through
 - **THEN** the response status is 200 with every count 0, `firstClickAt`, `lastClickAt` and `deltaPercent` null
+
+#### Scenario: After a month has been dropped by retention
+- **WHEN** a link's oldest clicks were in a partition that retention has dropped, and the owner requests the summary
+- **THEN** the response status is 200, `totalClicks` and `uniqueVisitors` count only the retained clicks, and `firstClickAt` is the oldest retained click rather than the link's first ever
 
 ### Requirement: Timeseries report
 `GET /api/v1/links/{id}/stats/timeseries` SHALL return `granularity` and `buckets`, one element per UTC bucket that intersects the period, in ascending order — the first and last bucket may be partial when `from` or `to` is not aligned to the granularity, every intersecting bucket present, buckets without clicks carrying zeros, and a period shorter than one bucket still yielding the bucket it lies in (two when it straddles a bucket boundary) — each with `bucket` (the RFC 3339 UTC start of the bucket), `clicks`, `uniqueVisitors` (distinct `visitor_hash` within the bucket) and `cumulativeClicks` (the running total of `clicks` from the first bucket). Only clicks inside the half-open period count, whatever their bucket: a partial first bucket holds the clicks from `from` onwards, a partial last one those before `to`. Consequently a 366-day period may span 367 day buckets and a 14-day period 337 hourly ones. Bucketing MUST be done in UTC regardless of the server's or the client's time zone: a click at `2026-03-29T00:30:00+02:00` belongs to the day bucket `2026-03-28`.

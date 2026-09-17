@@ -15,6 +15,5 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 14 | `stretch-partition-clicks` | monthly range partitioning of `clicks`, retention policy and job (ADR) | high |
 | 15 | `stretch-graphql` | API Platform GraphQL endpoint with the same voters and rate limits | medium |
 | 16 | `stretch-public-hosting` | public demo instance with HTTPS, seeded data and reset job; link in the README | medium |
