@@ -69,8 +69,12 @@ reads the schema rather than the database.
 
 A document that cannot be priced is refused before a token is spent: a body
 that is not a JSON object, a `query` that is not a string, `variables` that is
-not an object, a document that does not parse, one with no operation, one with
-several and no `operationName`, and one whose root fragments form a cycle.
+not a JSON object (a list is not one), a document that does not parse, one with
+no operation, one with several and no `operationName`, one whose root fragments
+form a cycle, and one asking for more than 1000 reads — past that ceiling the
+price is not computed, since no budget could cover it. A document that asks for
+more than your whole window, but stays under the ceiling, is a 429 with a
+`Retry-After` instead.
 
 ## What the schema will not do
 

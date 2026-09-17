@@ -118,15 +118,25 @@ The count SHALL be taken from the document as parsed, not from its text: named s
 - **WHEN** a document asks only for `__schema` and `__type`
 - **THEN** one token is consumed
 
+Pricing SHALL itself be bounded: the cost of a document SHALL be computed without re-expanding a fragment that has already been priced, and a document whose root selections exceed the largest budget the limit can grant SHALL be refused once that ceiling is reached, rather than counted to completion. A document of linear size SHALL NOT cost more than linear work to price.
+
 #### Scenario: A document over the budget is refused whole
 - **WHEN** a caller with one token left posts a document with three root selections
 - **THEN** the request is refused, and no field is resolved
 
+#### Scenario: A document larger than any budget is refused, not counted
+- **WHEN** a client posts a valid acyclic document whose root fragments each spread the next one twice, so that expanding every occurrence would yield millions of selections
+- **THEN** the request is refused for exceeding the ceiling, promptly, without the count ever being completed
+
+#### Scenario: A document asking for more than the whole budget is refused, not admitted
+- **WHEN** a caller posts a document whose root selections outnumber the rate limit's entire window
+- **THEN** the request is refused with the status the limiter uses, not answered because the charge could not be applied
+
 ### Requirement: An unusable request is refused before it is priced
-A request whose body is not a JSON object with a string `query`, whose `variables` is present but not an object, whose document does not parse, or whose operation cannot be selected — no operation, or several without `operationName` — SHALL be refused without consuming a token and without resolving anything.
+A request whose body is not a JSON object with a string `query`, whose `variables` is present but not a JSON **object** — a JSON list is not one, however it decodes — whose document does not parse, or whose operation cannot be selected — no operation, or several without `operationName` — SHALL be refused without consuming a token and without resolving anything.
 
 #### Scenario: A malformed body is refused
-- **WHEN** a client posts a body that is not a JSON object, or one whose `query` is not a string, or one whose `variables` is not an object
+- **WHEN** a client posts a body that is not a JSON object, or one whose `query` is not a string, or one whose `variables` is a string, or one whose `variables` is a JSON list
 - **THEN** the request is refused and no token is consumed
 
 #### Scenario: An unparseable document is refused

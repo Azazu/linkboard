@@ -78,10 +78,17 @@ endpoint would have been a worse cost than two shapes.
 | An unexpected internal failure | the GraphQL executor | 200 with `errors`, message generic outside `dev` |
 
 A document that cannot be priced is one whose body is not a JSON object, whose
-`query` is not a string, whose `variables` is not an object, that does not
-parse, that carries no operation, that carries several without naming one, or
-whose root fragments form a cycle. Each is refused before a token is spent and
-before anything is resolved.
+`query` is not a string, whose `variables` is present but is not a JSON
+*object* (a list is not one), that does not parse, that carries no operation,
+that carries several without naming one, whose root fragments form a cycle, or
+that asks for more than 1000 reads — the ceiling above which the price is not
+computed at all, because a document nobody could pay for is not worth counting.
+Each is refused before a token is spent and before anything is resolved.
+
+A document that *can* be priced but asks for more reads than the whole rate-limit
+window holds is a 429 rather than a 400: it is a legible request for more than
+the budget can grant, and the `Retry-After` tells the caller when to ask for
+less.
 
 ## Keeping this file honest
 

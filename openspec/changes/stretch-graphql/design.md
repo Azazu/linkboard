@@ -110,8 +110,11 @@ operation. The algorithm, because a hand-written counter is exactly where a
 bypass hides (Gate 1 round 1, finding 4):
 
 1. The body must be a JSON object with a string `query`; `variables`, when
-   present, must be an object. Anything else is **refused** without consuming a
-   token and without resolving anything.
+   present, must be a JSON **object**. Anything else is **refused** without
+   consuming a token and without resolving anything. Object and list are
+   separated by `array_is_list()`, not by `json_decode`'s return type: with
+   `true` as the second argument both `{"n":1}` and `[1]` are PHP arrays, which
+   is how a list first passed this check (Gate 2 round 1, finding 2).
 2. The document is parsed with the same parser that will execute it
    (`GraphQL\Language\Parser`). A parse error is refused.
 3. The operation is selected: `operationName` when given — and an
@@ -132,6 +135,13 @@ bypass hides (Gate 1 round 1, finding 4):
 5. A document whose root selections are all introspection (`__schema`,
    `__type`, `__typename`) costs **one**, whatever their number: introspection
    reads the schema, not the database.
+6. Counting is **memoised per fragment and saturating**: each fragment is priced
+   once, and the total stops at `MAX_TOKENS + 1`, above which the document is
+   refused rather than priced. Without this, a linear acyclic document whose
+   `F0` spreads `F1` twice, `F1` spreads `F2` twice and so on visits 2^n
+   selections — a denial of service in the counter itself, reached before any
+   ceiling of decision 4 can act, and invisible to the cycle guard because the
+   shape is acyclic (Gate 2 round 1, finding 1).
 
 *Why root selections.* One root selection is one logical read: `{ link(id:…)
 {…} linkSummaryReport(…) {…} }` is two reads and costs two, which is exactly
@@ -147,6 +157,14 @@ two unrelated things, and a caller unable to predict what a query costs.
 that is what the complexity ceiling is for. And the limiter stays **fail-open**
 on a storage failure, as it is for REST: consistency with the existing policy,
 stated because it is a real limit.
+
+*Fail-open has one deliberate exception.* `RateLimiterInterface::consume($n)`
+throws `InvalidArgumentException` when `$n` is larger than the limiter's whole
+window — a document asking for more reads than the budget could ever grant.
+That is the caller's document being wrong, not the store being unavailable, so
+it is caught separately from the fail-open branch and answered **429**. Left in
+the fail-open branch it did the opposite of what it looks like: the largest
+documents were the ones that went through unpriced (Gate 2 round 1, finding 3).
 
 ### 3a. The endpoint's path, and the one this repository already solved
 
@@ -226,10 +244,19 @@ two copies of the authentication and rate-limit logic. The split is cheaper and
 it is what the documentation now says, in the capability and in
 `docs/reference/api-errors.md`.
 
-*Not leaking internals.* API Platform renders an unexpected exception's message
-into `errors[].message`. Outside `dev` the message is replaced by a generic one;
-the test asserts no class name, no SQL and no stack frame appears — the same
-promise the REST API's error handling already makes.
+*Not leaking internals.* API Platform ships `RuntimeExceptionNormalizer`, which
+copies the message of any `\RuntimeException` into `errors[].message` whatever
+the debug flag says — and a Doctrine failure inside a resolver arrives as
+exactly that, carrying the SQL it failed on. `App\Shared\Api\GraphQlErrorBoundary`
+decorates `api_platform.graphql.error_handler` and, outside `dev`, answers one
+fixed message for every error the application did not mean for the client,
+logging the real one instead. What still reaches the caller is what describes
+its own request: an error graphql-php itself raised (no previous exception), a
+status this API chose (`HttpExceptionInterface`), a refused parameter
+(validation), an exception that declares itself client-safe — plus `locations`
+and `path`, which point into the document the caller sent. This is the same
+promise the REST API's error handling already makes; it was **not** true before
+this change, and the test that found it is the one that asserts it.
 
 ### 6. What "the same voters" actually rests on
 
@@ -240,14 +267,17 @@ requirement is the firewall's, matched by path.
 
 *So the work is proving it, not building it.* The tests query as a stranger, as
 an anonymous caller and as a non-admin, and assert that the answer carries no
-data — including that a stranger's "no such link" is indistinguishable from a
-missing one, which is the property `ADR-005` established for the pages.
+data. The two refusals stay **distinguishable**: a stranger's link answers
+`Access Denied`, an identifier no link has answers `No such link`. That is the
+REST contract this surface mirrors — [ADR-005](../../../docs/adr/ADR-005-pages-answer-404.md)
+made the *pages* answer 404 to both and deliberately left the API at 403/404,
+and GraphQL is the API.
 
 ## Applicability
 
 | Question | Answer |
 |---|---|
-| Authorization boundary | The whole point. A second entry point to the same voters, proven by tests from three angles (stranger, anonymous, non-admin) rather than by the claim that the providers are shared. The firewall matches `/api/v1/graphql` like any other API path; `security.yaml` gains the path, not a new firewall. |
+| Authorization boundary | The whole point. A second entry point to the same voters, proven by tests from three angles (stranger, anonymous, non-admin) rather than by the claim that the providers are shared. `security.yaml` is not edited at all: the `api` firewall already matches `^/api(/|$)`, so both entrypoint paths are behind it, and `app.api.graphql_paths` names them together for the rate limiter. |
 | Empty/zero/null inputs | Two places. A report queried with no arguments must use the documented defaults — the same ones the REST call uses, not whatever the factory's null-tolerance produces (decision 2). And an empty document, a document with no operation, and a `variables` object that is not an object must be refused rather than resolved as nothing. |
 | Crash before/after an external effect | n/a for writes — the schema has no mutation. A resolver that throws mid-document leaves the other fields' results in `data` with an entry in `errors`, which is GraphQL's own contract and is stated in the capability rather than discovered. |
 | Idempotency of retries | Queries are reads; retrying one costs another token, which is the intended cost. |

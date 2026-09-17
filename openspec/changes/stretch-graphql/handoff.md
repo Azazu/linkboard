@@ -1,7 +1,7 @@
 # Handoff — stretch-graphql
 
 **Updated:** 2026-09-17 · claude
-**State:** awaiting-gate-2
+**State:** fixing-g2
 **Branch:** change/stretch-graphql
 
 ## Done this session
@@ -44,13 +44,22 @@
   2. `Me` is a singleton whose provider ignores the identifier, so an item query demanded an `id` that changes nothing and invited a client to send somebody else's. It has a resolver now and takes no arguments.
 - **A latent fault of my own, surfaced by a mutation**: `GraphQlCost::isAllIntrospection()` walked fragments with no cycle guard, protected only by `count()` running first and throwing. Removing fragment expansion exhausted 512 MB instead of failing an assertion. It carries its own guard now — a defence that depends on the order two private methods are called in is not a defence.
 - **A requirement of mine was wrong and is corrected**: I had given GraphQL the *pages'* property of answering alike to "not yours" and "does not exist", but ADR-005 keeps 403 for the API deliberately. GraphQL mirrors the API, so it distinguishes them, and the capability says why.
-- **Measured, both environments**: in `dev` a depth refusal carries `extensions.file` naming a vendor path; in `prod` the same request answers with the message alone. The test asserts the absence of `/app/`, `vendor/`, `.php`, `SELECT ` and `App\`.
-- **The cost model in the wild**: one root selection leaves 599 of 600, three aliases leave 596, introspection alone leaves 595, a malformed body is 400 before a token is spent. Twenty-three unit cases pin the algorithm; three mutations (operation selection, fragment expansion, the cycle guard) each turn it red.
+- **Measured, both environments**: in `dev` a depth refusal carries `extensions.file` naming a vendor path; in `prod` the same request answers with the message alone. *(Superseded by Gate 2 finding 4 below: a depth refusal is not an unexpected internal failure, and the real one did leak.)*
+- **The cost model in the wild**: one root selection leaves 599 of 600, three aliases leave 596, introspection alone leaves 595, a malformed body is 400 before a token is spent. Twenty-eight unit cases pin the algorithm; three mutations (operation selection, fragment expansion, the cycle guard) each turn it red.
 
 - Branch run on the exact head (`459837f`) is green: run 35209737312 (2026-09-17), all four jobs — which is also what proves the new dependency installs and the schema builds on a machine that did not build it here.
 
+- Gate 2 round 1 (`b1d676e`, Reviewed-Commit `f1e946b`): changes-requested — one blocker and four major, **all five real, and three of them found live faults the tests had been hiding.**
+  1. **blocker — the cost guard was itself a denial of service.** `count()` re-expanded every fragment occurrence, so a linear acyclic document whose `F0` spreads `F1` twice, `F1` spreads `F2` twice and so on visits 2^n selections — and this runs in `LoginSuccessEvent`, *before* the complexity ceiling that was supposed to protect the worker. The cycle guard never saw it: the shape is acyclic. Measured unfixed: 22 fragments, 872 bytes, **1.39 s** and 2 097 152 tokens. Fixed by memoising each fragment's cost and saturating at `MAX_TOKENS + 1`, refusing above the ceiling: the same document is now refused in **0.0024 s**, a 200-fragment one in **0.0033 s**.
+  2. **`variables` accepted a JSON list.** `json_decode(..., true)` maps `{"n":1}` and `[1]` alike to a PHP array, so the "must be an object" check let a list through. Separated with `array_is_list()`; `{}` stays accepted, `[]` refused.
+  3. **The refusal half of the rate limit had no test — and was broken.** Writing it found a fail-open: `consume($n)` throws `InvalidArgumentException` when `$n` exceeds the limiter's own window, and the listener's fail-open branch swallowed it, so the *largest* documents were answered unpriced. Now caught separately and answered 429 with a `Retry-After`; `StatementRecorder` proves no statement touching `links` ran.
+  4. **The leak test proved nothing — and the promise was false.** It produced the same depth refusal as the limit test above, so its assertions about SQL and class names were vacuous. Rewritten to fail a real statement (`FailingStatement` armed on `FROM links t0`, a report query over it), it showed API Platform's `RuntimeExceptionNormalizer` copying `Injected failure on: SELECT t0.id AS id_1, … FROM links t0 WHERE t0.id = ?` into `errors[].message` **with `APP_DEBUG=0`** — that normalizer copies any `\RuntimeException`'s message whatever the debug flag says, and a Doctrine failure inside a resolver is exactly that. **Security-sensitive:** fixed by `App\Shared\Api\GraphQlErrorBoundary`, which decorates `api_platform.graphql.error_handler` and, outside `dev`, answers one fixed message for every error the application did not mean for the client, logging the real one. What still reaches the caller: an error graphql-php raised itself, an `HttpExceptionInterface`, a validation failure, a self-declared client-safe exception, and `locations`/`path`. Two demonstrated failing inputs: commenting out `#[AsDecorator]` fails the API test with the full `SELECT` as the actual message, and a unit case asserts the un-decorated normalizer chain leaks it.
+  5. **Stale claims in `design.md`** — the fourth time this change hit that class. Reconciled: the two refusals are deliberately **distinguishable** (`Access Denied` vs `No such link`, the REST contract ADR-005 left in place), and `security.yaml` is **not edited at all** — the `api` firewall already matches `^/api(/|$)`.
+- Swept beyond the finding, per "fix the CLAIM": the capability spec gained the pricing-is-bounded requirement and its two scenarios, the object-not-list rule and its case; `docs/reference/api-errors.md` and `docs/how-to/graphql.md` gained both new refusals; `openspec/ROADMAP.md` row 15 and `docs/explanation/requirements.md`'s stretch table said tier `medium` while the proposal declares `high` — both corrected.
+- `make check` green after the fixes: **1008 tests, 22 851 assertions** (994 / 22 787 when the gate was requested). `openspec validate stretch-graphql --strict` passes.
+
 ## Next step
-Gate 2: `scripts/gate-run.sh stretch-graphql 2 full`, per the lifecycle section at the end of `tasks.md`.
+Push `change/stretch-graphql`, verify the Actions run on the exact head, then `scripts/gate-run.sh stretch-graphql 2 confirm 1`.
 
 ## Blockers
 None.

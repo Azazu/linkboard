@@ -413,7 +413,7 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 | # | Change id | Scope | Tier |
 |---|---|---|---|
 | 14 | `stretch-partition-clicks` | monthly range partitioning of `clicks`, retention policy and job, ADR | high |
-| 15 | `stretch-graphql` | API Platform GraphQL endpoint with the same voters and limits | medium |
+| 15 | `stretch-graphql` | API Platform GraphQL endpoint with the same voters and limits | high |
 | 16 | `stretch-public-hosting` | deploy to a public host with HTTPS, demo instance link in the README | medium |
 
 ---
