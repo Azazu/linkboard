@@ -13,13 +13,14 @@
 - **No GraphQL package is installed** (`composer show | grep graphql` is empty): API Platform's GraphQL support needs `webonyx/graphql-php`. That is a new dependency, and the anti-overengineering rule means the proposal has to justify it against the row's own value rather than against "API Platform can do it".
 - **14 API resources** carry `#[ApiResource]`: `LinkResource`, `Me`, `Registration`, `ApiKeyOutput`, `UserAdmin` and the nine analytics reports. Enabling GraphQL exposes *all* of them unless each operation is chosen deliberately — which is the risk this change is really about.
 
-## Next step
-`/opsx:propose stretch-graphql`. Four things the proposal must settle, because they decide what is built:
+- Artifacts written and `openspec validate --strict` passes: proposal (tier `high` argued from the new dependency, the second authorization entry point and the denial-of-service shape of a query language), two capability deltas (`graphql-api` new, `api-docs` modified), design (six decisions plus the applicability table), tasks (31 across nine sections).
+- **The decision that shaped everything, found by reading rather than at Gate 2**: `ReportRequestFactory::parse()` reads every report parameter from `$request->query` and *tolerates a null request by falling back to defaults*. Through GraphQL there is no `Request` in the context, so every report would have answered with the default 30-day period and the caller would never have known. The factory takes a map of parameters instead; HTTP passes the query string, GraphQL passes its arguments, and the REST suites are the guard on the refactor — they must pass with no edit at all.
+- **The rate limit does not carry over by itself either**: `ApiRateLimitListener` consumes one token per HTTP request, so a document asking for fifty reports would cost what `GET /api/v1/me` costs. The rule chosen is one token per root field — one root field is one logical read, which is exactly what the same REST calls would cost, and it fits in a sentence.
+- **The surface is a list, not a side effect**: `graphQlOperations` on links, the nine reports and `me`; nothing on admin, registration or API keys; and a test that asserts the schema's query names **equal** a written-down list, so a new resource fails it rather than joining it. Its own failing input is a temporary declaration on `UserAdmin`.
+- **User decision (2026-09-17)**: offered a narrow read surface (links only), the wider read surface, or dropping the row with the reasons recorded, the user chose the wider one — links, the nine reports and `me`, read-only.
 
-1. **How much surface.** GraphQL on every resource, or a named subset? The nine analytics reports are parameterised read models with cache keys derived from their parameters (`ReportRequest::cacheKey()`); exposing them through a query language that composes parameters freely is not the same operation as the REST one, and the report cache is the place that would notice.
-2. **Whether the guarantees actually carry over.** "The same voters and rate limits" is easy to say. The limiters are wired per route and per credential in `config/packages/framework.yaml`; one GraphQL endpoint is one route, so a naive setup makes a thousand-field query cost the same as `GET /api/v1/me`. Whatever the answer, it needs a failing input.
-3. **The error format.** The API has one error contract — RFC 9457 problem details, with a catalogue and contract tests. GraphQL has its own error shape by specification. Two error formats in one API is a real cost and the proposal has to name which wins where.
-4. **Introspection and depth.** A public GraphQL endpoint with introspection on and no depth or complexity limit is a denial-of-service surface; with them off it is harder to justify at all. This is the part that argues the tier up from the roadmap's `medium`.
+## Next step
+Gate 1: `scripts/gate-run.sh stretch-graphql 1 full` — tier `high`, so the artifacts are reviewed before any implementation. `scripts/pregate-verify.sh gate1` passes.
 
 ## Blockers
 None.

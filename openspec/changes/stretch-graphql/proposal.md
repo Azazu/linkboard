@@ -1,0 +1,107 @@
+# Proposal — stretch-graphql
+
+**Risk-Tier:** high
+
+## Why
+
+§9 of the specification lists GraphQL as a stretch goal "through API Platform,
+reusing voters and rate limits", and that clause is the whole of the row: the
+interesting part is not that API Platform can serve GraphQL, it is whether the
+guarantees the REST API spent four stages establishing survive a second
+protocol. §4 currently says GraphQL is disabled, and this change is what makes
+that sentence out of date rather than contradicting it.
+
+Three of those guarantees do not carry over by themselves, and each was read
+from the source before this was written:
+
+- **The report parameters are HTTP-shaped.** `ReportRequestFactory::parse()`
+  reads `from`, `to`, `granularity`, `limit` and `includeBots` from
+  `$request->query`, an `InputBag`. GraphQL delivers arguments in the operation
+  context, not in a query string, so a report resolved through GraphQL would
+  receive `null` for the request and **silently answer with the default 30-day
+  period**, whatever the client asked for. A wrong number returned confidently
+  is worse than an error.
+- **The rate limit counts HTTP requests, not work.** `ApiRateLimitListener`
+  consumes one token on authentication success of the `api` firewall — once per
+  request. A GraphQL document asking for fifty reports is one request, so it
+  would cost exactly what `GET /api/v1/me` costs.
+- **Enabling GraphQL exposes every resource.** Fourteen classes carry
+  `#[ApiResource]`, including `UserAdmin`, `Registration` and `ApiKeyOutput`.
+  The flag is repository-wide; the surface has to be chosen operation by
+  operation, and the exclusions have to be checked rather than assumed.
+
+## What Changes
+
+- **A read-only GraphQL endpoint at `/api/v1/graphql`** over three groups of
+  resources, chosen by the user on 2026-09-17: links, the nine analytics
+  reports, and `me`. Queries only — no mutation is exposed for anything.
+- **BREAKING for `api-docs`**: the API gains a second documented protocol, and
+  the statement that GraphQL is disabled becomes false.
+- **Report parameters stop being HTTP-shaped.** The factory takes a map of
+  parameters; the HTTP path passes the query string, GraphQL passes its
+  arguments, and both produce the same `ReportRequest` with the same validation
+  and the same cache key.
+- **The rate limit is charged per root field**, not per request: a document
+  asking for ten reports consumes ten tokens from the same per-identity budget
+  a REST caller would spend on ten calls. Plus API Platform's own depth and
+  complexity ceilings, lowered from their defaults and stated.
+- **Admin, registration and API keys are not exposed**, and a test asserts the
+  schema does not contain them — an exclusion nobody checks is an exclusion
+  that lapses.
+- **One new dependency**, `webonyx/graphql-php`, which API Platform's GraphQL
+  support requires.
+
+## Capabilities
+
+### New Capabilities
+
+- `graphql-api`: what the GraphQL endpoint exposes, what it refuses, and the
+  guarantees it shares with the REST API — authorization, rate limiting,
+  report parameters and error shape.
+
+### Modified Capabilities
+
+- `api-docs`: the API serves a documented GraphQL schema beside the OpenAPI
+  document, and the "GraphQL is disabled" statement is replaced by what is
+  actually exposed.
+
+## Non-goals
+
+- **No mutations.** Creating a link, registering, issuing an API key and
+  blocking a user stay REST-only. A second write path doubles the surface where
+  the interesting part of this row — that the read guarantees carry over — is
+  already demonstrated by queries.
+- **No admin, registration or API-key resources in the schema**, by the same
+  argument and with a test.
+- **No change to any REST operation.** The OpenAPI document, the error
+  catalogue and the contract tests stay as they are; if a REST test changes,
+  something went wrong.
+- **No GraphiQL or GraphQL Playground in production.** A development IDE is a
+  development IDE.
+- **No subscriptions, no relay-style mutations, no custom resolvers** beyond
+  what the existing providers already do.
+- **No second error format for REST.** GraphQL answers in GraphQL's error
+  shape, which its specification requires; problem details remain the REST
+  contract, and the boundary is stated rather than blurred.
+
+## Impact
+
+- **Dependency**: `webonyx/graphql-php` (through API Platform's GraphQL
+  support) — the first new package since stage 3, justified by the row itself.
+- **`config/packages/api_platform.yaml`**: the `graphql` block, with
+  introspection, depth and complexity settled deliberately.
+- **`src/Analytics/`**: the report parameter plumbing — the factory takes a map
+  instead of a `Request`. The queries, the cache keys and the DTOs are
+  untouched, and the REST providers keep their behaviour.
+- **`src/Auth/`**: the rate-limit listener learns what a GraphQL document costs.
+- **Resources**: `graphQlOperations` declared on the exposed classes; the other
+  five left alone, which is what keeps them out.
+- **Security surface**: a second entry point to the same voters. That, the new
+  dependency and the denial-of-service shape of an unbounded query language are
+  why this is `high` rather than the roadmap's `medium`.
+
+## User decisions
+
+- **2026-09-17 — the surface.** Offered a narrow read-only surface (links
+  only), the wider read surface (links, the nine reports and `me`), or dropping
+  the row and recording why, the user chose the wider read surface.
