@@ -88,6 +88,19 @@ final readonly class ApiRateLimitListener
 
         try {
             $limit = $this->limiter->create($identity)->consume($cost->tokens);
+        } catch (\InvalidArgumentException $e) {
+            // The limiter refuses to reserve more tokens than its own size —
+            // a document asking for more reads than the whole budget holds.
+            // That is a refusal, not an outage: failing open here would let
+            // the largest documents through unlimited, which is the opposite
+            // of what the budget is for (Gate 2 round 1, finding 3, found by
+            // the test that finding asked for).
+            $this->logger->info('GraphQL document asks for more than the whole budget', ['tokens' => $cost->tokens]);
+            $response = ProblemDetails::response(429, 'Too Many Requests', 'The document asks for more reads than the rate limit allows in one window.');
+            $response->headers->set('Retry-After', '60');
+            $event->setResponse($response);
+
+            return;
         } catch (\Throwable $e) {
             $this->logger->warning('API rate limiter unavailable; failing open', ['exception' => $e::class]);
 

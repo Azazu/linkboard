@@ -69,6 +69,8 @@ final class GraphQlCostTest extends TestCase
         yield 'a body that is not a JSON object' => ['"just a string"', 'JSON object'];
         yield 'a query that is not a string' => [['query' => 42], '"query" string'];
         yield 'variables that are not an object' => [['query' => '{ me { email } }', 'variables' => 'nope'], '"variables"'];
+        yield 'variables that are a JSON list' => ['{"query":"{ me { email } }","variables":[1]}', '"variables"'];
+        yield 'variables that are a list of objects' => ['{"query":"{ me { email } }","variables":[{"n":1}]}', '"variables"'];
         yield 'an operationName that is not a string' => [['query' => '{ me { email } }', 'operationName' => 7], '"operationName"'];
         yield 'a document that does not parse' => [['query' => '{ me { email '], 'parsed'];
         yield 'a document with no operation' => [['query' => 'fragment f on Query { me { email } }'], 'exactly one operation'];
@@ -90,6 +92,49 @@ final class GraphQlCostTest extends TestCase
         self::assertTrue($cost->isRefused(), 'the request should not have been priced');
         self::assertStringContainsString($expected, (string) $cost->refusal);
         self::assertSame(0, $cost->tokens, 'a refused request consumes nothing');
+    }
+
+    public function testAnEmptyVariableSetIsAccepted(): void
+    {
+        // `{}` and `[]` decode to the same PHP array, and an empty variable
+        // set is a legitimate thing to send: there is nothing to misread in it
+        foreach (['{"query":"{ me { email } }","variables":{}}', '{"query":"{ me { email } }","variables":[]}'] as $body) {
+            $cost = GraphQlCost::of(self::request($body));
+            self::assertFalse($cost->isRefused(), (string) $cost->refusal);
+        }
+    }
+
+    public function testAFragmentTreeThatDoublesAtEveryLevelIsPricedPromptly(): void
+    {
+        // Gate 2 round 1, finding 1: without memoisation this visits 2^n
+        // selections. Measured before the fix — 22 fragments, 860 bytes, 1.39
+        // seconds and 2 097 152 tokens; the shape is acyclic and valid, so the
+        // cycle guard never saw it, and this runs before API Platform's
+        // complexity ceiling could.
+        $fragments = '';
+        $levels = 40;
+        for ($i = 0; $i < $levels; ++$i) {
+            $next = $i === $levels - 1 ? 'me { email }' : \sprintf('...F%d ...F%d', $i + 1, $i + 1);
+            $fragments .= \sprintf(' fragment F%d on Query { %s }', $i, $next);
+        }
+
+        $started = microtime(true);
+        $cost = GraphQlCost::of(self::request(['query' => '{ ...F0 }'.$fragments]));
+        $elapsed = microtime(true) - $started;
+
+        self::assertTrue($cost->isRefused(), 'a document asking for more reads than the budget can cover is refused');
+        self::assertStringContainsString('more than '.GraphQlCost::MAX_TOKENS, (string) $cost->refusal);
+        self::assertLessThan(1.0, $elapsed, \sprintf('pricing took %.2fs: the counter is expanding every occurrence again', $elapsed));
+    }
+
+    public function testACostAtTheCeilingIsStillPriced(): void
+    {
+        $document = '{ '.implode(' ', array_map(static fn (int $i): string => "a$i: me { email }", range(1, GraphQlCost::MAX_TOKENS))).' }';
+
+        $cost = GraphQlCost::of(self::request(['query' => $document]));
+
+        self::assertFalse($cost->isRefused(), (string) $cost->refusal);
+        self::assertSame(GraphQlCost::MAX_TOKENS, $cost->tokens);
     }
 
     public function testARequestThatIsNotGraphQlCostsOne(): void

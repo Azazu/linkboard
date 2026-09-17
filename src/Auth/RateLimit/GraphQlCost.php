@@ -31,6 +31,16 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final readonly class GraphQlCost
 {
+    /**
+     * The most a document may cost before it is refused rather than priced.
+     *
+     * A document costing more than the whole per-minute budget can never be
+     * served, so pricing it precisely is work done for nothing — and the
+     * pricing itself is where that work would be spent (Gate 2 round 1,
+     * finding 1). The counter saturates here and refuses.
+     */
+    public const int MAX_TOKENS = 1000;
+
     public function __construct(
         /** The reason a document could not be priced, or null when it could. */
         public ?string $refusal,
@@ -69,7 +79,7 @@ final readonly class GraphQlCost
         if (!\is_string($query)) {
             return self::refused('The request body must carry a "query" string.');
         }
-        if (\array_key_exists('variables', $body) && null !== $body['variables'] && !\is_array($body['variables'])) {
+        if (\array_key_exists('variables', $body) && null !== $body['variables'] && !self::isJsonObject($body['variables'])) {
             return self::refused('"variables" must be an object.');
         }
 
@@ -92,8 +102,9 @@ final readonly class GraphQlCost
         }
 
         $fragments = self::fragments($document);
+        $memo = [];
         try {
-            $selections = self::count($operation->selectionSet, $fragments, []);
+            $selections = self::count($operation->selectionSet, $fragments, [], $memo);
             // introspection reads the schema, not the database: one token
             // however many of these a document asks for
             $introspectionOnly = self::isAllIntrospection($operation->selectionSet, $fragments, []);
@@ -101,11 +112,30 @@ final readonly class GraphQlCost
             return self::refused($e->getMessage());
         }
 
+        if ($selections > self::MAX_TOKENS) {
+            return self::refused(\sprintf('The document asks for more than %d reads.', self::MAX_TOKENS));
+        }
+
         if (0 === $selections) {
             return self::refused('The operation selects nothing.');
         }
 
         return new self(null, $introspectionOnly ? 1 : $selections);
+    }
+
+    /**
+     * Whether a decoded value was a JSON **object** rather than a list.
+     *
+     * `json_decode(…, true)` maps both to PHP arrays, so `is_array()` accepted
+     * `"variables": [1]` — a request the capability says is refused before
+     * pricing, which instead consumed a token and reached the executor (Gate 2
+     * round 1, finding 2). An empty JSON object decodes to `[]` and so does an
+     * empty list; `[]` is accepted, because an empty variable set is a
+     * legitimate thing to send and there is nothing to misread in it.
+     */
+    private static function isJsonObject(mixed $value): bool
+    {
+        return \is_array($value) && ([] === $value || !array_is_list($value));
     }
 
     private static function select(DocumentNode $document, ?string $name): ?OperationDefinitionNode
@@ -148,12 +178,27 @@ final readonly class GraphQlCost
     /**
      * Root selections, with fragments expanded.
      *
+     * Two properties make this safe to run before anything else does, and both
+     * were added because the first version had neither (Gate 2 round 1,
+     * finding 1):
+     *
+     * - **each fragment is counted once**, its cost memoised. Without that, a
+     *   document where `F0` spreads `F1` twice, `F1` spreads `F2` twice and so
+     *   on re-expands every occurrence: measured, 22 such fragments in an
+     *   860-byte document made this visit 2 097 152 selections in 1.39 s, and
+     *   a few more would have taken minutes and then overflowed the addition.
+     *   It runs on `LoginSuccessEvent`, before API Platform's complexity
+     *   validation, so that ceiling could not have saved the worker;
+     * - **the total saturates** at `MAX_TOKENS + 1` and stops adding, so the
+     *   arithmetic cannot overflow however the fragments multiply.
+     *
      * @param array<string, FragmentDefinitionNode> $fragments
      * @param list<string>                          $expanding the spreads already being followed, so a cycle is refused rather than followed for ever
+     * @param array<string, int>                    $memo      each fragment's cost, computed once
      *
-     * @throws \OverflowException on a fragment cycle
+     * @throws \OverflowException on a fragment cycle or an undefined fragment
      */
-    private static function count(SelectionSetNode $set, array $fragments, array $expanding): int
+    private static function count(SelectionSetNode $set, array $fragments, array $expanding, array &$memo): int
     {
         $total = 0;
         foreach ($set->selections as $selection) {
@@ -166,16 +211,21 @@ final readonly class GraphQlCost
                 if (null === $fragment) {
                     throw new \OverflowException(\sprintf('The document spreads an undefined fragment "%s".', $name));
                 }
-                $total += self::count($fragment->selectionSet, $fragments, [...$expanding, $name]);
-                continue;
+                if (!\array_key_exists($name, $memo)) {
+                    $memo[$name] = self::count($fragment->selectionSet, $fragments, [...$expanding, $name], $memo);
+                }
+                $total += $memo[$name];
+            } elseif ($selection instanceof InlineFragmentNode) {
+                $total += self::count($selection->selectionSet, $fragments, $expanding, $memo);
+            } else {
+                // a field: aliases are separate selections, and @skip/@include
+                // are deliberately not evaluated
+                ++$total;
             }
-            if ($selection instanceof InlineFragmentNode) {
-                $total += self::count($selection->selectionSet, $fragments, $expanding);
-                continue;
+
+            if ($total > self::MAX_TOKENS) {
+                return self::MAX_TOKENS + 1;
             }
-            // a field: aliases are separate selections, and @skip/@include are
-            // deliberately not evaluated
-            ++$total;
         }
 
         return $total;
