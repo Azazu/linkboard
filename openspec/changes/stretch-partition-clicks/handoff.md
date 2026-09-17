@@ -1,7 +1,7 @@
 # Handoff — stretch-partition-clicks
 
 **Updated:** 2026-09-16 · claude
-**State:** fixing-g2
+**State:** ready-to-merge
 **Branch:** change/stretch-partition-clicks
 
 ## Done this session
@@ -55,8 +55,10 @@
 
 - Branch run on the head that carries the confirmation 1 fixes (`ea2bd20`) is green: run 35192108153 (2026-09-17), all four jobs.
 
+- Gate 2 Confirmation 2 (`beeb13c`, Reviewed-Commit `17ba9fd`): **confirmed — Gate 2 passed.** Both findings closed. The reviewer states what it could not do: no Docker socket in its sandbox, so `make check` and the lock-removal mutations were read rather than re-executed.
+
 ## Next step
-Re-review round 1: `scripts/gate-run.sh stretch-partition-clicks 2 confirm 1`. **Second confirmation of round 1 — if finding 2 comes back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
+The user pushes this commit and merges (`/git:merge stretch-partition-clicks`), then `/opsx:archive` — the two capability deltas (`click-logging`, `analytics`) are synced into `openspec/specs/` and roadmap row 14 is removed. Next: row 15 `stretch-graphql`.
 
 ## Blockers
 None.
