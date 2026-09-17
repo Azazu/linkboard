@@ -120,10 +120,60 @@ final class SharedCacheAndBudgetTest extends GraphQlTestCase
         self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
         self::assertNotNull($client->getResponse()->headers->get('Retry-After'));
         self::assertStringContainsString('more reads than the rate limit allows', Json::string(Json::decode($client->getResponse()->getContent()), 'detail'));
-        self::assertSame([], array_filter(
+        // the window is named here too, so a caller learns what it overran and
+        // not merely that it did (Gate 2 confirmation 1, finding 3)
+        self::assertSame('2', $client->getResponse()->headers->get('X-RateLimit-Limit'));
+        self::assertSame('2', $client->getResponse()->headers->get('X-RateLimit-Remaining'), 'nothing was reserved: the charge was never applied');
+        self::assertSame([], self::statementsTouchingLinks(), 'no field was resolved: the refusal happened before the executor');
+    }
+
+    public function testADocumentOverWhatIsLeftOfTheBudgetIsRefusedWithTheWholeContract(): void
+    {
+        // Gate 2 confirmation 1, finding 3: the test above exercises a charge
+        // larger than the limiter's whole capacity, which is a different
+        // branch. This is the case the capability states — a document whose
+        // root cost exceeds what this caller has LEFT — and it asserts the
+        // refusal's whole contract rather than its status alone.
+        $client = self::createClient();
+        $client->disableReboot();
+        $owner = UserFactory::createOne(['email' => 'a@example.com']);
+        LinkFactory::createOne(['owner' => $owner, 'slug' => 'partly-read']);
+        self::getContainer()->set('limiter.api_identity', self::limiterWithLimit(5));
+        $token = $this->token($client, 'a@example.com');
+
+        // spend two of five, leaving three
+        $this->post($client, $token, '{ a: links { totalCount } b: links { totalCount } }');
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame(3, self::remaining($client), 'two of five spent');
+
+        StatementRecorder::reset();
+        $this->post($client, $token, '{ a: links { totalCount } b: links { totalCount } c: links { totalCount } d: links { totalCount } }');
+
+        self::assertResponseStatusCodeSame(429, 'four reads against three left');
+        self::assertStringStartsWith('application/problem+json', (string) $client->getResponse()->headers->get('Content-Type'));
+        self::assertStringContainsString('rate limit exceeded', Json::string(Json::decode($client->getResponse()->getContent()), 'detail'));
+        self::assertNotNull($client->getResponse()->headers->get('Retry-After'));
+        self::assertSame('5', $client->getResponse()->headers->get('X-RateLimit-Limit'));
+        // still three: a refused charge reserves nothing, so the caller may
+        // come straight back with a document of three selections or fewer
+        self::assertSame('3', $client->getResponse()->headers->get('X-RateLimit-Remaining'));
+        self::assertSame([], self::statementsTouchingLinks(), 'the whole document was refused: not one of the four was resolved');
+
+        // and that is not a claim about the header alone: the smaller document
+        // is answered immediately after the refusal
+        $this->post($client, $token, '{ a: links { totalCount } b: links { totalCount } c: links { totalCount } }');
+        self::assertResponseStatusCodeSame(200, 'the refusal cost the caller nothing');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function statementsTouchingLinks(): array
+    {
+        return array_values(array_filter(
             StatementRecorder::statements(),
             static fn (string $sql): bool => (bool) preg_match('/\blinks\b/i', $sql),
-        ), 'no field was resolved: the refusal happened before the executor');
+        ));
     }
 
     public function testADocumentWithinTheBudgetIsAnsweredWhereTheSameDocumentOverItIsNot(): void
@@ -144,6 +194,8 @@ final class SharedCacheAndBudgetTest extends GraphQlTestCase
 
         $this->post($client, $token, $document);
         self::assertResponseStatusCodeSame(429, 'and the same document again cannot be covered');
+        self::assertSame('3', $client->getResponse()->headers->get('X-RateLimit-Limit'));
+        self::assertSame('0', $client->getResponse()->headers->get('X-RateLimit-Remaining'));
     }
 
     private static function limiterWithLimit(int $limit): RateLimiterFactoryInterface

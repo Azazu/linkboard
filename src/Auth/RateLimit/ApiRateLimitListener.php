@@ -98,6 +98,15 @@ final readonly class ApiRateLimitListener
             $this->logger->info('GraphQL document asks for more than the whole budget', ['tokens' => $cost->tokens]);
             $response = ProblemDetails::response(429, 'Too Many Requests', 'The document asks for more reads than the rate limit allows in one window.');
             $response->headers->set('Retry-After', '60');
+            // the same headers the other 429 carries, so a caller learns the
+            // window it overran rather than only that it did: consume(0)
+            // reports the state without reserving anything
+            try {
+                self::decorate($response->headers, $this->limiter->create($identity)->consume(0));
+            } catch (\Throwable) {
+                // the store is the only thing that can fail here, and a
+                // missing header is not worth failing a refusal over
+            }
             $event->setResponse($response);
 
             return;
