@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Click;
 
+use App\Click\Handler\ClickRecordedHandler;
 use App\Click\Retention\ClickPartitionsCommand;
 use App\Click\Retention\ClickRetention;
 use App\Shared\Db\Row;
 use App\Tests\Factory\LinkFactory;
 use App\Tests\Factory\UserFactory;
+use App\Tests\Fixture\InterruptingStatement;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -138,45 +144,84 @@ final class ClickPartitionsCommandTest extends KernelTestCase
         self::assertEquals($boundary, $this->retention('13', '3')->droppedThrough());
     }
 
-    public function testRetentionCannotDropWhileAHandlerHoldsItsDecision(): void
+    public function testTheRealMaintenanceCommandCannotDropWhileAHandlerHoldsItsDecision(): void
     {
-        // the two sides of the race take one advisory lock: shared in the
-        // handler, exclusive in retention (Gate 2 round 1, finding 2). Proven
-        // deterministically with two connections rather than with timing.
-        $handler = $this->connection();
-        $maintenance = DriverManager::getConnection($handler->getParams());
+        // The race in full, deterministically and through production code on
+        // both sides (Gate 2 round 1, finding 2, and its confirmation): the
+        // handler is stopped between its eligibility decision and its insert,
+        // and the REAL maintenance command runs there, on its own connection,
+        // with a lock timeout so "it waits" is observable.
+        //
+        // Removing either production lock — the handler's shared one or the
+        // command's exclusive one — makes the command succeed at that moment
+        // and this test fail.
+        // the worker runs with the long window, maintenance with a short one —
+        // the reviewer's scenario exactly: the handler judges the click
+        // recordable and the command is about to decide it is not
+        $link = LinkFactory::createOne(['owner' => UserFactory::createOne(), 'slug' => 'raced']);
+        $month = new \DateTimeImmutable('-4 months');
+        $message = ClickRecordedHandlerTest::messageAt((string) $link->getId(), $month);
 
-        $handler->beginTransaction();
-        $handler->executeStatement('SELECT pg_advisory_xact_lock_shared(?)', [ClickRetention::LOCK_KEY]);
+        $maintenance = DriverManager::getConnection($this->connection()->getParams());
+        $maintenance->executeStatement("SET lock_timeout = '250ms'");
+        $blocked = null;
+
+        InterruptingStatement::interruptOn('INSERT INTO clicks', static function () use ($maintenance, &$blocked): void {
+            // the handler is inside its transaction, past its decision, about
+            // to write: the command must not be able to remove that month now
+            try {
+                new ClickPartitionsCommand($maintenance, new ClickRetention($maintenance, '2', '3'))(
+                    new SymfonyStyle(new ArrayInput([]), new BufferedOutput()),
+                    true,
+                );
+                $blocked = false;
+            } catch (DriverException $e) {
+                $blocked = str_contains(strtolower($e->getMessage()), 'lock timeout');
+            }
+        });
 
         try {
-            self::assertFalse(
-                (bool) $maintenance->fetchOne('SELECT pg_try_advisory_xact_lock(?)', [ClickRetention::LOCK_KEY]),
-                'retention cannot take the lock while a handler holds its decision',
-            );
+            $this->handler($this->retention('13', '3'))($message);
         } finally {
-            $handler->rollBack();
-            $maintenance->close();
+            InterruptingStatement::reset();
         }
+
+        self::assertTrue($blocked, 'the maintenance command dropped a month while a handler held its decision');
+        self::assertSame(1, $this->clickCount($link->getId()), 'the handler completed its own write');
+
+        // and the second half: once the handler is done, the same command runs
+        // for real — dropping the month and recording the boundary — a later
+        // run re-provisions it under a longer window, and the replay of that
+        // very message must not be counted again
+        $this->maintain(months: '2', horizon: '3', retention: true);
+        self::assertNotContains($month->format('Y_m'), $this->partitionMonths(), 'the month is gone once nobody holds the lock');
+        $this->maintain(months: '13', horizon: '3', retention: true);
+        self::assertContains($month->format('Y_m'), $this->partitionMonths(), 're-provisioned by the longer window');
+
+        $this->handler(new ClickRetention($this->connection(), '13', '3'))($message);
+
+        self::assertSame(0, $this->clickRowCount($link->getId()), 'the replay wrote no row');
+        self::assertSame(1, $this->lifetimeCounter($link->getId()), 'and the lifetime counter stayed at one');
     }
 
-    public function testAHandlerCannotDecideWhileRetentionIsDropping(): void
+    private function handler(?ClickRetention $retention = null): ClickRecordedHandler
     {
-        $maintenance = $this->connection();
-        $handler = DriverManager::getConnection($maintenance->getParams());
+        return new ClickRecordedHandler(
+            $this->connection(),
+            new Logger('test', [new TestHandler()]),
+            $retention ?? $this->retention('13', '3'),
+            new NativeClock(),
+        );
+    }
 
-        $maintenance->beginTransaction();
-        $maintenance->executeStatement('SELECT pg_advisory_xact_lock(?)', [ClickRetention::LOCK_KEY]);
+    private function clickRowCount(Uuid $link): int
+    {
+        return Row::toInt($this->connection()->fetchOne('SELECT count(*) FROM clicks WHERE link_id = ?', [$link->toRfc4122()]));
+    }
 
-        try {
-            self::assertFalse(
-                (bool) $handler->fetchOne('SELECT pg_try_advisory_xact_lock_shared(?)', [ClickRetention::LOCK_KEY]),
-                'a handler waits rather than deciding against a schema that is being changed',
-            );
-        } finally {
-            $maintenance->rollBack();
-            $handler->close();
-        }
+    private function lifetimeCounter(Uuid $link): int
+    {
+        return Row::toInt($this->connection()->fetchOne('SELECT click_count FROM links WHERE id = ?', [$link->toRfc4122()]));
     }
 
     public function testNothingIsDroppedWithoutTheRetentionOption(): void

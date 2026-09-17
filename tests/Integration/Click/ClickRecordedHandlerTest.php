@@ -265,7 +265,7 @@ final class ClickRecordedHandlerTest extends KernelTestCase
         self::assertSame(0, self::clickCount($link->getId()), 'and nothing was counted');
     }
 
-    private static function messageAt(string $linkId, \DateTimeImmutable $at): ClickRecorded
+    public static function messageAt(string $linkId, \DateTimeImmutable $at): ClickRecorded
     {
         $message = self::message($linkId);
 
