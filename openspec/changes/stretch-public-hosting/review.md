@@ -75,3 +75,22 @@
 | 7 | confirmed |
 | 8 | confirmed |
 | 9 | confirmed |
+
+## Confirmation 4 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** 7bcd4fdbcf4943564f0a7c0634395f192cc2d577
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed |
+| 2 | confirmed |
+| 3 | confirmed |
+| 4 | changes-requested — The deployment requirement, design decision 3, and tasks 2.2–2.4 now consistently specify the real safety mechanism: dependants remain stopped after an interrupted two-file publication, and the next init run repairs the partial or mismatched pair. However, the same claim remains stale in `proposal.md`: its production-image bullet says provisioning moves to “the entrypoint,” while the following bullet says the one-shot init service is the only writer, and that bullet still says the pair is published by moving both files into place “at once.” Two moves are not one atomic publication, as the revised design now correctly states. Reconcile these scope statements with the init-service ordering and fail/repair mechanism before this finding is confirmed. |
+| 5 | changes-requested — Task 2.4 now no longer contains the production-stack invocation caught by confirmation 3, and the planned checks cover the rendered server settings and all effective application consumers. But `design.md` still gives the production rollback as the exact command `docker compose down`, despite decision 6 saying every production-stack invocation uses `docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.prod.yml <command>`. Use that documented production form for the rollback too (and keep the repository-wide assertion), so teardown addresses the same project and interpolation source as deployment. |
+| 6 | confirmed |
+| 7 | confirmed |
+| 8 | confirmed |
+| 9 | confirmed |
