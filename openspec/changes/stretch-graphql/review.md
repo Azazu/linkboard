@@ -28,3 +28,17 @@
 | 2 | changes-requested — The versioned-route mechanism is now named, but its method contract and verification remain inconsistent with the installed route. API Platform's `api_graphql_entrypoint` route declares no method restriction, while the api-docs delta asserts `GET /api/graphql` is 405 because the endpoint accepts POST only; task 2.3 tests only successful POSTs, and the planned custom route likewise does not specify `methods: [POST]`. The route plan therefore still does not establish the claimed positive/negative behavior. |
 | 3 | changes-requested — The artifacts now consistently choose problem details for pre-executor failures and identify the firewall/rate-limit listener as the mechanism. However, the contract explicitly covers missing, invalid, and blocked credentials, while tasks 2.4 and 7.1 verify only a missing credential; no task verifies invalid or blocked credentials at either GraphQL path. The requested tests for each credential failure path are therefore incomplete. |
 | 4 | changes-requested — The parser plan is more precise, but it still omits named-operation selection tests, a missing/nonexistent `operationName`, inline fragments, repeated selections with the same response key, and fragment-cycle rejection. Tasks 6.2–6.5 cover only named fragment spreads, aliases, directives, introspection, malformed bodies, no operation, and ambiguity without `operationName`; thus several bypass cases explicitly named in the finding remain unspecified or unverified. |
+
+## Confirmation 2 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** fc51d0a47ccd9b0b55400325d79c6268c76fba8d
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The inventory, explicit empty lists, implementation tasks, and demonstrated regression direction are now correct, but the capability spec still states the inverse mechanism. `specs/graphql-api/spec.md` says a resource carrying `ApiResource` “without a GraphQL operation” does not appear in the schema (lines 35–44); under the API Platform default behavior established by this finding, that undeclared resource receives default queries and mutations. The requirement and scenario must instead express explicit exclusion (for example, `graphQlOperations: []`) so the living requirement agrees with the design and tasks. |
+| 2 | confirmed — The artifacts now specify the custom `/api/v1/graphql` route, bind it to the GraphQL entrypoint with `methods: [POST]`, test POST on both registered paths and 405 only on the versioned route, and defer the framework route's GET behavior to an explicit measurement task rather than asserting an unsupported status. |
+| 3 | confirmed — The firewall/rate-limit problem-details boundary is consistent across the design and specs, and task 2.4 now verifies missing, malformed, expired, unknown-key, and blocked-account credentials at both GraphQL paths before execution. |
+| 4 | confirmed — The counting algorithm and verification tasks now cover named-operation selection and unmatched names, named and inline root fragments, repeated response keys, directives, introspection, malformed and ambiguous documents, and fragment cycles, with demonstrated failing inputs for selection, fragment expansion, cycle protection, and per-selection charging. |
