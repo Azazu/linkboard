@@ -33,11 +33,17 @@ Because the build boots nothing, two artefacts the running service needs are pro
 
 Provisioning SHALL have a **single writer**, and every process that depends on its output SHALL start only after it has completed. This is not tidiness: generating a keypair is not atomic — a generator writes the private and the public key as two files, and may build a candidate pair before deciding whether one already exists — so several processes provisioning at once on a clean host can leave one run's private key beside another run's public key, an instance that signs tokens nothing can verify. A deployment SHALL make that impossible by ordering rather than detect it afterwards.
 
-The assets SHALL be compiled into a location the web server can read, and the keypair SHALL be generated only if absent, into storage that survives a container being replaced. Neither SHALL be written into an image layer, and the private key SHALL NOT enter the repository, an image, a log or any output. Provisioning SHALL be idempotent: starting the deployment repeatedly SHALL NOT replace an existing keypair, and SHALL NOT leave the assets missing or half-written.
+The keypair SHALL be **published atomically**: it SHALL become visible at its final location only when both of its files exist, and a provisioning run that is interrupted SHALL NOT leave a state that a later run accepts as complete. Before deciding whether provisioning is needed, a run SHALL repair what it finds: a location holding only one of the two files, or a pair whose public key is not the one belonging to its private key, SHALL be discarded and generated afresh rather than used. Treating the presence of either file as proof of a usable pair is insufficient, because it admits exactly the state an interrupted run leaves behind.
+
+The assets SHALL be compiled into a location the web server can read, and the keypair SHALL be generated only if a usable one is absent, into storage that survives a container being replaced. Neither SHALL be written into an image layer, and the private key SHALL NOT enter the repository, an image, a log or any output. Provisioning SHALL be idempotent: starting the deployment repeatedly SHALL NOT replace a usable keypair, and SHALL NOT leave the assets missing or half-written.
 
 #### Scenario: A concurrent clean start yields one matching pair
 - **WHEN** the whole stack is started at once on a host with no keypair, so that every process that needs one starts in the same moment
 - **THEN** exactly one keypair exists, its public key is the one belonging to its private key, and no process served a request before it existed
+
+#### Scenario: An interrupted provisioning run is repaired, not inherited
+- **WHEN** provisioning is interrupted after one of the keypair's two files has been written, and the deployment is started again
+- **THEN** the second run discards the partial state and produces a complete, matching pair, and no process served a request with the partial one
 
 #### Scenario: A clean host issues tokens
 - **WHEN** the stack is started for the first time on a host with no keypair, and a seeded account posts its credentials to the token endpoint
@@ -100,7 +106,7 @@ The deployment SHALL require, from outside the repository, every setting through
 
 When one of those settings is unset, empty, or **still equal to the value committed in the repository as a local development default**, the application SHALL fail to boot with a message naming the setting — in every process of the deployment, the web application, the worker and the scheduler alike. The message SHALL NOT contain the value it found. No such value SHALL appear in the repository, in an image layer, in a log line or in a message.
 
-Naming the settings is not sufficient on its own, because two of them can disagree: a data store's server is configured with a password of its own while the application connects with a connection string, so changing only the second would satisfy the check while the server kept the committed credential, and changing both differently would produce a deployment that starts and then cannot query. The deployment SHALL therefore take **one authoritative credential per store** and derive every connection string the application uses from it, so that a disagreement cannot be introduced through configuration. Where a connection string is nonetheless overridden so that it no longer matches its store, the deployment SHALL surface it through the deep dependency probe as that store being unreachable, rather than by failing at an arbitrary later request.
+Naming the settings is not sufficient on its own, because two of them can disagree: a data store's server is configured with a password of its own while the application connects with a connection string, so changing only the second would satisfy the check while the server kept the committed credential, and changing both differently would produce a deployment that starts and then cannot query. The deployment SHALL therefore take **one authoritative credential per store** and derive every connection string the application uses from it, so that a disagreement cannot be introduced through configuration. The file those authoritative credentials live in SHALL be the one the deployment's own tooling reads when it renders that configuration, and the invocation that names it SHALL be the same one the documentation gives and the same one every verification uses — otherwise the derived values would be rendered from the repository's committed defaults while the check examined credentials nothing consumed. Where a connection string is nonetheless overridden so that it no longer matches its store, the deployment SHALL surface it through the deep dependency probe as that store being unreachable, rather than by failing at an arbitrary later request.
 
 #### Scenario: An unset setting is fatal, and named
 - **WHEN** the deployment starts with the application secret unset
@@ -117,6 +123,10 @@ Naming the settings is not sufficient on its own, because two of them can disagr
 #### Scenario: The failure does not disclose the value
 - **WHEN** a setting is misconfigured and the boot fails
 - **THEN** the message names the setting and does not contain the value it found
+
+#### Scenario: The rendered configuration comes from the authoritative file
+- **WHEN** the deployment's configuration is rendered with the documented invocation
+- **THEN** the authoritative credentials appear in the store servers' own settings and in every connection string derived for the application, and no committed default does
 
 #### Scenario: One credential reaches both the store and the application
 - **WHEN** the deployment is started on empty storage with only the authoritative database credential changed from its committed value, and then the same is done for the Redis credential

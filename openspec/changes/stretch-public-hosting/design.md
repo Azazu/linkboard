@@ -82,10 +82,12 @@ exempt the build from the check. The first puts secrets in a build log, the
 second is a bypass that will be used by accident.
 
 So the build does the work that needs no kernel — install without development
-packages, copy the source — and **the entrypoint does the rest at container
-start, after the settings have been accepted**: warm the cache, compile the
-assets, generate the JWT keypair if it is absent. The check is not weakened
-anywhere, and the build genuinely has nothing to bypass.
+packages, copy the source — and **the rest happens at start, after the settings
+have been accepted**. Which process does which part is decision 3's subject and
+is not a detail: the shared artefacts (the compiled assets and the signing
+keypair) are written once by a one-shot init service, and each application
+container's own entrypoint warms only its private cache. The check is not
+weakened anywhere, and the build genuinely has nothing to bypass.
 
 *What it does not guarantee.* The first start is slower than a start from a
 pre-warmed image, and every container of the stack pays it. That is the price of
@@ -103,14 +105,14 @@ mechanisms would be worse than one).
 ### 3. One volume carries the assets to the proxy, another carries the keys — written by a single provisioner
 
 PHP-FPM cannot serve static files and the proxy has no copy of the application
-(Gate 1 round 1, finding 3). The application container writes its compiled assets
-at start into a **named volume**, which the proxy mounts read-only and serves
-directly; the proxy passes everything else to the application. One producer, one
-consumer, no bind mount of the working tree and no second image to keep in step.
+(Gate 1 round 1, finding 3). The init service writes the compiled assets at start
+into a **named volume**, which the proxy mounts read-only and serves directly;
+the proxy passes everything else to the application. One producer, one consumer,
+no bind mount of the working tree and no second image to keep in step.
 
 The JWT keypair gets a volume of its own for a different reason: it must
 **survive** a container being replaced, or every restart would invalidate every
-token in the wild. The entrypoint generates it only when absent. The private key
+token in the wild. The init service generates it only when absent. The private key
 is therefore in a volume on the host and in no image layer, no repository and no
 log (Gate 1 round 1, finding 4).
 
@@ -134,10 +136,25 @@ application containers warm only their own cache, which is private to each of
 them. `--skip-if-exists` still covers the ordinary restart, where the keys are
 already there.
 
+*And the pair is published atomically, because one writer is not enough.*
+`--skip-if-exists` treats **either** file existing as "already provisioned", and
+the generator writes the private and the public key as two separate files — so a
+crash between the two writes leaves half a pair that every later start then
+accepts, and dependants are allowed to serve with a key nothing can verify (Gate
+1 confirmation 2, finding 4). Ordering does not help here: there is only ever one
+writer and it still dies mid-way. So provisioning generates into a temporary
+directory **inside the same volume** and moves the two files into place only once
+both exist; and before it decides anything it repairs what it finds — a target
+holding only one of the two files, or a pair whose public key is not the one
+derived from its private key, is removed and regenerated rather than trusted. A
+move within one filesystem is the atomic step the generator does not give us.
+
 *What that does not guarantee.* Two *stacks* started against one volume — two
 `docker compose up` runs racing on the same host — are outside this: compose
 serialises the services of one project, not two projects. The deploy document
-says the stack is started once.
+says the stack is started once. And a keypair that is complete and self-
+consistent but *older* than the tokens in flight is indistinguishable from the
+right one; that is what keeping the volume is for.
 
 *Alternatives considered.* A `flock` around the provisioning step inside each
 entrypoint (works, since the containers share the volume's filesystem, but hides
@@ -231,12 +248,31 @@ something an operator can introduce through configuration, and the check still
 examines the effective connection strings, so a stack that somehow has a
 committed one still refuses to boot.
 
+**And the derivation has exactly one input file, named on every invocation.**
+Compose interpolation does not read `.env.local`: it reads the shell, the
+project's own `.env`, or the file `--env-file` names. A service-level
+`env_file: .env.local` populates a container that has already been created and
+does nothing for `${DB_PASSWORD}` in the compose file itself — so the derived
+connection strings and the Postgres and Redis server settings would have resolved
+from the **committed** defaults while the check passed on values nobody used
+(Gate 1 confirmation 2, finding 5). Every invocation of the production stack is
+therefore written, everywhere it appears, as
+
+```bash
+docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.prod.yml <command>
+```
+
+— in the deploy document, in every task that brings the stack up, and in
+anything CI runs. The verification is `config` rendering the authoritative values
+into both the server settings and every derived connection string, so that "the
+interpolation source is the one we meant" is checked rather than assumed.
+
 *What it does not guarantee.* It cannot tell a weak value from a strong one, only
 a changed one from an unchanged one; it says nothing about the host's file
-permissions; and someone who overrides a derived connection string by hand is
-outside the contract. That last case is not silent, though: the deep dependency
-probe reports the store unreachable, which is what the deploy document tells an
-operator to look at.
+permissions; and someone who overrides a derived connection string by hand, or
+omits `--env-file`, is outside the contract. Neither case is silent: the boot
+check refuses a committed default, and the deep dependency probe reports a store
+unreachable, which is what the deploy document tells an operator to look at.
 
 ### 7. The demo guard is an instance property; the seed locks; the password is the instance's
 

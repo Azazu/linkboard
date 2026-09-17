@@ -40,7 +40,10 @@ visible action.
   image layer and out of the repository. Both are written by a **one-shot init
   service** the other containers wait for, because generating a keypair is not
   atomic and three containers starting together on a clean host could otherwise
-  leave one run's private key beside another's public key.
+  leave one run's private key beside another's public key. One writer is not
+  enough on its own: the pair is published by moving both files into place at
+  once, and a run first repairs a half-written or mismatched pair rather than
+  accepting it, because the generator treats either file's presence as success.
 - **A production compose profile** (`docker-compose.prod.yml`): Caddy terminating
   TLS, the application, the Messenger worker as a supervised service, a scheduler
   for the periodic commands, Postgres and Redis. The development stack is
@@ -61,7 +64,10 @@ visible action.
   leave two carrying committed values. The production compose takes **one
   authoritative credential per store** and derives those connection strings from
   it, so the database server and the application cannot end up holding different
-  passwords. Each effective setting must be set, non-empty, and **not equal to
+  passwords — with `--env-file .env.local` on every invocation, because compose
+  interpolation reads the shell, the project `.env` or that flag and never a
+  service's `env_file:`, so without it the derivation would silently render the
+  committed defaults. Each effective setting must be set, non-empty, and **not equal to
   the value committed in `.env`**; otherwise the boot fails naming the
   setting, in the web process, the worker and the scheduler alike. It reuses the
   existing `app.startup_check` tag rather than adding a mechanism.
