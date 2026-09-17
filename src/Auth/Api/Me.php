@@ -7,6 +7,7 @@ namespace App\Auth\Api;
 use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GraphQl\Query as QueryOperation;
 use App\Auth\Entity\User;
 
 /**
@@ -14,6 +15,21 @@ use App\Auth\Entity\User;
  */
 #[ApiResource(
     shortName: 'Me',
+    // Read-only through GraphQL (change stretch-graphql), same provider and
+    // same security expression as the REST operation.
+    graphQlOperations: [
+        new QueryOperation(
+            resolver: MeResolver::class,
+            security: 'is_granted("ROLE_USER")',
+            // no arguments: `Me` is a singleton, and its provider ignores any
+            // identifier, so requiring one would make a client send a value
+            // that changes nothing — and invite it to send somebody else's
+            // and wonder why its own account came back
+            args: [],
+            read: false,
+            description: 'The authenticated account.',
+        ),
+    ],
     operations: [
         new Get(
             uriTemplate: '/me',

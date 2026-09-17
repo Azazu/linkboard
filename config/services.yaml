@@ -19,6 +19,12 @@ parameters:
     # Anchored, without delimiters; each reader wraps them as it needs.
     app.api.path.auth: '^/api/v1/auth/'
     app.api.path.docs: '^/api/docs'
+    # Both GraphQL entrypoints: the one this repository declares and the one
+    # API Platform registers. A path that is rate-limited differently from its
+    # alias is the bug naming them together prevents (change stretch-graphql).
+    app.api.graphql_paths:
+        - '^/api/v1/graphql$'
+        - '^/api/graphql$'
     app.api.path.base: '^/api/v1$'
     # The json_login check path of the api firewall: the one public operation
     # that authenticates, so the one that answers 401 without a firewall
