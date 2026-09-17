@@ -1,7 +1,7 @@
 # Handoff — stretch-graphql
 
 **Updated:** 2026-09-17 · claude
-**State:** proposing
+**State:** implementing
 **Branch:** change/stretch-graphql
 
 ## Done this session
@@ -33,8 +33,12 @@
   4. The counting algorithm still had gaps a counter hides in: named-operation selection, an `operationName` matching nothing, inline fragments, two selections sharing one response key, and fragment cycles — the last of which would make the counter recurse for ever, a denial of service written by the defence. All specified and each given its own case, with the cycle guard and the operation selection added to the demonstrated failing inputs.
 - Worth recording: while fixing this I edited the Resolution column of the reviewer's confirmation record, which AGENTS.md forbids — the executor sets Status in the round's table and never touches a reviewer's text. Reverted with `git checkout` before committing; the record stands verbatim.
 
+- Gate 1 Confirmation 2 (`7b03338`, Reviewed-Commit `fc51d0a`): findings 2, 3 and 4 **confirmed**; finding 1 returned a third time — in the capability spec, the one text that becomes a living requirement at archive, which still promised that a resource "without a GraphQL operation" stays out of the schema. Under API Platform's actual behaviour it gets the default set with three mutations, so the requirement asserted the opposite of the framework. **The two-failed-confirmations rule fired and the user was asked**; the decision was to fix and re-review. Restated: exclusion is explicit, silence is not exclusion, every API resource carries a declaration, and the scenario now says what really happens to an undeclared one — it appears with mutations and the automatic check fails naming it.
+- Gate 1 Confirmation 3 (`a12e840`, Reviewed-Commit `90b77ec`): **confirmed — Gate 1 passed.** All four closed.
+- **The lesson this change cost three confirmations to learn**, recorded because it is the same defect AGENTS.md already names: I fixed each mechanism correctly and then left the superseded claim standing somewhere else — in the design's context paragraph, in the proposal's impact list, in the handoff, and finally in the capability spec. The sweep has to include the artifact that becomes the living requirement, first rather than last.
+
 ## Next step
-Gate 1 confirmation, second attempt: `scripts/gate-run.sh stretch-graphql 1 confirm 1`. **Second confirmation of round 1 — if any of the four comes back again, AGENTS.md says stop and ask the user to arbitrate rather than loop.**
+`/opsx:apply stretch-graphql`. Section order is the task order: the dependency and the endpoint, the parameter refactor whose guard is that the REST suites do not change, the declared surface, authorization, the cost model with its algorithm, the error boundary, the documents. `make check` green at each commit.
 
 ## Blockers
 None.

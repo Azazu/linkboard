@@ -11,7 +11,7 @@ changes, the refactor of section 3 is wrong.
 
 ## 1. Gate 1
 
-- [ ] 1.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh stretch-graphql 1 full`) and disposition every finding before section 2 starts. Verify: the last Gate 1 record in `review.md` reads `approved` or `confirmed` with no finding row left `open`.
+- [x] 1.1 Request Gate 1 on the artifacts (`scripts/gate-run.sh stretch-graphql 1 full`) and disposition every finding before section 2 starts. Verify: the last Gate 1 record in `review.md` reads `confirmed` with no finding row left `open` — round 1 raised two blockers and three more, confirmations 1 and 2 returned findings for claims left standing elsewhere, and Confirmation 3 (`90b77ec`) confirmed all four. The user was asked before the third attempt, per the two-failed-confirmations rule, and chose to fix and re-review.
 
 ## 2. The dependency and the endpoint
 
