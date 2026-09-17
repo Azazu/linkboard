@@ -42,3 +42,17 @@
 | 2 | confirmed — The artifacts now specify the custom `/api/v1/graphql` route, bind it to the GraphQL entrypoint with `methods: [POST]`, test POST on both registered paths and 405 only on the versioned route, and defer the framework route's GET behavior to an explicit measurement task rather than asserting an unsupported status. |
 | 3 | confirmed — The firewall/rate-limit problem-details boundary is consistent across the design and specs, and task 2.4 now verifies missing, malformed, expired, unknown-key, and blocked-account credentials at both GraphQL paths before execution. |
 | 4 | confirmed — The counting algorithm and verification tasks now cover named-operation selection and unmatched names, named and inline root fragments, repeated response keys, directives, introspection, malformed and ambiguous documents, and fragment cycles, with demonstrated failing inputs for selection, fragment expansion, cycle protection, and per-selection charging. |
+
+## Confirmation 3 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** 90b77ec2e16801dad0708f16677c90508f7207bc
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed — The capability spec now requires every API resource to declare its GraphQL operation list, requires excluded resources to use an explicit empty list, and states that an undeclared resource receives the framework defaults including mutations. Its scenarios and tasks also verify both explicit exclusion and automatic failure for an undeclared resource, consistent with the corrected 11-exposed/3-excluded inventory and regression direction. |
+| 2 | confirmed — The custom `/api/v1/graphql` route is explicitly bound to the GraphQL entrypoint with `methods: [POST]`; both registered POST paths and the versioned route's 405 behavior are covered, while the framework route's unrestricted GET behavior is left to an explicit measurement task rather than an unsupported assertion. |
+| 3 | confirmed — The specs and design consistently assign firewall and rate-limit refusals to RFC 9457 problem details and executor refusals to GraphQL errors, with tests required for missing, malformed, expired, unknown-key, and blocked-account credentials at both GraphQL paths. |
+| 4 | confirmed — The parser algorithm and verification tasks cover operation selection and unmatched names, named and inline root fragments, aliases and repeated response keys, directives, introspection, malformed and ambiguous documents, and fragment cycles, with bypass-focused demonstrated failing inputs. |
