@@ -44,17 +44,32 @@ rather than remembered:
 
 ## Decisions
 
-### 1. The surface is declared per resource, and checked by a test
+### 1. Every resource declares its GraphQL operations — including the empty list
 
 `graphQlOperations` on `LinkResource` (`Query` + `QueryCollection`), on each of
-the nine report classes (`Query`), and on `Me` (`Query`). The other five
-resource classes — `UserAdmin`, `Registration`, `ApiKeyOutput` and the two
-remaining — are left alone, which is what keeps them out.
+the nine report classes (`Query`) and on `Me` (`Query`); and
+**`graphQlOperations: []`** on `UserAdmin`, `Registration` and `ApiKeyOutput`.
 
-*Why a test over the schema rather than a review.* An exclusion nobody checks is
-an exclusion that lapses: the next resource someone adds inherits whatever the
-default is. The test introspects the shipped schema, asserts the set of query
-names equals a written-down list, and fails when a new type appears — so adding
+*Leaving a resource alone does the opposite of excluding it.* Read from the
+installed source rather than assumed (Gate 1 round 1, finding 1): when
+`graphQlOperations` is `null`,
+`MetadataCollectionFactoryTrait` calls `addDefaultGraphQlOperations()`, which
+adds `Query`, `QueryCollection` **and three mutations** — `create`, `update`,
+`delete`. So the flag alone would expose administration, registration and API
+keys, with writes, through a change whose whole premise is read-only. The
+exclusion is therefore an explicit empty list on each of the three, and the
+inventory is exact: 14 resources = 11 exposed (links, `me`, nine reports) + 3
+excluded.
+
+*And the exposed ones list their queries explicitly*, for the same reason: the
+default set carries mutations, so "expose this resource" has to mean "expose
+these operations".
+
+*Why a test over the schema on top of that.* An exclusion nobody checks is an
+exclusion that lapses: the next resource someone adds inherits the default —
+which is now known to include mutations. The test introspects the shipped
+schema, asserts the set of query names equals a written-down list, asserts
+there is no mutation type at all, and fails when a new type appears — so adding
 a resource forces a decision rather than granting one.
 
 *What this does not guarantee.* It is a list of names. A resource exposed under
@@ -80,27 +95,67 @@ allowed to change: `tests/Api/Analytics` passes untouched, and that is a task.
 GraphQL client can still ask for a period the REST client would not, and gets
 the same refusal.
 
-### 3. The rate limit charges per root field
+### 3. The rate limit charges per root field, by a stated algorithm
 
 The listener keeps its one token per request for every REST call. For a request
-to the GraphQL path it parses the document, counts the **root fields** of the
-operation, and consumes that many tokens — refusing the whole request when the
-budget cannot cover it, before any field is resolved.
+to a GraphQL path it charges the number of **root selections** of the executed
+operation. The algorithm, because a hand-written counter is exactly where a
+bypass hides (Gate 1 round 1, finding 4):
 
-*Why root fields.* One root field is one logical read: `{ link(id:…) { … }
-linkSummaryReport(…) { … } }` is two reads and costs two, which is exactly what
-the same two REST calls cost. It is a rule that fits in a sentence, which
-matters more here than precision — a cost model nobody can explain is a cost
-model nobody maintains.
+1. The body must be a JSON object with a string `query`; `variables`, when
+   present, must be an object. Anything else is **refused** without consuming a
+   token and without resolving anything.
+2. The document is parsed with the same parser that will execute it
+   (`GraphQL\Language\Parser`). A parse error is refused.
+3. The operation is selected: `operationName` when given; otherwise the single
+   operation definition in the document. **No operation, or more than one
+   without `operationName`, is refused** — GraphQL itself refuses these, and
+   charging for an ambiguous document would charge for work nobody asked for.
+4. The cost is the number of selections in that operation's root selection set,
+   counted **after resolving fragment spreads at the root** (a spread
+   contributes its own root selections, a cycle is refused), with **aliases
+   counted separately** (two aliases of one field are two reads) and
+   `@skip`/`@include` **not** evaluated — a directive decided at execution time
+   cannot lower a price charged before execution.
+5. A document whose root selections are all introspection (`__schema`,
+   `__type`, `__typename`) costs **one**, whatever their number: introspection
+   reads the schema, not the database.
+
+*Why root selections.* One root selection is one logical read: `{ link(id:…)
+{…} linkSummaryReport(…) {…} }` is two reads and costs two, which is exactly
+what the same two REST calls cost. A rule that fits in a sentence matters more
+here than precision — a cost model nobody can explain is a cost model nobody
+maintains.
 
 *Why not complexity-proportional tokens.* Complexity is already bounded by
 decision 4; making the budget depend on it too would mean one number governing
 two unrelated things, and a caller unable to predict what a query costs.
 
-*What this does not guarantee.* A single root field can still be expensive —
+*What this does not guarantee.* A single root selection can still be expensive —
 that is what the complexity ceiling is for. And the limiter stays **fail-open**
 on a storage failure, as it is for REST: consistency with the existing policy,
 stated because it is a real limit.
+
+### 3a. The endpoint's path, and the one this repository already solved
+
+API Platform registers its entrypoint as the static route `/graphql`, and
+`config/routes/api_platform.yaml` imports the collection with `prefix: /api` —
+so enabling the flag publishes **`/api/graphql`**. The `route_prefix: /v1`
+default applies to resource operations, not to that route (Gate 1 round 1,
+finding 2; read from `ApiLoader` and `routing/graphql/graphql.php`).
+
+This repository has met this before and answered it: `/api/docs` is API
+Platform's own path, and `config/routes.yaml` declares `api_v1_docs` at
+`/api/v1` pointing at the same public controller. GraphQL follows that
+precedent exactly — a declared route `api_v1_graphql` at `/api/v1/graphql` on
+`api_platform.graphql.action.entrypoint`.
+
+*So both paths answer*, `/api/graphql` and `/api/v1/graphql`, exactly as both
+`/api/docs` and `/api/v1` answer today. The versioned one is the documented one;
+the unversioned one is API Platform's, kept rather than fought. The
+specification says so instead of claiming a single path, and the firewall and
+the rate limiter cover **both** — a path that authenticates differently from its
+alias is the bug this note exists to prevent.
 
 ### 4. Introspection on, GraphiQL off, depth and complexity lowered
 
@@ -118,13 +173,38 @@ usefully express rather than against the framework's default.
 not know that one report scans a month. The per-identity budget of decision 3 is
 what bounds the total, and the report cache is what makes repetition cheap.
 
-### 5. Errors keep both shapes, and the boundary is written down
+### 5. Two error shapes, and the boundary is *where the refusal happens*
 
-GraphQL answers `200` with `data` and `errors`, as its specification requires;
-REST keeps RFC 9457. Two error formats in one API is a real cost, and the
-mitigation is that the boundary is a path, not a content negotiation: everything
-under `/api/v1/graphql` is GraphQL-shaped, everything else is problem details.
-`docs/reference/api-errors.md` says so.
+The blanket claim "GraphQL always answers in GraphQL's shape" was false, and the
+review caught it (Gate 1 round 1, finding 3). Three refusals never reach the
+GraphQL executor at all, because they happen before any controller runs:
+
+- **no credential or a bad one** — the `api` firewall's entry point and access
+  denied handler answer RFC 9457 401/403;
+- **over the rate budget** — `ApiRateLimitListener` sets an RFC 9457 429 on
+  `LoginSuccessEvent`, before access control;
+- **a malformed body or an unselectable operation** — refused by the listener of
+  decision 3, in the same place and therefore in the same shape.
+
+So the contract is stated by *where*, not by *whether*:
+
+| Refusal | Answered by | Shape |
+|---|---|---|
+| Credential missing, invalid, or blocked | the firewall | RFC 9457, status 401/403 |
+| Over the per-identity budget | the rate-limit listener | RFC 9457, status 429 |
+| Malformed body, unparseable or ambiguous document | the rate-limit listener | RFC 9457, status 400 |
+| Depth or complexity exceeded | the GraphQL executor | 200 with `errors` |
+| A voter refusing a resource | the GraphQL executor | 200 with `errors`, `data` null for that field |
+| A parameter refused | the GraphQL executor | 200 with `errors` |
+| An unexpected internal failure | the GraphQL executor | 200 with `errors`, message generic outside `dev` |
+
+*Why not force the first three into GraphQL's shape.* It would mean a second
+authenticator and a second limiter path for one endpoint — two implementations
+of rules this project has spent four stages proving are singular. The cost of
+the split is that a GraphQL client meets two shapes; the cost of avoiding it is
+two copies of the authentication and rate-limit logic. The split is cheaper and
+it is what the documentation now says, in the capability and in
+`docs/reference/api-errors.md`.
 
 *Not leaking internals.* API Platform renders an unexpected exception's message
 into `errors[].message`. Outside `dev` the message is replaced by a generic one;

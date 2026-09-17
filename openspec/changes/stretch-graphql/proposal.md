@@ -25,29 +25,37 @@ from the source before this was written:
   consumes one token on authentication success of the `api` firewall — once per
   request. A GraphQL document asking for fifty reports is one request, so it
   would cost exactly what `GET /api/v1/me` costs.
-- **Enabling GraphQL exposes every resource.** Fourteen classes carry
-  `#[ApiResource]`, including `UserAdmin`, `Registration` and `ApiKeyOutput`.
-  The flag is repository-wide; the surface has to be chosen operation by
-  operation, and the exclusions have to be checked rather than assumed.
+- **Enabling GraphQL exposes every resource, with mutations.** Fourteen classes
+  carry `#[ApiResource]`, including `UserAdmin`, `Registration` and
+  `ApiKeyOutput`. Read from the installed source: a resource that declares no
+  `graphQlOperations` gets the **default** set — two queries and three
+  mutations, `create`, `update`, `delete`. So "leave it alone" is the opposite
+  of excluding it, and every resource has to say what it exposes, the excluded
+  three by declaring an empty list.
 
 ## What Changes
 
 - **A read-only GraphQL endpoint at `/api/v1/graphql`** over three groups of
   resources, chosen by the user on 2026-09-17: links, the nine analytics
-  reports, and `me`. Queries only — no mutation is exposed for anything.
+  reports, and `me`. Queries only — no mutation is exposed for anything. The
+  framework also registers the unversioned `/api/graphql`; both are covered by
+  the same firewall and budget, exactly as `/api/docs` lives beside `/api/v1`.
 - **BREAKING for `api-docs`**: the API gains a second documented protocol, and
   the statement that GraphQL is disabled becomes false.
 - **Report parameters stop being HTTP-shaped.** The factory takes a map of
   parameters; the HTTP path passes the query string, GraphQL passes its
   arguments, and both produce the same `ReportRequest` with the same validation
   and the same cache key.
-- **The rate limit is charged per root field**, not per request: a document
+- **The rate limit is charged per root selection**, not per request: a document
   asking for ten reports consumes ten tokens from the same per-identity budget
-  a REST caller would spend on ten calls. Plus API Platform's own depth and
-  complexity ceilings, lowered from their defaults and stated.
-- **Admin, registration and API keys are not exposed**, and a test asserts the
-  schema does not contain them — an exclusion nobody checks is an exclusion
-  that lapses.
+  a REST caller would spend on ten calls, counted by a stated algorithm that
+  resolves root fragments, counts aliases separately and refuses a document it
+  cannot price. Plus API Platform's own depth and complexity ceilings, lowered
+  from their defaults and stated.
+- **Admin, registration and API keys are excluded by declaring an empty
+  operation list on each**, not by silence, and a test asserts the schema
+  contains neither them nor any mutation type — an exclusion nobody checks is
+  an exclusion that lapses, and here silence would have granted writes.
 - **One new dependency**, `webonyx/graphql-php`, which API Platform's GraphQL
   support requires.
 
@@ -80,9 +88,11 @@ from the source before this was written:
   development IDE.
 - **No subscriptions, no relay-style mutations, no custom resolvers** beyond
   what the existing providers already do.
-- **No second error format for REST.** GraphQL answers in GraphQL's error
-  shape, which its specification requires; problem details remain the REST
-  contract, and the boundary is stated rather than blurred.
+- **No second authenticator and no second rate limiter.** A refusal the
+  firewall or the limiter decides keeps its problem-details shape and its
+  status, because duplicating those rules for one endpoint is a worse cost than
+  two error shapes. Everything the GraphQL executor decides is GraphQL-shaped.
+  The boundary is a table in the capability, not a blur.
 
 ## Impact
 

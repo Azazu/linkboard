@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: JSON-only content negotiation
-The REST API SHALL accept and produce `application/json` (plus `application/problem+json` for errors) and SHALL NOT expose JSON-LD, Hydra or HAL representations. Two declared exceptions: the QR code operation `GET /api/v1/links/{id}/qr` (capability `qr-codes`), which produces `image/svg+xml` or `image/png` and, for its errors, `application/problem+json` like every other operation — the OpenAPI document SHALL list both image content types and the `format` parameter of that operation; and the GraphQL endpoint (capability `graphql-api`), which answers at its own path in GraphQL's own response shape and is reachable at no other path.
+The REST API SHALL accept and produce `application/json` (plus `application/problem+json` for errors) and SHALL NOT expose JSON-LD, Hydra or HAL representations. Two declared exceptions: the QR code operation `GET /api/v1/links/{id}/qr` (capability `qr-codes`), which produces `image/svg+xml` or `image/png` and, for its errors, `application/problem+json` like every other operation — the OpenAPI document SHALL list both image content types and the `format` parameter of that operation; and the GraphQL endpoint (capability `graphql-api`), which answers at `/api/v1/graphql` and at the framework's unversioned `/api/graphql`, in GraphQL's own response shape for everything its executor decides.
 
 #### Scenario: JSON-LD is not available
 - **WHEN** a client requests `GET /api/v1` with `Accept: application/ld+json`
@@ -11,7 +11,7 @@ The REST API SHALL accept and produce `application/json` (plus `application/prob
 
 #### Scenario: GraphQL endpoint is absent
 - **WHEN** a client requests `GET /api/graphql`
-- **THEN** the response status is 404 — the endpoint this API serves is versioned like every other, at `/api/v1/graphql`, and is reachable at no other path
+- **THEN** the response status is 405, because the endpoint exists there and accepts POST only — the versioned `/api/v1/graphql` is the documented path, and the unversioned one is the framework's, kept as `/api/docs` is kept beside `/api/v1`
 
 #### Scenario: The QR operation is documented with its image types
 - **WHEN** a client requests `GET /api/docs.json`

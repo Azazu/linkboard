@@ -10,7 +10,7 @@ is a second way to ask, not a second set of rules.
 ## ADDED Requirements
 
 ### Requirement: A read-only GraphQL endpoint
-The API SHALL serve GraphQL at `/api/v1/graphql`, accepting `POST` with a JSON body carrying `query` and optional `variables`. The schema SHALL expose queries only: an item and a collection query for links, an item query for each of the nine analytics reports, and a query for the current user. The schema SHALL contain **no mutation type**, so no data can be created, changed or deleted through it.
+The API SHALL serve GraphQL at `/api/v1/graphql`, accepting `POST` with a JSON body carrying `query` and optional `variables`. The same endpoint SHALL also answer at the unversioned `/api/graphql`, which the framework registers, exactly as `/api/docs` answers beside `/api/v1`; both paths SHALL be covered by the same firewall and the same rate budget, and the versioned one SHALL be the documented one. The schema SHALL expose queries only: an item and a collection query for links, an item query for each of the nine analytics reports, and a query for the current user. The schema SHALL contain **no mutation type**, so no data can be created, changed or deleted through it.
 
 #### Scenario: A link is readable through GraphQL
 - **WHEN** the owner of a link posts `{ link(id: "<iri>") { slug targetUrl clickCount } }` with a valid credential
@@ -20,8 +20,12 @@ The API SHALL serve GraphQL at `/api/v1/graphql`, accepting `POST` with a JSON b
 - **WHEN** a client introspects the schema
 - **THEN** the schema declares no mutation type, and a document containing a mutation is rejected
 
-#### Scenario: The endpoint lives at one path
-- **WHEN** a client posts a valid query to any path other than `/api/v1/graphql`
+#### Scenario: Both paths answer, and identically
+- **WHEN** the same query with the same credential is posted to `/api/v1/graphql` and to `/api/graphql`
+- **THEN** both answer with the same data, and an unauthenticated post to either is refused the same way
+
+#### Scenario: No other path answers
+- **WHEN** a client posts a valid query to any path other than those two
 - **THEN** the response status is 404
 
 ### Requirement: The schema exposes only the declared resources
@@ -43,7 +47,7 @@ Every GraphQL query SHALL require the same credential and SHALL be subject to th
 - **THEN** `data.link` is null and the response carries an error, and the error does not distinguish "not yours" from "does not exist"
 
 #### Scenario: A stranger cannot read someone else's reports
-- **WHEN** an authenticated user queries any of the nine reports for a link owned by somebody else
+- **WHEN** an authenticated user queries any of the six per-link reports for a link owned by somebody else
 - **THEN** the query returns no report data and carries an error
 
 #### Scenario: The global reports still require an administrator
@@ -52,7 +56,7 @@ Every GraphQL query SHALL require the same credential and SHALL be subject to th
 
 #### Scenario: An anonymous caller reads nothing
 - **WHEN** a client posts any query without a credential
-- **THEN** the response carries an error and no data, and the credential requirement is the firewall's, not a resolver's
+- **THEN** the request is refused by the firewall with 401 and a problem-details body, before the executor runs — the credential requirement is the firewall's, not a resolver's
 
 ### Requirement: Report parameters are the same parameters
 A report queried through GraphQL SHALL accept the same parameters as its REST operation — the period, the bucket size, the top-N limit and the bot flag — SHALL validate them by the same rules, and SHALL produce the same figures and the same cached entry as the REST call with those parameters. A report SHALL NOT silently answer with default parameters when the caller supplied others.
@@ -70,15 +74,44 @@ A report queried through GraphQL SHALL accept the same parameters as its REST op
 - **THEN** the second request is served from the cache the first populated, and both carry the same `generatedAt`
 
 ### Requirement: A GraphQL document costs what the work costs
-A GraphQL request SHALL consume one token of the caller's per-identity rate budget **for each root field of the document**, so that asking for ten reports in one document costs what ten REST calls cost. When the budget is exhausted the request SHALL be refused before any field is resolved.
+A GraphQL request SHALL consume one token of the caller's per-identity rate budget for each **root selection** of the executed operation, so that asking for ten reports in one document costs what ten REST calls cost. When the budget cannot cover the document the request SHALL be refused before any field is resolved.
 
-#### Scenario: A document with several root fields costs several tokens
-- **WHEN** a caller posts a document with three root fields
+The count SHALL be taken from the document as parsed, not from its text: fragment spreads at the root SHALL contribute the selections they name, aliases of one field SHALL count separately, and `@skip`/`@include` SHALL NOT reduce the count, because a directive evaluated at execution time cannot lower a price charged before execution. A document whose root selections are all introspection SHALL cost one, whatever their number.
+
+#### Scenario: A document with several root selections costs several tokens
+- **WHEN** a caller posts a document with three root selections
 - **THEN** three tokens are consumed from that caller's budget
 
+#### Scenario: Aliases and fragments are counted
+- **WHEN** a document asks for one field twice under two aliases, and a document spreads a root fragment naming two fields
+- **THEN** the first costs two and the second costs two
+
+#### Scenario: A skipped field is still paid for
+- **WHEN** a document's root selection carries `@skip(if: true)`
+- **THEN** it is still counted, because the price is charged before the directive is evaluated
+
+#### Scenario: Introspection costs one
+- **WHEN** a document asks only for `__schema` and `__type`
+- **THEN** one token is consumed
+
 #### Scenario: A document over the budget is refused whole
-- **WHEN** a caller with one token left posts a document with three root fields
+- **WHEN** a caller with one token left posts a document with three root selections
 - **THEN** the request is refused, and no field is resolved
+
+### Requirement: An unusable request is refused before it is priced
+A request whose body is not a JSON object with a string `query`, whose `variables` is present but not an object, whose document does not parse, or whose operation cannot be selected — no operation, or several without `operationName` — SHALL be refused without consuming a token and without resolving anything.
+
+#### Scenario: A malformed body is refused
+- **WHEN** a client posts a body that is not a JSON object, or one whose `query` is not a string, or one whose `variables` is not an object
+- **THEN** the request is refused and no token is consumed
+
+#### Scenario: An unparseable document is refused
+- **WHEN** a client posts a `query` that does not parse
+- **THEN** the request is refused and no token is consumed
+
+#### Scenario: An ambiguous operation is refused
+- **WHEN** a document carries two operations and the body names neither, or carries none
+- **THEN** the request is refused and no token is consumed
 
 ### Requirement: The schema bounds what one document may ask
 The endpoint SHALL refuse a document exceeding a declared query depth or a declared query complexity, before executing it. Both limits SHALL be configuration with stated defaults.
@@ -91,12 +124,18 @@ The endpoint SHALL refuse a document exceeding a declared query depth or a decla
 - **WHEN** a client posts a document whose complexity exceeds the declared limit
 - **THEN** the response carries an error naming the complexity limit and no data is resolved
 
-### Requirement: GraphQL answers in GraphQL's shape, and says so
-The GraphQL endpoint SHALL answer in the shape the GraphQL specification defines — a 200 response carrying `data` and, where applicable, `errors` — and SHALL NOT answer in RFC 9457 problem details. The REST API's problem-details contract SHALL be unchanged by this capability, and the boundary SHALL be documented so that a reader is not surprised by two error formats in one API.
+### Requirement: Which refusals answer in which shape
+A refusal decided **by the GraphQL executor** SHALL answer in the shape the GraphQL specification defines — a 200 response carrying `data` and `errors`. A refusal decided **before the request reaches the executor** SHALL answer in RFC 9457 problem details with its status, because it is the same firewall and the same rate limiter the REST API uses and they are not duplicated for one endpoint. The boundary SHALL be documented where a reader meets errors, so that two shapes in one API are a stated contract rather than a surprise.
 
-#### Scenario: A GraphQL error is a GraphQL error
-- **WHEN** a query is refused for any reason — authorization, a parameter, a limit
-- **THEN** the response carries an `errors` array in GraphQL's shape rather than a problem-details body
+Answered as problem details: a missing, invalid or blocked credential (401/403); a request over the per-identity budget (429); a body or document that cannot be priced (400). Answered as GraphQL errors: a voter refusing a resource, a refused report parameter, an exceeded depth or complexity limit, and an unexpected internal failure.
+
+#### Scenario: A refusal by the executor is a GraphQL error
+- **WHEN** a query is refused by a voter, by a report parameter or by a depth or complexity limit
+- **THEN** the response status is 200 and the body carries an `errors` array in GraphQL's shape
+
+#### Scenario: A refusal before the executor is problem details
+- **WHEN** a request carries no credential, or exceeds the per-identity budget, or carries a body that cannot be priced
+- **THEN** the response carries its own status — 401, 429 or 400 — and an `application/problem+json` body, like every other API refusal
 
 #### Scenario: The REST contract is untouched
 - **WHEN** any REST operation answers any documented error status
