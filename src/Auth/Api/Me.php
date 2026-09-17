@@ -19,8 +19,14 @@ use App\Auth\Entity\User;
     // same security expression as the REST operation.
     graphQlOperations: [
         new QueryOperation(
-            provider: MeProvider::class,
+            resolver: MeResolver::class,
             security: 'is_granted("ROLE_USER")',
+            // no arguments: `Me` is a singleton, and its provider ignores any
+            // identifier, so requiring one would make a client send a value
+            // that changes nothing — and invite it to send somebody else's
+            // and wonder why its own account came back
+            args: [],
+            read: false,
             description: 'The authenticated account.',
         ),
     ],

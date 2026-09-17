@@ -33,6 +33,19 @@ use App\Shared\Api\RefusedParameters;
         new QueryOperation(
             provider: LinkReportProvider::class,
             security: 'is_granted("ROLE_USER")',
+            // The report's parameters, declared again: API Platform's
+            // `parameters:` are a REST concept and do not become GraphQL
+            // arguments — measured, the schema exposed `id` alone, so a
+            // client could not have asked for a period and would have been
+            // answered with the default one silently. Same names, same rules,
+            // same cache key; `ReportParameters` reads them from the
+            // operation's arguments here and from the query string over REST.
+            args: [
+                'id' => ['type' => 'ID!'],
+                'from' => ['type' => 'String'],
+                'to' => ['type' => 'String'],
+                'includeBots' => ['type' => 'Boolean'],
+            ],
         ),
     ],
     operations: [

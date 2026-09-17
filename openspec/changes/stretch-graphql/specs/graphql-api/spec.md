@@ -50,11 +50,13 @@ Exclusion SHALL be **explicit**: a resource that is meant to stay out of the sch
 - **THEN** neither a query nor a mutation for it appears in the schema
 
 ### Requirement: Authorization is the same as the REST API's
-Every GraphQL query SHALL require the same credential and SHALL be subject to the same voters as the REST operation serving the same data. A caller SHALL NOT be able to read through GraphQL anything the REST API would refuse them, and the refusal SHALL NOT reveal whether the resource exists where the REST API would not.
+Every GraphQL query SHALL require the same credential and SHALL be subject to the same voters as the REST operation serving the same data. A caller SHALL NOT be able to read through GraphQL anything the REST API would refuse them, and a refusal SHALL distinguish the cases exactly as the REST API distinguishes them — no more and no less.
+
+That last clause is deliberate and was corrected during implementation: the REST API answers **403** for a resource the caller may not see and **404** for one that does not exist, because "403 tells an integrator plainly" and the enumeration it costs is accepted there and mitigated by the rate limit ([ADR-005](../../../../docs/adr/ADR-005-pages-answer-404.md)). Answering both alike is the *pages'* property, not the API's; importing it here would have made GraphQL disagree with the protocol it mirrors.
 
 #### Scenario: A stranger cannot read someone else's link
 - **WHEN** an authenticated user posts a query for a link owned by somebody else
-- **THEN** `data.link` is null and the response carries an error, and the error does not distinguish "not yours" from "does not exist"
+- **THEN** `data.link` is null and the response carries the refusal the REST API gives that caller, distinct from the one a link that does not exist gives
 
 #### Scenario: A stranger cannot read someone else's reports
 - **WHEN** an authenticated user queries any of the six per-link reports for a link owned by somebody else
