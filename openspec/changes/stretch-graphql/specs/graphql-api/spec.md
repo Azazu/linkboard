@@ -118,7 +118,7 @@ The count SHALL be taken from the document as parsed, not from its text: named s
 - **WHEN** a document asks only for `__schema` and `__type`
 - **THEN** one token is consumed
 
-Pricing SHALL itself be bounded: the cost of a document SHALL be computed without re-expanding a fragment that has already been priced, and a document whose root selections exceed the largest budget the limit can grant SHALL be refused once that ceiling is reached, rather than counted to completion. A document of linear size SHALL NOT cost more than linear work to price.
+Pricing SHALL itself be bounded: the cost of a document SHALL be computed without re-expanding a fragment that has already been priced, and a document whose root selections exceed the largest budget the limit can grant SHALL be refused once that ceiling is reached, rather than counted to completion. **Every** traversal the pricing performs SHALL be bounded this way, not only the one that adds up the cost. A document of linear size SHALL NOT cost more than linear work to price, whatever its selections name.
 
 #### Scenario: A document over the budget is refused whole
 - **WHEN** a caller with one token left posts a document with three root selections
@@ -128,16 +128,24 @@ Pricing SHALL itself be bounded: the cost of a document SHALL be computed withou
 - **WHEN** a client posts a valid acyclic document whose root fragments each spread the next one twice, so that expanding every occurrence would yield millions of selections
 - **THEN** the request is refused for exceeding the ceiling, promptly, without the count ever being completed
 
+#### Scenario: The same document made of introspection is refused just as promptly
+- **WHEN** that doubling document's innermost fragment selects only introspection, so that no traversal of it can stop early on a non-introspection field
+- **THEN** the request is still refused promptly, while a document that shares a fragment and stays under the ceiling is still priced at one token
+
 #### Scenario: A document asking for more than the whole budget is refused, not admitted
 - **WHEN** a caller posts a document whose root selections outnumber the rate limit's entire window
 - **THEN** the request is refused with the status the limiter uses, not answered because the charge could not be applied
 
 ### Requirement: An unusable request is refused before it is priced
-A request whose body is not a JSON object with a string `query`, whose `variables` is present but not a JSON **object** — a JSON list is not one, however it decodes — whose document does not parse, or whose operation cannot be selected — no operation, or several without `operationName` — SHALL be refused without consuming a token and without resolving anything.
+A request whose body is not a JSON object with a string `query`, whose `variables` is present, is not null and is not a JSON **object** — a JSON list is not one, the empty list `[]` included, however it decodes — whose document does not parse, or whose operation cannot be selected — no operation, or several without `operationName` — SHALL be refused without consuming a token and without resolving anything. An empty JSON object `{}` SHALL be accepted: an empty variable set is a legitimate thing to send.
 
 #### Scenario: A malformed body is refused
-- **WHEN** a client posts a body that is not a JSON object, or one whose `query` is not a string, or one whose `variables` is a string, or one whose `variables` is a JSON list
+- **WHEN** a client posts a body that is not a JSON object, or one whose `query` is not a string, or one whose `variables` is a string, or one whose `variables` is a JSON list, empty or not
 - **THEN** the request is refused and no token is consumed
+
+#### Scenario: An empty variable object is not an empty variable list
+- **WHEN** one client sends `"variables": {}` and another sends `"variables": []`
+- **THEN** the first is priced and answered and the second is refused
 
 #### Scenario: An unparseable document is refused
 - **WHEN** a client posts a `query` that does not parse

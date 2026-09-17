@@ -58,8 +58,16 @@
 - Swept beyond the finding, per "fix the CLAIM": the capability spec gained the pricing-is-bounded requirement and its two scenarios, the object-not-list rule and its case; `docs/reference/api-errors.md` and `docs/how-to/graphql.md` gained both new refusals; `openspec/ROADMAP.md` row 15 and `docs/explanation/requirements.md`'s stretch table said tier `medium` while the proposal declares `high` — both corrected.
 - `make check` green after the fixes: **1008 tests, 22 851 assertions** (994 / 22 787 when the gate was requested). `openspec validate stretch-graphql --strict` passes.
 
+- Branch run on the round-1 fixes (`5bfb20c`) green: run 35214425108, all four jobs.
+- Gate 2 Confirmation 1 (`50d20e3`, Reviewed-Commit `5bfb20c`): findings 4 and 5 **confirmed**; 1, 2 and 3 returned, each because the fix stopped one step short of the claim.
+  1. **The bound covered the counting walk only.** `count()` was memoised and saturating, but `isAllIntrospection()` runs after it with neither memo nor ceiling, and it traverses the whole expansion precisely when every leaf *is* introspection — so the same doubling document ending in `__typename` still cost 2^n. Two independent guards now: the ceiling is applied before that walk, and the walk memoises. Measured as three mutations: **both removed, the test did not finish in 300 s**; either one alone, 0.006 s.
+  2. **`[]` was still accepted as `variables`.** `array_is_list()` cannot recover a distinction `json_decode(…, true)` has already destroyed — `{}` and `[]` are the same empty array by then — and my own docs and task said every list is refused. The body is decoded **as objects** now and `variables` must be a `\stdClass`, so the wire format's own distinction survives: `{}` priced, `[]` refused.
+  3. **The 429 test exercised the wrong branch.** A three-token document against a two-token *window* is `consume()` refusing to reserve more than its own size, not a cost above what the caller has **left**. The capability's case now has its own test with the whole contract — status, problem details, `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, no statement touching `links`, and a smaller document answered immediately afterwards, which proves the refused charge reserved nothing. Both 429s carry the window headers now; the over-capacity branch reads the state with `consume(0)`.
+- The pattern in all three: I fixed the instance the finding named and left the claim's other half — one more walk, one more shape of the same value, one more branch of the same refusal. Same class as the Gate 1 sweeps, one level down.
+- `make check` green after these fixes: **1015 tests, 22 916 assertions**. `openspec validate stretch-graphql --strict` passes.
+
 ## Next step
-Push `change/stretch-graphql`, verify the Actions run on the exact head, then `scripts/gate-run.sh stretch-graphql 2 confirm 1`.
+Push `change/stretch-graphql`, verify the Actions run on the exact head, then `scripts/gate-run.sh stretch-graphql 2 confirm 2`.
 
 ## Blockers
 None.

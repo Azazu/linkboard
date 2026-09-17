@@ -110,11 +110,15 @@ operation. The algorithm, because a hand-written counter is exactly where a
 bypass hides (Gate 1 round 1, finding 4):
 
 1. The body must be a JSON object with a string `query`; `variables`, when
-   present, must be a JSON **object**. Anything else is **refused** without
-   consuming a token and without resolving anything. Object and list are
-   separated by `array_is_list()`, not by `json_decode`'s return type: with
-   `true` as the second argument both `{"n":1}` and `[1]` are PHP arrays, which
-   is how a list first passed this check (Gate 2 round 1, finding 2).
+   present and not null, must be a JSON **object** — a JSON list is not one,
+   `[]` included. Anything else is **refused** without consuming a token and
+   without resolving anything. The body is therefore decoded **as objects**,
+   not as associative arrays: with `true` as `json_decode`'s second argument
+   `{"n":1}` and `[1]` are both PHP arrays, which is how a list first passed
+   this check (Gate 2 round 1, finding 2) — and `{}` and `[]` become the *same*
+   empty array, so no later test can tell them apart, which is how the first
+   fix still accepted an empty list (Gate 2 confirmation 1, finding 2). A
+   `\stdClass` check keeps the distinction the wire format made.
 2. The document is parsed with the same parser that will execute it
    (`GraphQL\Language\Parser`). A parse error is refused.
 3. The operation is selected: `operationName` when given — and an
@@ -142,6 +146,16 @@ bypass hides (Gate 1 round 1, finding 4):
    selections — a denial of service in the counter itself, reached before any
    ceiling of decision 4 can act, and invisible to the cycle guard because the
    shape is acyclic (Gate 2 round 1, finding 1).
+7. **Every walk over the document obeys the same rule, not just the counting
+   one.** Deciding whether a document is introspection-only is a second walk,
+   and it only traverses the whole expansion when every leaf *is* introspection
+   — so the identical hostile shape ending in `__typename` moved the cost one
+   method along (Gate 2 confirmation 1, finding 1). Two independent guards now:
+   the ceiling is applied **before** that walk, so a document refused for its
+   size is never walked again, and the walk memoises per fragment so it is
+   bounded even if somebody reorders the checks. Measured, each alone is
+   sufficient and neither alone was there: with both removed the 40-fragment
+   introspection document did not finish in five minutes.
 
 *Why root selections.* One root selection is one logical read: `{ link(id:…)
 {…} linkSummaryReport(…) {…} }` is two reads and costs two, which is exactly
