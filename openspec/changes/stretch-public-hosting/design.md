@@ -136,18 +136,24 @@ application containers warm only their own cache, which is private to each of
 them. `--skip-if-exists` still covers the ordinary restart, where the keys are
 already there.
 
-*And the pair is published atomically, because one writer is not enough.*
+*And a half-written pair is never served, because one writer is not enough.*
 `--skip-if-exists` treats **either** file existing as "already provisioned", and
 the generator writes the private and the public key as two separate files — so a
 crash between the two writes leaves half a pair that every later start then
 accepts, and dependants are allowed to serve with a key nothing can verify (Gate
 1 confirmation 2, finding 4). Ordering does not help here: there is only ever one
-writer and it still dies mid-way. So provisioning generates into a temporary
-directory **inside the same volume** and moves the two files into place only once
-both exist; and before it decides anything it repairs what it finds — a target
-holding only one of the two files, or a pair whose public key is not the one
-derived from its private key, is removed and regenerated rather than trusted. A
-move within one filesystem is the atomic step the generator does not give us.
+writer and it still dies mid-way. Two file moves are two operations, so nothing
+here claims atomic publication — a symlink switch could provide it, and is
+deliberately not used because it buys nothing the ordering already gives. The
+guarantee is the one the stack really provides, stated as such: provisioning
+generates into a temporary directory **inside the same volume** and moves the two
+files into place; if it dies anywhere, the init service exits non-zero, so
+`service_completed_successfully` is false and **no dependant starts** — the
+partial state exists on disk but nothing serves with it. And before deciding
+anything, the next run repairs what it finds: a target holding only one of the
+two files, or a pair whose public key is not the one derived from its private
+key, is removed and regenerated rather than trusted (Gate 1 confirmation 3,
+finding 4).
 
 *What that does not guarantee.* Two *stacks* started against one volume — two
 `docker compose up` runs racing on the same host — are outside this: compose

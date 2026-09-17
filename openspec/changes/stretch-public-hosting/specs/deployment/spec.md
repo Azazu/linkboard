@@ -33,7 +33,7 @@ Because the build boots nothing, two artefacts the running service needs are pro
 
 Provisioning SHALL have a **single writer**, and every process that depends on its output SHALL start only after it has completed. This is not tidiness: generating a keypair is not atomic — a generator writes the private and the public key as two files, and may build a candidate pair before deciding whether one already exists — so several processes provisioning at once on a clean host can leave one run's private key beside another run's public key, an instance that signs tokens nothing can verify. A deployment SHALL make that impossible by ordering rather than detect it afterwards.
 
-The keypair SHALL be **published atomically**: it SHALL become visible at its final location only when both of its files exist, and a provisioning run that is interrupted SHALL NOT leave a state that a later run accepts as complete. Before deciding whether provisioning is needed, a run SHALL repair what it finds: a location holding only one of the two files, or a pair whose public key is not the one belonging to its private key, SHALL be discarded and generated afresh rather than used. Treating the presence of either file as proof of a usable pair is insufficient, because it admits exactly the state an interrupted run leaves behind.
+A partial keypair SHALL never be **used**. Writing two files is two operations, so the guarantee is not that an interrupted run leaves nothing behind — it is that what it leaves behind is never served and never inherited: a provisioning run that does not complete SHALL fail, every process that depends on its output SHALL remain stopped, and the next run SHALL repair rather than trust what it finds. A location holding only one of the two files, or a pair whose public key is not the one belonging to its private key, SHALL be discarded and generated afresh. Treating the presence of either file as proof of a usable pair is insufficient, because it admits exactly the state an interrupted run leaves behind.
 
 The assets SHALL be compiled into a location the web server can read, and the keypair SHALL be generated only if a usable one is absent, into storage that survives a container being replaced. Neither SHALL be written into an image layer, and the private key SHALL NOT enter the repository, an image, a log or any output. Provisioning SHALL be idempotent: starting the deployment repeatedly SHALL NOT replace a usable keypair, and SHALL NOT leave the assets missing or half-written.
 
@@ -41,9 +41,13 @@ The assets SHALL be compiled into a location the web server can read, and the ke
 - **WHEN** the whole stack is started at once on a host with no keypair, so that every process that needs one starts in the same moment
 - **THEN** exactly one keypair exists, its public key is the one belonging to its private key, and no process served a request before it existed
 
-#### Scenario: An interrupted provisioning run is repaired, not inherited
-- **WHEN** provisioning is interrupted after one of the keypair's two files has been written, and the deployment is started again
-- **THEN** the second run discards the partial state and produces a complete, matching pair, and no process served a request with the partial one
+#### Scenario: An interrupted provisioning run stops the deployment and is repaired, not inherited
+- **WHEN** provisioning is interrupted after one of the keypair's two files has reached its final location
+- **THEN** provisioning is reported as failed and no process that depends on it starts
+
+#### Scenario: The run after the interruption repairs it before anything serves
+- **WHEN** the deployment is started again after such an interruption
+- **THEN** the partial state is discarded, a complete matching pair is produced, and only then do the dependent processes start
 
 #### Scenario: A clean host issues tokens
 - **WHEN** the stack is started for the first time on a host with no keypair, and a seeded account posts its credentials to the token endpoint
