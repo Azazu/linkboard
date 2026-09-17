@@ -94,3 +94,22 @@
 | 7 | confirmed |
 | 8 | confirmed |
 | 9 | confirmed |
+
+## Confirmation 5 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-17
+**Reviewed-Commit:** cdd8f17041918ebb86a32ced910444f0237c1c10
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed |
+| 2 | confirmed |
+| 3 | confirmed |
+| 4 | changes-requested — The proposal now correctly assigns shared provisioning to the one-shot init service and no longer claims an atomic two-file publication. However, the directly related crash analysis in `design.md`'s Applicability table still says that a crash between the two key files is “the case decision 3's single writer exists for” and that verification merely asserts the pair matches. Single-writer ordering prevents concurrent generators but does not handle a sole writer dying between moves; the mechanism specified elsewhere is instead that dependants remain stopped and the next init run repairs the partial state, with task 2.3 explicitly verifying those states. Reconcile this remaining claim with the actual fail/repair mechanism. The current `handoff.md` also retains the superseded statement that provisioning “moves both files into place at once,” so the same stale atomic-publication claim still survives in a sibling artifact despite the latest sweep. |
+| 5 | confirmed |
+| 6 | confirmed |
+| 7 | confirmed |
+| 8 | confirmed |
+| 9 | confirmed |
