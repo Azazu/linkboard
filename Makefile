@@ -128,3 +128,7 @@ cs-fix: ## Code style fix
 
 check: cs stan test ## The gate floor: style + static analysis + tests
 	@echo "check: all green"
+
+image: ## Build the production image (the deployment's own command; CI runs this exact target)
+	docker build -f .docker/php/Dockerfile --target prod -t linkboard-prod .
+	@echo "image: linkboard-prod built"

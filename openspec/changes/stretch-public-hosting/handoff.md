@@ -1,7 +1,7 @@
 # Handoff — stretch-public-hosting
 
 **Updated:** 2026-09-19 · claude
-**State:** implementing
+**State:** awaiting-gate-2
 **Branch:** change/stretch-public-hosting
 
 ## Done this session
@@ -79,8 +79,29 @@ Record `553ce47`, Reviewed-Commit `cdd8f17`. Eight confirmed. Finding 4 alone re
 
 **What this round cost, recorded because it is the same defect four changes running.** Nine findings became seven confirmation rounds, and after the third round every returning finding was the *same* correction not reaching a sibling artifact — proposal, then an applicability row, then this handoff. The mechanism work was finished at confirmation 3. Task 3.9's repository-wide assertion exists to catch one class of this mechanically; the rest is the rule AGENTS.md already states, which I keep applying to the files I remember rather than to the whole change directory.
 
+## Implemented — 68 tasks, all checked
+`make check` green in the container with no override: **1 053 tests, 22 993 assertions**. `scripts/pregate-verify.sh gate2 stretch-public-hosting` passes every check.
+
+What exists: a production stage in the shared Dockerfile with a `.dockerignore` (509.29 MB → 5.84 MB of build context), a one-shot init service that is the only writer of the keys and asset volumes, `docker-compose.prod.yml` self-contained behind Caddy, a required-settings check armed by the deployment itself, one listener closing both registration surfaces, a demo seed that is safe to schedule, a sign-in page that publishes the demo credential, a scheduler, a CI job that builds the image and reaches nothing, `docs/how-to/deploy.md`, ADR-007, and roadmap row 16 split so that publishing the instance is the user's own row 17.
+
+## Five things the running stack disproved or found, none of them by reasoning
+1. **The demo user and the administrator shared a password.** Found by reading what the seeded prod stack printed. The administrator's address is a constant of this repository, so the sign-in page would have published administrator access. The instance's password is now the demo user's alone, with a test asserting the administrator's differs.
+2. **`reverse_proxy` appends to `X-Forwarded-For` rather than replacing it**, so a client could have chosen which rate-limit bucket counted it — the thing a per-IP limit exists to prevent. The proxy now overwrites the header with the connecting address.
+3. **The trusted-proxy premise in design decision 8 was wrong for this topology.** The upstream is FastCGI, so Caddy passes the real client as `REMOTE_ADDR` and the per-IP limits count correctly whatever `TRUSTED_PROXIES` says — measured with the proxy deliberately untrusted. The design and the capability say that now; task 9.3's predicted failure does not happen.
+4. **Decision 2's collision no longer exists under the arming that shipped.** A build-time `cache:warmup` does not trip the settings check (the image carries `.env` with `DEPLOYMENT=false`); it fails for a different reason — `--no-dev` removed the bundles the dev environment lists. Both halves measured, and the decision now records why the build still boots nothing.
+5. **A mismatched connection string stops the start, not a later request** — provisioning reaches the database first, so the failure names the store and no dependant serves. Stronger than the deep probe the task predicted.
+
+Two more worth keeping: `docker kill` does not trigger `unless-stopped` (Docker records an API kill as a manual stop), and Compose **appends** volume lists when files are merged, which is why the production file is self-contained rather than an override.
+
+## What was NOT demonstrated, said plainly
+- **The publicly trusted certificate.** It needs a public host name; the stack was exercised with a `.localhost` name, for which Caddy uses its internal authority. The deploy document marks that step as not run.
+- **Task 2.6's race.** Provisioning was moved back into the three entrypoints and raced five times on empty volumes; the pair matched every time, because staging plus the repair step narrows the window to about 200 ms. Recorded as the negative result it is: the single writer removes the race by construction, and what proves it is the ordering declared in the compose file.
+
+## Left on the machine
+The scratch `.env.local` was removed (it would override the development stack's settings) and the production stack was torn down with its volumes; the development stack is back up. One `linkboard-prod` image remains locally.
+
 ## Next step
-`/opsx:apply stretch-public-hosting` — 61 tasks in twelve sections, starting with the `.dockerignore` and the production stage.
+Push `change/stretch-public-hosting`, verify the Actions run on the exact head — it now includes the new `image` job — then `scripts/gate-run.sh stretch-public-hosting 2 full`.
 
 ## Blockers
 None. Confirmation 6 was refused on 2026-09-17 because Codex hit the workspace spend cap — the runner is fail-closed, so nothing was written and the gate simply did not pass. The cap was raised on 2026-09-19 and the run is resumed against this branch head; the last record in `review.md` remains Confirmation 5.

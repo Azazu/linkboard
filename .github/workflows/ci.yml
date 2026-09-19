@@ -89,6 +89,19 @@ jobs:
           MESSENGER_TRANSPORT_DSN: in-memory://
         run: make migrations-roundtrip EXEC=
 
+  image:
+    # The production image, built with the SAME target the deploy document
+    # gives — one command in one place, so the two cannot drift and no string
+    # comparison has to police them. It builds and nothing else: no registry
+    # login, no push, no deployment credential, no host contacted.
+    needs: detect
+    if: needs.detect.outputs.php == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the production image (make image)
+        run: make image
+
   php:
     needs: detect
     if: needs.detect.outputs.php == 'true'

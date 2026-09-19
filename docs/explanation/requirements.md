@@ -414,7 +414,8 @@ The stage plan is the source for `openspec/ROADMAP.md`; ids are stable across bo
 |---|---|---|---|
 | 14 | `stretch-partition-clicks` | monthly range partitioning of `clicks`, retention policy and job, ADR | high |
 | 15 | `stretch-graphql` | API Platform GraphQL endpoint with the same voters and limits | high |
-| 16 | `stretch-public-hosting` | deploy to a public host with HTTPS, demo instance link in the README | medium |
+| 16 | `stretch-public-hosting` | the deployment configuration: production image, compose stack behind Caddy with HTTPS, required-settings contract, registration switch, seeded demo and its reset job | high |
+| 17 | *(the user's own step)* | provision the host, point a domain at it, and put the instance's URL in the README | — |
 
 ---
 
@@ -442,7 +443,7 @@ Taken only after stages 1–4 are archived, each as its own change:
 
 - ~~**Monthly partitioning and retention of `clicks`**~~ — done in `stretch-partition-clicks` ([ADR-006](../adr/ADR-006-clicks-partitioning-and-retention.md)): monthly range partitions on `occurred_at`, a 13-month window enforced only by `app:clicks:partitions --retention`, and the effect on unique-visitor counts stated where the numbers are defined.
 - ~~**GraphQL** through API Platform, reusing voters and rate limits.~~ — done in `stretch-graphql`: a read-only surface over links, the reports and `me`, with the voters carried over, a per-root-selection cost model and declared depth and complexity ceilings.
-- **Public hosting** of a demo instance (HTTPS, seeded data, reset job).
+- **Public hosting** of a demo instance (HTTPS, seeded data, reset job). — the *configuration* is delivered in `stretch-public-hosting` and exercised in CI; the instance itself is not published yet, so this item is **not** marked done.
 - **`click_daily` aggregate** (materialized view or table refreshed by the worker) if report latency on large fixtures warrants it.
 - **Link-page metadata** (title, favicon of the target fetched asynchronously by the worker) — only with an explicit SSRF-safe fetcher design.
 

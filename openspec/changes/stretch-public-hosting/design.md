@@ -73,34 +73,50 @@ stage names say so and the deploy document names them.
 
 ### 2. The build boots nothing; the container provisions itself at start
 
-This is the decision the rest hangs on, and it exists because two guarantees
-collided (Gate 1 round 1, finding 2): the build must need no secret, and a
-missing setting must stop the boot. `cache:warmup` and `asset-map:compile` are
-console commands, so both boot the kernel, so both would run the check — and the
-only ways to keep a build-time warm are to hand the build real secrets or to
-exempt the build from the check. The first puts secrets in a build log, the
-second is a bypass that will be used by accident.
+*The reason this decision was written is no longer the reason it holds, and
+both are recorded.* It began as a collision: the build must need no secret, and
+a missing setting must stop the boot, and `cache:warmup` and
+`asset-map:compile` are console commands, so both boot the kernel and would run
+the check. That collision was real while the check was armed by
+`APP_ENV=prod`. It is not real under the arming that shipped (decision 6): the
+image carries `.env`, which sets `DEPLOYMENT=false`, so a build-time boot
+simply does not arm the check — measured by adding `cache:warmup` back to the
+stage with `APP_ENV=prod` and watching it warm successfully.
+
+*What holds now, each measured:*
+
+1. **`composer install` must carry `--no-scripts`.** `post-install-cmd` runs
+   `cache:clear`, and dependencies are installed before the source is copied,
+   so the boot would fail with nothing to boot.
+2. **A build-time boot at the default environment fails outright.** `.env` says
+   `APP_ENV=dev`, and `config/bundles.php` lists bundles that `--no-dev`
+   deliberately removed: measured, `cache:warmup` in the prod stage dies with
+   `Class "Zenstruck\Foundry\ZenstruckFoundryBundle" not found`. Making it
+   work means pinning `APP_ENV=prod` for that one layer — a second place where
+   the environment is decided, next to the `ENV` the image already carries.
+3. **A cache warmed at build time was built somewhere the image will never
+   run.** Symfony resolves `%env()%` lazily, so it is not wrong, but the only
+   thing it buys is a faster first request, and it is paid for by a layer whose
+   contents depend on the builder's `.env` rather than on the deployment's.
+4. **The contract stays true by construction rather than by exemption:** a
+   build that boots nothing cannot need a secret and cannot bake one, and there
+   is nothing to remember not to do.
 
 So the build does the work that needs no kernel — install without development
-packages, copy the source — and **the rest happens at start, after the settings
-have been accepted**. Which process does which part is decision 3's subject and
-is not a detail: the shared artefacts (the compiled assets and the signing
-keypair) are written once by a one-shot init service, and each application
-container's own entrypoint warms only its private cache. The check is not
-weakened anywhere, and the build genuinely has nothing to bypass.
+packages, copy the source — and the rest happens at start, after the settings
+have been accepted: the shared artefacts in the one-shot init service, each
+container's private cache in its own entrypoint.
 
 *What it does not guarantee.* The first start is slower than a start from a
-pre-warmed image, and every container of the stack pays it. That is the price of
-a check that cannot be bypassed; the deploy document states it rather than
-letting an operator discover it.
+pre-warmed image, and every container of the stack pays it. The deploy document
+states it rather than letting an operator discover it.
 
 *Alternatives considered.* Building with placeholder values (rejected: they end
 up in a layer and in a log, and a placeholder that happens to work is worse than
-none); a build-time flag the check honours (rejected: that is the bypass);
-splitting Symfony's build directory from its cache directory so part of the warm
-needs no environment (rejected as a partial answer — the asset compile and the
-key generation still boot, so the entrypoint is needed anyway, and having two
-mechanisms would be worse than one).
+none); a build-time flag the check honours (rejected: that is a bypass, and the
+arming in decision 6 is an opt-in precisely so no such flag exists); pinning
+`APP_ENV=prod` for the warm layer (rejected on point 3 above, not on point 2 —
+it does work).
 
 ### 3. One volume carries the assets to the proxy, another carries the keys — written by a single provisioner
 

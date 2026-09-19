@@ -21,6 +21,9 @@ may also describe decided design, citing the ADR that decided it.
   endpoint for Claude Code
 - [`how-to/benchmarks.md`](how-to/benchmarks.md) — the three performance
   targets, the commands that measure them and what they measured
+- [`how-to/deploy.md`](how-to/deploy.md) — the production stack: what runs,
+  how the settings reach it, and what a real operator would add that is not
+  there.
 - [`how-to/graphql.md`](how-to/graphql.md) — the read-only GraphQL endpoint:
   a worked query, what a document costs, and what the schema will not do
 

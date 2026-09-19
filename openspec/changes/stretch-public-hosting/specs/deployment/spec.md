@@ -14,7 +14,7 @@ public demo instance in particular exposes.
 ### Requirement: The production image carries the application and boots nothing at build time
 The production image SHALL contain the application's source and its dependencies installed without development packages, SHALL NOT require a mounted working tree, and SHALL run as a non-root user fixed in the image rather than taken from the building machine. It SHALL be configured for production rather than development — in particular the opcode cache SHALL NOT re-stat sources on each request.
 
-Building the image SHALL NOT start the application: no build step may boot the kernel. This is not a convenience — the boot is where the deployment's own configuration check lives (see "A missing or default setting stops the boot"), so a build that booted would have to be given real settings or be exempted from the check, and both defeat it. Consequently the build SHALL require no secret of any kind, and the image SHALL contain no placeholder value standing in for one.
+Building the image SHALL NOT start the application: no build step may boot the kernel. Consequently the build SHALL require no secret of any kind, and the image SHALL contain no placeholder value standing in for one — a property held by construction, since a build that boots nothing has nothing to be given and nothing to bake. It also keeps the image free of a cache built in an environment it will never run in, and free of a second place where the running environment is decided.
 
 #### Scenario: The image runs without the source directory
 - **WHEN** the production image is started with no bind mount of the repository
