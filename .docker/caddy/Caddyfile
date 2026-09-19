@@ -6,9 +6,7 @@
 }
 
 # Plain HTTP is answered with a permanent redirect rather than content, so a
-# short link is never followed over an unencrypted connection. Caddy does this
-# by default for a host it serves over HTTPS; it is written out because a
-# guarantee nobody can point at is not a guarantee.
+# short link is never followed over an unencrypted connection.
 http://{$PUBLIC_HOST} {
 	redir https://{$PUBLIC_HOST}{uri} permanent
 }
@@ -21,10 +19,9 @@ http://{$PUBLIC_HOST} {
 		-Server
 	}
 
-	# The application's document root. Only the two generated subtrees exist
-	# in this container — they are volumes written by the init service — and
-	# everything else is handed to PHP-FPM, which reads index.php from its own
-	# image.
+	# The only files this container has are the two volumes the init service
+	# writes: the compiled asset map and the bundle assets. It serves those
+	# itself, because PHP-FPM cannot serve static files.
 	root * /app/public
 
 	@static path /assets/* /bundles/*
@@ -32,9 +29,38 @@ http://{$PUBLIC_HOST} {
 		file_server
 	}
 
+	# Everything else is the application. `php_fastcgi` is deliberately NOT
+	# used: it decides what to run by looking for the file on ITS OWN
+	# filesystem, and this container has no `index.php` — the application
+	# lives in the php image, which is the whole point of the split. Measured:
+	# with `php_fastcgi` every dynamic request answered 200 with an empty
+	# body, because the try_files check matched nothing. The explicit
+	# transport states the script instead of guessing at it.
 	handle {
-		php_fastcgi php:9000 {
-			root /app/public
+		# `php_fastcgi` is deliberately NOT used, and neither is a rewrite.
+		# Both decide which script to run by looking at the filesystem, and
+		# this container has no `index.php` — the application lives in the php
+		# image, which is the whole point of the split. Measured: with
+		# `php_fastcgi` every dynamic request answered 200 with an empty body,
+		# because its try_files check matched nothing.
+		#
+		# Naming the script outright fixes a second thing too. An active
+		# health check bypasses any rewrite, so with a filesystem-derived
+		# script it asked PHP-FPM for `/app/public/health`, which does not
+		# exist, and the proxy declared the upstream down — measured as a
+		# blanket 503. With SCRIPT_FILENAME fixed, every request including the
+		# health check runs `index.php` and carries its own REQUEST_URI, so
+		# the check exercises the service's real liveness route.
+		reverse_proxy php:9000 {
+			transport fastcgi {
+				env SCRIPT_FILENAME /app/public/index.php
+				env SCRIPT_NAME /index.php
+				env DOCUMENT_ROOT /app/public
+			}
+
+			health_uri /health
+			health_interval 10s
+			health_timeout 3s
 		}
 	}
 }

@@ -92,6 +92,23 @@ provision_assets() {
     php bin/console asset-map:compile --no-interaction
 }
 
+# --- the schema ------------------------------------------------------------
+#
+# A deployment's database starts empty, and nothing else in the stack would
+# create it. Migrations belong here for the same reason the keys do: one
+# writer, before anything serves, and idempotent — `--allow-no-migration` makes
+# a start with nothing to do a success rather than an error.
+#
+# The trade-off is deliberate and stated: this instance migrates itself on
+# every start. That is right for one demo instance whose migrations are
+# reviewed and reversible; a fleet would separate the two so that a rollout
+# cannot half-migrate behind a half-rolled-out image.
+provision_schema() {
+    log 'applying migrations'
+    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+}
+
 provision_keys
+provision_schema
 provision_assets
 log 'done'
