@@ -10,6 +10,13 @@ twig:
         # (change stretch-public-hosting, design decision 5). One source, two
         # readers — the rule is not restated, it is read twice.
         registration_enabled: '%env(bool:REGISTRATION_ENABLED)%'
+        # A demo instance publishes its own credentials, which is the only
+        # place they are stated: the repository says the page states them, and
+        # never what they are (change stretch-public-hosting, design decision
+        # 7). Off everywhere else, and then the sign-in page says nothing.
+        demo_instance: '%env(bool:DEMO_INSTANCE)%'
+        demo_email: '%app.demo_email%'
+        demo_password: '%env(DEMO_PASSWORD)%'
 
 when@test:
     twig:

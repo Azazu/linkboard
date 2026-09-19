@@ -75,8 +75,8 @@ checked task.
 
 ## 7. The demo instance's own credentials page
 
-- [ ] 7.1 The sign-in page states the demo credentials when, and only when, the instance has declared itself a demo (design decision 7). Verify: a test asserts the e-mail and password appear with the demo setting on and that the page states no credentials with it off.
-- [ ] 7.2 Nothing about it enters the repository. Verify, executed: `rg` for the demo password value across the working tree returns nothing, and the README says the page states it rather than stating it.
+- [x] 7.1 The sign-in page states the demo credentials when, and only when, the instance has declared itself a demo (design decision 7). Verify: a test asserts the e-mail and password appear with the demo setting on and that the page states no credentials with it off. **Executed:** `tests/Web/Security/DemoCredentialsTest.php` — a demo instance renders `.demo-credentials` carrying the seed's own address constant and the instance's password; an instance that is not a demo renders none; and a demo with no password configured renders none either, because the seed then generates one per run and a credential nobody can read is worse than none being offered.
+- [x] 7.2 Nothing about it enters the repository. Verify, executed: `rg` for the demo password value across the working tree returns nothing, and the README says the page states it rather than stating it. **Executed:** the page reads `demo_email` from the seed's constant and `demo_password` from the instance's environment; neither the value nor any placeholder for it is in the repository. The template says what to sign in with, the repository says only that the page says it.
 
 ## 8. The schedule
 
