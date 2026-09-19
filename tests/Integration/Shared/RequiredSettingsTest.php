@@ -150,13 +150,41 @@ final class RequiredSettingsTest extends KernelTestCase
         self::expectNotToPerformAssertions();
     }
 
-    public function testADeploymentOnTheCommittedDefaultsIsRefused(): void
+    public function testADeploymentOnACommittedDefaultIsRefused(): void
     {
-        // the same instance, told it is a deployment: every committed default
-        // it still carries is now a refusal
-        $this->expectException(MisconfiguredSetting::class);
+        // The same instance, told it is a deployment. The setting left at its
+        // committed value is chosen HERE rather than inherited from whatever
+        // the process happens to carry: locally the connection strings come
+        // from `.env` and are committed defaults, while CI sets all four
+        // explicitly, so a test that relied on ambient state passed on one
+        // machine and failed on the other — which is the divergence
+        // `App\Tests\TestEnvironment` exists because of.
+        $committed = RequiredSettings::committedDefaults(\dirname(__DIR__, 3).'/.env');
+        $salt = $committed['VISITOR_HASH_SALT'] ?? '';
+        self::assertNotSame('', $salt, '.env commits a development salt for this to be about');
+
+        self::arrangeAcceptableSettings();
+        $_SERVER['VISITOR_HASH_SALT'] = $salt;
+        $_ENV['VISITOR_HASH_SALT'] = $salt;
+
+        try {
+            (new RequiredSettings(true, \dirname(__DIR__, 3)))->check();
+            self::fail('a deployment still carrying a committed default was allowed');
+        } catch (MisconfiguredSetting $e) {
+            self::assertStringContainsString('VISITOR_HASH_SALT', $e->getMessage());
+            self::assertStringNotContainsString($salt, $e->getMessage());
+        }
+    }
+
+    public function testADeploymentWithEverySettingItsOwnIsAllowed(): void
+    {
+        // the other half, and the reason the case above cannot pass by
+        // accident: with nothing left at a committed value, nothing refuses
+        self::arrangeAcceptableSettings();
 
         (new RequiredSettings(true, \dirname(__DIR__, 3)))->check();
+
+        self::expectNotToPerformAssertions();
     }
 
     public function testTheProductionComposeFileArmsIt(): void
