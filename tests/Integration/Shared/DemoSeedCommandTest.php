@@ -10,6 +10,7 @@ use App\Shared\Demo\DemoDataset;
 use App\Shared\Demo\DemoSeedCommand;
 use App\Tests\Fixture\FailingStatement;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -84,6 +85,28 @@ final class DemoSeedCommandTest extends WebTestCase
         self::assertNotSame($password, self::printedPassword($reset->getDisplay()), 'a new password');
     }
 
+    /**
+     * The printed password whatever its shape: the generated one is 24 hex
+     * characters, an instance-supplied one is whatever the host set.
+     */
+    private static function printedPasswordOfAnyShape(string $display): string
+    {
+        if (1 !== preg_match('/demo@example\.com\s+password: (\S+)/', $display, $m)) {
+            self::fail('no printed password for the demo user in: '.$display);
+        }
+
+        return $m[1];
+    }
+
+    private static function printedAdminPassword(string $display): string
+    {
+        if (1 !== preg_match('/admin@example\.com\s+password: (\S+)/', $display, $m)) {
+            self::fail('no printed password for the demo administrator in: '.$display);
+        }
+
+        return $m[1];
+    }
+
     private static function printedPassword(string $display): string
     {
         if (1 !== preg_match('/demo@example\.com\s+password: ([0-9a-f]{24})/', $display, $m)) {
@@ -97,6 +120,124 @@ final class DemoSeedCommandTest extends WebTestCase
     {
         FailingStatement::reset();
         parent::tearDown();
+    }
+
+    public function testASecondRunIsRefusedWhileAnotherHoldsTheLockHoweverLongItRuns(): void
+    {
+        // Gate 2 round 1, finding 1. The first implementation took a Symfony
+        // lock with a fixed 3 600-second TTL that Symfony refreshes only on
+        // acquisition — and the shipped reload cadence is also 3 600 seconds,
+        // so a run that outlived its interval lost ownership while it was
+        // still deleting and recreating the accounts.
+        //
+        // The guarantee is now a transaction-scoped advisory lock, which has
+        // no TTL at all: ownership ends with the transaction and with nothing
+        // else. That is what this test demonstrates — the holder here has been
+        // holding for an unbounded time and the second run is still refused,
+        // which is the case no TTL-based lock can promise.
+        // the client first: `self::connection()` boots the kernel, and
+        // createClient() refuses a kernel that is already up
+        $client = self::createClient();
+        $client->disableReboot();
+        $kernel = self::$kernel;
+        self::assertInstanceOf(KernelInterface::class, $kernel);
+
+        $holder = DriverManager::getConnection(self::connection()->getParams());
+        $holder->beginTransaction();
+        $holder->executeStatement('SELECT pg_advisory_xact_lock(?)', [DemoSeedCommand::LOCK_KEY]);
+
+        try {
+            $tester = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+
+            self::assertSame(1, $tester->execute(['--clicks' => '10', '--days' => '2']));
+            self::assertStringContainsString('Another app:demo:seed run is in progress', preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '');
+            self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM users')), 'nothing was written');
+        } finally {
+            $holder->rollBack();
+            $holder->close();
+        }
+    }
+
+    public function testTheLockIsReleasedWithTheTransactionSoTheNextRunProceeds(): void
+    {
+        // the other half: ownership really does end with the transaction, so
+        // a refusal is not a stuck instance
+        $client = self::createClient();
+        $client->disableReboot();
+        $kernel = self::$kernel;
+        self::assertInstanceOf(KernelInterface::class, $kernel);
+
+        $holder = DriverManager::getConnection(self::connection()->getParams());
+        $holder->beginTransaction();
+        $holder->executeStatement('SELECT pg_advisory_xact_lock(?)', [DemoSeedCommand::LOCK_KEY]);
+        $holder->rollBack();
+        $holder->close();
+
+        $tester = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+
+        self::assertSame(0, $tester->execute(['--clicks' => '10', '--days' => '2']), $tester->getDisplay());
+    }
+
+    public function testAConfiguredPasswordSurvivesAReset(): void
+    {
+        // Gate 1 round 1, finding 1: with a password generated per run, the
+        // first scheduled reload orphans whatever credential a visitor was
+        // given, and the console output nobody reads is the only place the
+        // replacement appears. This is the case that fails without the
+        // instance's own password.
+        //
+        // The two seeds run back to back with no HTTP between them: a request
+        // through the same kernel leaves the EntityManager holding the former
+        // dataset, and the reset then dies on a cascade rather than on
+        // anything this test is about.
+        $configured = 'demo-password-for-this-test-only';
+        // saved, not unset afterwards: `.env` declares DEMO_PASSWORD, and a
+        // later test in this process would fail to build the container at all
+        // if the variable disappeared
+        $saved = \is_string($_SERVER['DEMO_PASSWORD'] ?? null) ? $_SERVER['DEMO_PASSWORD'] : '';
+        $_SERVER['DEMO_PASSWORD'] = $configured;
+        $_ENV['DEMO_PASSWORD'] = $configured;
+
+        try {
+            $client = self::createClient();
+            $client->disableReboot();
+            $kernel = self::$kernel;
+            self::assertInstanceOf(KernelInterface::class, $kernel);
+
+            $first = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+            self::assertSame(0, $first->execute(['--clicks' => '10', '--days' => '2']), $first->getDisplay());
+            self::assertSame($configured, self::printedPasswordOfAnyShape($first->getDisplay()), 'the instance supplied it');
+
+            // A fresh kernel for the reload. Two seeds through one
+            // EntityManager die on a cascade — the first run's accounts are
+            // still managed when the second removes and recreates them — and
+            // that is an artefact of running both in one process, not
+            // something a scheduled instance ever does.
+            self::ensureKernelShutdown();
+            $client = self::createClient();
+            $client->disableReboot();
+            $kernel = self::$kernel;
+            self::assertInstanceOf(KernelInterface::class, $kernel);
+
+            $reset = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+            self::assertSame(0, $reset->execute(['--reset' => true, '--clicks' => '10', '--days' => '2']), $reset->getDisplay());
+            self::assertSame($configured, self::printedPasswordOfAnyShape($reset->getDisplay()), 'and the reload did not change it');
+
+            // and the administrator does NOT share it: publishing the demo
+            // credential must not publish administrator access, and that
+            // address is a constant of this repository
+            self::assertNotSame($configured, self::printedAdminPassword($reset->getDisplay()), 'the administrator keeps a generated password');
+
+            // and it is not only printed: it signs in against the new dataset
+            $client->request('POST', '/api/v1/auth/token', server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json',
+            ], content: json_encode(['email' => DemoDataset::USER_EMAIL, 'password' => $configured], \JSON_THROW_ON_ERROR));
+            self::assertSame(200, $client->getResponse()->getStatusCode());
+        } finally {
+            $_SERVER['DEMO_PASSWORD'] = $saved;
+            $_ENV['DEMO_PASSWORD'] = $saved;
+        }
     }
 
     public function testAFailureRollsBackAFreshSeedAndAReset(): void

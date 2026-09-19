@@ -15,4 +15,5 @@ minimum). Ids are stable between the specification and this file.
 
 | # | Change id | Scope (summary) | Tier |
 |---|---|---|---|
-| 16 | `stretch-public-hosting` | public demo instance with HTTPS, seeded data and reset job; link in the README | medium |
+| 16 | `stretch-public-hosting` | the deployment configuration: production image, compose stack behind Caddy with HTTPS, required-settings contract, registration switch, seeded demo and its reset job, deploy how-to and ADR | high |
+| 17 | *(the user's own step, not a change)* | provision a host, point a domain at it, run the stack, and put the instance's URL in the README's demo section | — |

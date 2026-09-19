@@ -1,0 +1,87 @@
+# Linkboard — the public instance's edge (change stretch-public-hosting,
+# design decision 4). Caddy terminates TLS and renews the certificate on its
+# own: no timer, no reload hook, no certbot beside it.
+{
+	email {$TLS_EMAIL}
+}
+
+# Plain HTTP is answered with a permanent redirect rather than content, so a
+# short link is never followed over an unencrypted connection.
+http://{$PUBLIC_HOST} {
+	redir https://{$PUBLIC_HOST}{uri} permanent
+}
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# The only files this container has are the two volumes the init service
+	# writes: the compiled asset map and the bundle assets. It serves those
+	# itself, because PHP-FPM cannot serve static files.
+	root * /app/public
+
+	@static path /assets/* /bundles/*
+	handle @static {
+		file_server
+	}
+
+	# Everything else is the application. `php_fastcgi` is deliberately NOT
+	# used: it decides what to run by looking for the file on ITS OWN
+	# filesystem, and this container has no `index.php` — the application
+	# lives in the php image, which is the whole point of the split. Measured:
+	# with `php_fastcgi` every dynamic request answered 200 with an empty
+	# body, because the try_files check matched nothing. The explicit
+	# transport states the script instead of guessing at it.
+	handle {
+		# `php_fastcgi` is deliberately NOT used, and neither is a rewrite.
+		# Both decide which script to run by looking at the filesystem, and
+		# this container has no `index.php` — the application lives in the php
+		# image, which is the whole point of the split. Measured: with
+		# `php_fastcgi` every dynamic request answered 200 with an empty body,
+		# because its try_files check matched nothing.
+		#
+		# Naming the script outright fixes a second thing too. An active
+		# health check bypasses any rewrite, so with a filesystem-derived
+		# script it asked PHP-FPM for `/app/public/health`, which does not
+		# exist, and the proxy declared the upstream down — measured as a
+		# blanket 503. With SCRIPT_FILENAME fixed, every request including the
+		# health check runs `index.php` and carries its own REQUEST_URI, so
+		# the check exercises the service's real liveness route.
+		reverse_proxy php:9000 {
+			# REPLACED, not appended. `reverse_proxy` appends by default, so a
+			# client that sends its own X-Forwarded-For would have it preserved
+			# — and with the proxy trusted, the application would believe it.
+			# That is a client choosing its own rate-limit bucket, which is
+			# exactly what the per-IP limits exist to prevent. Overwriting with
+			# the real peer is what makes "a forwarded header from outside the
+			# proxy is not believed" true here.
+			header_up X-Forwarded-For {remote_host}
+			# Anything a client sends under the country header is deleted
+			# here, so it can never be mistaken for an edge's answer. On a
+			# directly exposed instance the application would not believe it
+			# anyway — the address it sees is the visitor's, not a trusted
+			# proxy's — but "would not believe it" is a property of two
+			# components agreeing, and this is one component refusing to carry
+			# it at all (Gate 2 round 1, finding 2). Behind an edge that DOES
+			# resolve the country, remove this line and name that edge in
+			# TRUSTED_PROXIES.
+			header_up -{$COUNTRY_HEADER}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+
+			transport fastcgi {
+				env SCRIPT_FILENAME /app/public/index.php
+				env SCRIPT_NAME /index.php
+				env DOCUMENT_ROOT /app/public
+			}
+
+			health_uri /health
+			health_interval 10s
+			health_timeout 3s
+		}
+	}
+}

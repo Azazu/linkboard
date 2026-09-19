@@ -11,5 +11,12 @@
     <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
     <button type="submit">Log in</button>
 </form>
-<p><a href="{{ path('app_register') }}">Create an account</a></p>
+{% if demo_instance and demo_password is not empty %}
+    <article class="demo-credentials">
+        <h2>This is a demo</h2>
+        <p>Sign in with <strong>{{ demo_email }}</strong> and the password <strong><code>{{ demo_password }}</code></strong>.</p>
+        <p><small>The dataset is reloaded on a schedule, so anything you create here is temporary — and everyone shares this account.</small></p>
+    </article>
+{% endif %}
+{% if registration_enabled %}<p><a href="{{ path('app_register') }}">Create an account</a></p>{% endif %}
 {% endblock %}

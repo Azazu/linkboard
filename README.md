@@ -47,6 +47,24 @@ It prints two accounts and their generated passwords once. `.env` is committed
 with local defaults (Symfony convention); machine-specific overrides and real
 credentials belong in `.env.local`, which is not.
 
+## The demo instance
+
+<!-- The URL goes here once the instance is running. It is deliberately absent:
+     this repository ships the deployment configuration, and the instance it
+     describes is provisioned separately (openspec/ROADMAP.md row 17). Writing
+     a link nobody can visit would be the document lying. -->
+
+_Not published yet._ The configuration that runs it is here and is exercised in
+continuous integration on every build; putting a host behind it is one manual
+step, described in [`docs/how-to/deploy.md`](docs/how-to/deploy.md).
+
+When it is up, the instance is a **demo**: one shared account, registration
+closed, and the dataset reloaded on a schedule, so anything a visitor creates
+is temporary. Its sign-in page states the account and its password — that page
+is the only place they are stated, and neither is in this repository. The
+administrator account is not that credential: its password is generated per
+run, because a shared one would mean the page publishes administrator access.
+
 ## How it is built
 
 [`docs/explanation/architecture.md`](docs/explanation/architecture.md) has the

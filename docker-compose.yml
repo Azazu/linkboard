@@ -6,7 +6,13 @@
 services:
   php:
     build:
-      context: .docker/php
+      # The repository root, because .docker/php/Dockerfile's prod stage copies
+      # the application in and Docker cannot reach outside its context. This
+      # stage does not: the working tree is mounted over /app below, exactly as
+      # before (change stretch-public-hosting, design decision 1).
+      context: .
+      dockerfile: .docker/php/Dockerfile
+      target: dev
       args:
         HOST_UID: ${HOST_UID:-1000}
         HOST_GID: ${HOST_GID:-1000}
@@ -22,7 +28,13 @@ services:
 
   worker:
     build:
-      context: .docker/php
+      # The repository root, because .docker/php/Dockerfile's prod stage copies
+      # the application in and Docker cannot reach outside its context. This
+      # stage does not: the working tree is mounted over /app below, exactly as
+      # before (change stretch-public-hosting, design decision 1).
+      context: .
+      dockerfile: .docker/php/Dockerfile
+      target: dev
       args:
         HOST_UID: ${HOST_UID:-1000}
         HOST_GID: ${HOST_GID:-1000}

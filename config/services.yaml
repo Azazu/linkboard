@@ -25,6 +25,18 @@ parameters:
     app.api.graphql_paths:
         - '^/api/v1/graphql$'
         - '^/api/graphql$'
+    # The demo account a public demo instance signs visitors in as. The
+    # address is the seed's own constant so the page and the dataset cannot
+    # disagree; the password is never here — it is the instance's.
+    app.demo_email: !php/const App\Shared\Demo\DemoDataset::USER_EMAIL
+
+    # The two entry points of self-registration, named together because the
+    # switch that closes them has to close BOTH: a rule that lives in one
+    # surface is a rule the other surface forgets (change
+    # stretch-public-hosting, design decision 5).
+    app.registration_paths:
+        - '^/register$'
+        - '^/api/v1/auth/register$'
     app.api.path.base: '^/api/v1$'
     # The json_login check path of the api firewall: the one public operation
     # that authenticates, so the one that answers 401 without a firewall
