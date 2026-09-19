@@ -1,7 +1,7 @@
 # Handoff — stretch-public-hosting
 
-**Updated:** 2026-09-17 · claude
-**State:** blocked
+**Updated:** 2026-09-19 · claude
+**State:** fixing-g1
 **Branch:** change/stretch-public-hosting
 
 ## Done this session
@@ -77,6 +77,4 @@ Record `553ce47`, Reviewed-Commit `cdd8f17`. Eight confirmed. Finding 4 alone re
 Gate 1 confirmation 6: `scripts/gate-run.sh stretch-public-hosting 1 confirm 1`. If finding 4 returns, stop and ask the user to arbitrate again rather than running a seventh.
 
 ## Blockers
-**Codex is out of budget.** `scripts/gate-run.sh stretch-public-hosting 1 confirm 1` on `aa8ee7e` exited 1 with "You hit your spend cap set by the owner of your workspace" after 26 603 tokens. The runner is fail-closed, so nothing was written: the last record in `review.md` is Confirmation 5 and the working tree is clean. The gate is NOT passed.
-
-The fix is outside this repository — the workspace owner raises the cap — after which the next step above runs unchanged against `aa8ee7e`. Nothing else is outstanding: the fixes for confirmation 5's finding are committed, `openspec validate --strict` and `scripts/pregate-verify.sh gate1` both pass on that commit.
+None. Confirmation 6 was refused on 2026-09-17 because Codex hit the workspace spend cap — the runner is fail-closed, so nothing was written and the gate simply did not pass. The cap was raised on 2026-09-19 and the run is resumed against this branch head; the last record in `review.md` remains Confirmation 5.
