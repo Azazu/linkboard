@@ -138,6 +138,16 @@ remove the `header_up -{$COUNTRY_HEADER}` line from the Caddyfile so the edge's
 value reaches the application. **Not exercised here:** this deployment is the
 directly exposed one.
 
+The mount and the lookup *are* exercised. `tests/Fixture/build-country-mmdb.php`
+builds a small database in MaxMind's own format — not the licensed GeoLite2
+dataset, which needs an account — and with one mounted at `var/geoip/` the
+stack was measured end to end: the file is readable inside the php container, a
+redirect for a link whose rules target Germany answered
+`302 https://example.de/` rather than its default, and the click was recorded
+with country `DE`. The same request carrying a forged `CF-IPCountry: FR` still
+went to `https://example.de/` — that link has a French rule, so a believed
+header would have sent it to `https://example.fr/`.
+
 ## Looking after it
 
 ```bash
