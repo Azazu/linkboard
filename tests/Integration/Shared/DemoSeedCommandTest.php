@@ -97,6 +97,15 @@ final class DemoSeedCommandTest extends WebTestCase
         return $m[1];
     }
 
+    private static function printedAdminPassword(string $display): string
+    {
+        if (1 !== preg_match('/admin@example\.com\s+password: (\S+)/', $display, $m)) {
+            self::fail('no printed password for the demo administrator in: '.$display);
+        }
+
+        return $m[1];
+    }
+
     private static function printedPassword(string $display): string
     {
         if (1 !== preg_match('/demo@example\.com\s+password: ([0-9a-f]{24})/', $display, $m)) {
@@ -156,6 +165,11 @@ final class DemoSeedCommandTest extends WebTestCase
             $reset = new CommandTester(new Application($kernel)->find('app:demo:seed'));
             self::assertSame(0, $reset->execute(['--reset' => true, '--clicks' => '10', '--days' => '2']), $reset->getDisplay());
             self::assertSame($configured, self::printedPasswordOfAnyShape($reset->getDisplay()), 'and the reload did not change it');
+
+            // and the administrator does NOT share it: publishing the demo
+            // credential must not publish administrator access, and that
+            // address is a constant of this repository
+            self::assertNotSame($configured, self::printedAdminPassword($reset->getDisplay()), 'the administrator keeps a generated password');
 
             // and it is not only printed: it signs in against the new dataset
             $client->request('POST', '/api/v1/auth/token', server: [

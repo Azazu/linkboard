@@ -317,17 +317,40 @@ can seed it, and anyone at all can read the demo password — which is the point
 a demo account, and why it owns nothing but regenerated data. An instance that
 has not declared itself a demo publishes nothing.
 
-### 8. The client's address is a correctness decision, not a setting
+### 8. The client's address: what actually decides it here
 
-Behind Caddy every request arrives from the proxy. The service already
-guarantees, in two capabilities, that the per-IP limits count the *client* and
-that a forwarded header from an untrusted peer creates no bucket — and
-`framework.yaml` already reads `TRUSTED_PROXIES`. Deployed with the shipped
-`127.0.0.1` the proxy is not trusted, so every visitor is counted as the proxy
-and the redirect limiter becomes one global bucket of 60 per minute: the demo
-would rate-limit itself. The deployment sets the proxy's address, and the
-verification is a forwarded request through the real stack rather than a claim in
-a document.
+This decision was written from the wrong model and the running stack corrected
+it, so both versions are recorded.
+
+*What it said.* Behind a proxy every request arrives from the proxy, so
+`TRUSTED_PROXIES` must name it or the per-IP limits collapse into one global
+bucket and the demo rate-limits itself.
+
+*What is true in this topology.* The upstream is **FastCGI, not HTTP**. Caddy
+passes the connecting client's address as `REMOTE_ADDR` in the FastCGI
+parameters, so the application already sees the real client whatever
+`TRUSTED_PROXIES` says. Measured: with the proxy deliberately left untrusted,
+two containers with different addresses each got their own bucket of three
+redirects — if the application had been counting the proxy, the second client's
+first request would have been refused.
+
+*So the thing that actually needed fixing was a different one.* `reverse_proxy`
+**appends** to `X-Forwarded-For` by default, and the application trusts what a
+trusted chain forwards — so a client that sent its own header could choose
+which bucket it was counted in, which is precisely what a per-IP limit exists
+to prevent. The proxy now **overwrites** it with the real peer
+(`header_up X-Forwarded-For {remote_host}`), and the capability says that
+rather than the claim above.
+
+`TRUSTED_PROXIES` is still set — to the compose network by default, and
+configurable for a deployment that sits behind something else — so that the
+forwarded scheme and host are believed. What it is *not* is the thing holding
+up the per-IP limits, and the artifacts no longer say it is.
+
+*What this does not guarantee.* Nothing here protects an instance whose
+application port is published beside the proxy: then a client could reach
+PHP-FPM directly and be its own `REMOTE_ADDR`. The production stack publishes
+only the proxy's ports, and that is the property the guarantee rests on.
 
 ### 9. What this change can deliver of roadmap row 16, and what it cannot
 

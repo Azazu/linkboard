@@ -112,7 +112,12 @@ final class DemoSeedCommand
         }
 
         $now = new \DateTimeImmutable();
-        $passwords = [DemoDataset::USER_EMAIL => $this->demoPassword(), DemoDataset::ADMIN_EMAIL => $this->demoPassword()];
+        // The instance's password is the DEMO USER's alone. Giving it to the
+        // administrator too would mean the sign-in page publishes admin
+        // access, because that address is a constant in this repository —
+        // found by running the stack and reading what it printed, not by
+        // reasoning about it.
+        $passwords = [DemoDataset::USER_EMAIL => $this->demoPassword(), DemoDataset::ADMIN_EMAIL => self::password()];
         $formerLinkIds = [];
         /** @var list<Link> $links */
         $links = [];

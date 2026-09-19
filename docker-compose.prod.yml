@@ -46,7 +46,7 @@ x-app-environment: &app-environment
   # Behind Caddy every request arrives from the proxy, and two capabilities
   # require the per-IP limits to count the CLIENT. The proxy is on this
   # compose network, so the private ranges are exactly it.
-  TRUSTED_PROXIES: private_ranges
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-private_ranges}
 
   REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-false}
   DEMO_INSTANCE: ${DEMO_INSTANCE:-true}

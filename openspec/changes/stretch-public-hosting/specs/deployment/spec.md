@@ -95,22 +95,22 @@ The deployment SHALL terminate TLS in front of the application, obtain and renew
 - **THEN** a valid certificate is in place without an operator command, and renewal needs none either
 
 ### Requirement: The client IP survives the proxy
-The deployment SHALL configure the trusted proxy so that the address the application treats as the client's is the one the proxy forwards, not the proxy's own. Two behaviours the service already guarantees depend on it: the per-IP redirect limit and the per-IP authentication limit count one bucket per client, and the country resolver reads a forwarded header. A deployment left with the development default SHALL be treated as misconfigured, because every visitor would share a single bucket.
+The address the application treats as the client's SHALL be the requesting client's own, not the proxy's, so that the per-IP redirect limit and the per-IP authentication limit count one bucket per client. A client SHALL NOT be able to choose which bucket it is counted in: the proxy SHALL overwrite any forwarded-for header the client sends with the address it actually connected from, rather than adding to it. The deployment SHALL also declare the proxy trusted, so that the forwarded scheme and host are believed where the application depends on them.
 
 #### Scenario: Two clients are two buckets
 - **WHEN** two different client addresses reach the deployment through the proxy and each sends requests up to the per-IP redirect limit
 - **THEN** neither is refused, because they are counted separately
 
-#### Scenario: A forwarded header from outside the proxy is still not believed
-- **WHEN** a client sends its own forwarded header through the proxy
-- **THEN** the address counted is the one the trusted proxy set, not the one the client claimed
+#### Scenario: A client cannot pick its own bucket
+- **WHEN** a client sends a forwarded-for header naming another address
+- **THEN** it is counted against the address it connected from, because the proxy replaced the header rather than appending to it
 
 ### Requirement: A missing or default setting stops the boot
 The deployment SHALL require, from outside the repository, every setting through which a credential or a secret actually reaches the application. That set SHALL be named exhaustively rather than by category, and SHALL be defined by what the application consumes, not by what looks like a password: the application secret, the JWT passphrase, the visitor-hash salt, the database connection string, and **each** of the Redis connection strings the application uses independently — the cache and counter connection, the lock connection, and the message transport — because a check that examined only one of them would leave the others carrying the committed values.
 
 When one of those settings is unset, empty, or **still equal to the value committed in the repository as a local development default**, the application SHALL fail to boot with a message naming the setting — in every process of the deployment, the web application, the worker and the scheduler alike. The message SHALL NOT contain the value it found. No such value SHALL appear in the repository, in an image layer, in a log line or in a message.
 
-Naming the settings is not sufficient on its own, because two of them can disagree: a data store's server is configured with a password of its own while the application connects with a connection string, so changing only the second would satisfy the check while the server kept the committed credential, and changing both differently would produce a deployment that starts and then cannot query. The deployment SHALL therefore take **one authoritative credential per store** and derive every connection string the application uses from it, so that a disagreement cannot be introduced through configuration. The file those authoritative credentials live in SHALL be the one the deployment's own tooling reads when it renders that configuration, and the invocation that names it SHALL be the same one the documentation gives and the same one every verification uses — otherwise the derived values would be rendered from the repository's committed defaults while the check examined credentials nothing consumed. Where a connection string is nonetheless overridden so that it no longer matches its store, the deployment SHALL surface it through the deep dependency probe as that store being unreachable, rather than by failing at an arbitrary later request.
+Naming the settings is not sufficient on its own, because two of them can disagree: a data store's server is configured with a password of its own while the application connects with a connection string, so changing only the second would satisfy the check while the server kept the committed credential, and changing both differently would produce a deployment that starts and then cannot query. The deployment SHALL therefore take **one authoritative credential per store** and derive every connection string the application uses from it, so that a disagreement cannot be introduced through configuration. The file those authoritative credentials live in SHALL be the one the deployment's own tooling reads when it renders that configuration, and the invocation that names it SHALL be the same one the documentation gives and the same one every verification uses — otherwise the derived values would be rendered from the repository's committed defaults while the check examined credentials nothing consumed. Where a connection string is nonetheless overridden so that it no longer matches its store, the deployment SHALL fail to start rather than serve: provisioning reaches that store before anything else does, so the failure arrives at start-up, names the store, and leaves every dependent process stopped — not at an arbitrary later request.
 
 #### Scenario: An unset setting is fatal, and named
 - **WHEN** the deployment starts with the application secret unset
@@ -136,9 +136,9 @@ Naming the settings is not sufficient on its own, because two of them can disagr
 - **WHEN** the deployment is started on empty storage with only the authoritative database credential changed from its committed value, and then the same is done for the Redis credential
 - **THEN** in each case the store accepts the application's connection, because the connection string the application uses was derived from the credential the store was created with
 
-#### Scenario: A connection string that no longer matches its store is reported, not hidden
+#### Scenario: A connection string that no longer matches its store stops the start, not a later request
 - **WHEN** a derived connection string is overridden so that it disagrees with the store it names
-- **THEN** the deep dependency probe reports that store unreachable
+- **THEN** the process that needs it fails at start-up with a message naming that store, and no dependent process serves
 
 ### Requirement: The public demo instance exposes one account and no registration
 On the public demo instance self-registration SHALL be closed and the dataset SHALL be reloaded on a schedule, so that what a visitor finds is the demo dataset and not what previous visitors left. A visitor SHALL be able to sign in with the demo account, create and edit links and read every report that account owns.

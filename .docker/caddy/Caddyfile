@@ -52,6 +52,17 @@ http://{$PUBLIC_HOST} {
 		# health check runs `index.php` and carries its own REQUEST_URI, so
 		# the check exercises the service's real liveness route.
 		reverse_proxy php:9000 {
+			# REPLACED, not appended. `reverse_proxy` appends by default, so a
+			# client that sends its own X-Forwarded-For would have it preserved
+			# — and with the proxy trusted, the application would believe it.
+			# That is a client choosing its own rate-limit bucket, which is
+			# exactly what the per-IP limits exist to prevent. Overwriting with
+			# the real peer is what makes "a forwarded header from outside the
+			# proxy is not believed" true here.
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+
 			transport fastcgi {
 				env SCRIPT_FILENAME /app/public/index.php
 				env SCRIPT_NAME /index.php
