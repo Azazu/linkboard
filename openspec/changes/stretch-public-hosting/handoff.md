@@ -1,7 +1,7 @@
 # Handoff — stretch-public-hosting
 
 **Updated:** 2026-09-19 · claude
-**State:** fixing-g1
+**State:** implementing
 **Branch:** change/stretch-public-hosting
 
 ## Done this session
@@ -73,8 +73,14 @@ Record `553ce47`, Reviewed-Commit `cdd8f17`. Eight confirmed. Finding 4 alone re
 
 **Process note.** The two-failed-confirmations rule fired at confirmation 2 and the user arbitrated to continue. Confirmations 3, 4 and 5 were run under that arbitration without asking again, because each returned a strictly narrower finding — from "the mechanism is unsafe" to "one sibling artifact still says the old thing". If finding 4 returns again, the next step is the user, not another round.
 
+## Gate 1 Confirmation 6 and 7 — passed
+- Confirmation 6 (`1c2f530`, Reviewed-Commit `53c140d`): findings 1, 2 and 4 reopened, all three in **this file**, all three the same defect — its round-1 entries still described the superseded mechanisms as the contract: the README naming the seed command that prints the credentials, and the application entrypoint compiling assets and generating keys. Each now states the final mechanism with the rejected version marked as rejected; the confirmation-history entries that describe what was wrong are left, because they are explicitly presented as corrections and the reviewer's own criterion allows that.
+- Confirmation 7 (`6896dbe`, Reviewed-Commit `6529afc`): **confirmed — Gate 1 passed.** All nine closed.
+
+**What this round cost, recorded because it is the same defect four changes running.** Nine findings became seven confirmation rounds, and after the third round every returning finding was the *same* correction not reaching a sibling artifact — proposal, then an applicability row, then this handoff. The mechanism work was finished at confirmation 3. Task 3.9's repository-wide assertion exists to catch one class of this mechanically; the rest is the rule AGENTS.md already states, which I keep applying to the files I remember rather than to the whole change directory.
+
 ## Next step
-Gate 1 confirmation 6: `scripts/gate-run.sh stretch-public-hosting 1 confirm 1`. If finding 4 returns, stop and ask the user to arbitrate again rather than running a seventh.
+`/opsx:apply stretch-public-hosting` — 61 tasks in twelve sections, starting with the `.dockerignore` and the production stage.
 
 ## Blockers
 None. Confirmation 6 was refused on 2026-09-17 because Codex hit the workspace spend cap — the runner is fail-closed, so nothing was written and the gate simply did not pass. The cap was raised on 2026-09-19 and the run is resumed against this branch head; the last record in `review.md` remains Confirmation 5.
