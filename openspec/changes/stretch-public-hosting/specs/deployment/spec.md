@@ -22,7 +22,7 @@ Building the image SHALL NOT start the application: no build step may boot the k
 
 #### Scenario: Building needs no secret and bakes none
 - **WHEN** the image is built in an environment where none of the required settings is present — as continuous integration builds it
-- **THEN** the build succeeds, and no layer of the resulting image contains a value for any of them
+- **THEN** the build succeeds, and the only values for those settings anywhere in the image are the repository's own committed development defaults, which are public by construction and which the running application refuses to start on
 
 #### Scenario: Development packages and settings are absent
 - **WHEN** the production image is inspected
