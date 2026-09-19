@@ -1,0 +1,198 @@
+# Linkboard — the production stack (change stretch-public-hosting).
+#
+# Self-contained on purpose: it is NOT an override of docker-compose.yml.
+# Compose APPENDS volume lists when files are merged (measured), so overlaying
+# this on the development file would keep its `.:/app` bind mount and the
+# deployment would silently run with the working tree over the image it was
+# built to carry.
+#
+# Every invocation names the interpolation source, because Compose reads the
+# shell, the project `.env` or `--env-file` — never a service's `env_file:`:
+#
+#   docker compose --env-file .env.local -f docker-compose.prod.yml up -d
+#
+# `.env.local` is generated on the host and is gitignored; `docs/how-to/
+# deploy.md` gives the commands that generate it. No value of it is in this
+# repository.
+name: linkboard-prod
+
+# One authoritative credential per store, and every connection string derived
+# from it, so the server and the application cannot end up holding different
+# passwords (design decision 6). `${VAR:?...}` refuses to render at all when
+# the host has not set one.
+x-app-environment: &app-environment
+  APP_ENV: prod
+  APP_DEBUG: "0"
+  # Arms the required-settings check. The deployment definition is the thing
+  # that knows this instance serves the public; `dev`, `test`, the benchmark
+  # recipe and the prod-kernel probe are prod-LIKE, not deployments.
+  DEPLOYMENT: "true"
+
+  APP_SECRET: ${APP_SECRET:?generate one into .env.local — see docs/how-to/deploy.md}
+  JWT_PASSPHRASE: ${JWT_PASSPHRASE:?generate one into .env.local — see docs/how-to/deploy.md}
+  VISITOR_HASH_SALT: ${VISITOR_HASH_SALT:?generate one into .env.local — see docs/how-to/deploy.md}
+
+  DB_NAME: ${DB_NAME:-linkboard}
+  DB_USER: ${DB_USER:-linkboard}
+  DB_PASSWORD: ${DB_PASSWORD:?generate one into .env.local — see docs/how-to/deploy.md}
+  DATABASE_URL: postgresql://${DB_USER:-linkboard}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-linkboard}?serverVersion=16&charset=utf8
+
+  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+  LOCK_DSN: redis://:${REDIS_PASSWORD}@redis:6379
+  MESSENGER_TRANSPORT_DSN: redis://:${REDIS_PASSWORD}@redis:6379/messages
+
+  APP_PUBLIC_URL: https://${PUBLIC_HOST:?the host name this instance answers on}
+  DEFAULT_URI: https://${PUBLIC_HOST}
+  # Behind Caddy every request arrives from the proxy, and two capabilities
+  # require the per-IP limits to count the CLIENT. The proxy is on this
+  # compose network, so the private ranges are exactly it.
+  TRUSTED_PROXIES: private_ranges
+
+  REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-false}
+  DEMO_INSTANCE: ${DEMO_INSTANCE:-true}
+  DEMO_PASSWORD: ${DEMO_PASSWORD:?the demo account's password, published by this instance's own sign-in page}
+
+  RATE_LIMIT_AUTH_PER_IP: ${RATE_LIMIT_AUTH_PER_IP:-10}
+  RATE_LIMIT_REDIRECT_PER_IP: ${RATE_LIMIT_REDIRECT_PER_IP:-60}
+  RATE_LIMIT_API_PER_KEY: ${RATE_LIMIT_API_PER_KEY:-600}
+
+  COUNTRY_RESOLVERS: ${COUNTRY_RESOLVERS:-header}
+  GEOIP_COUNTRY_HEADER: ${GEOIP_COUNTRY_HEADER:-CF-IPCountry}
+  CLICK_RETENTION_MONTHS: ${CLICK_RETENTION_MONTHS:-13}
+  CLICK_PARTITION_HORIZON_MONTHS: ${CLICK_PARTITION_HORIZON_MONTHS:-3}
+
+x-app-image: &app-image
+  build:
+    context: .
+    dockerfile: .docker/php/Dockerfile
+    target: prod
+  image: linkboard-prod
+
+services:
+  # The ONLY writer of the shared volumes, and the reason nothing races on a
+  # clean host: the three long-running services wait for it to exit 0.
+  init:
+    <<: *app-image
+    command: ["provision"]
+    environment: *app-environment
+    volumes:
+      - jwt:/app/config/jwt/prod
+      - assets:/app/public/assets
+      - bundles:/app/public/bundles
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  php:
+    <<: *app-image
+    restart: unless-stopped
+    environment: *app-environment
+    volumes:
+      - jwt:/app/config/jwt/prod:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    <<: *app-image
+    restart: unless-stopped
+    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=256M"]
+    environment: *app-environment
+    volumes:
+      - jwt:/app/config/jwt/prod:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    <<: *app-image
+    restart: unless-stopped
+    command: ["scheduler"]
+    environment:
+      <<: *app-environment
+      # The cadences, in one place. The reload is short because a demo nobody
+      # moderates should not carry what a visitor left for long.
+      DEMO_RELOAD_SECONDS: ${DEMO_RELOAD_SECONDS:-3600}
+      PARTITIONS_SECONDS: ${PARTITIONS_SECONDS:-86400}
+    volumes:
+      - jwt:/app/config/jwt/prod:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?the host name this instance answers on}
+      TLS_EMAIL: ${TLS_EMAIL:?the address Let's Encrypt writes to about this certificate}
+    volumes:
+      - ./.docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The compiled assets, written by init and served directly: PHP-FPM
+      # cannot serve static files and this container has no copy of the
+      # application. Read-only here — one writer, one reader.
+      - assets:/app/public/assets:ro
+      - bundles:/app/public/bundles:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      php:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-linkboard}
+      POSTGRES_USER: ${DB_USER:-linkboard}
+      # The same authoritative value DATABASE_URL is derived from, so the
+      # server and the application cannot disagree.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?generate one into .env.local — see docs/how-to/deploy.md}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-linkboard} -d ${DB_NAME:-linkboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?generate one into .env.local — see docs/how-to/deploy.md}", "--save", "60", "1"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+volumes:
+  jwt:
+  assets:
+  bundles:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

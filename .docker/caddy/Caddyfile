@@ -1,0 +1,40 @@
+# Linkboard — the public instance's edge (change stretch-public-hosting,
+# design decision 4). Caddy terminates TLS and renews the certificate on its
+# own: no timer, no reload hook, no certbot beside it.
+{
+	email {$TLS_EMAIL}
+}
+
+# Plain HTTP is answered with a permanent redirect rather than content, so a
+# short link is never followed over an unencrypted connection. Caddy does this
+# by default for a host it serves over HTTPS; it is written out because a
+# guarantee nobody can point at is not a guarantee.
+http://{$PUBLIC_HOST} {
+	redir https://{$PUBLIC_HOST}{uri} permanent
+}
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# The application's document root. Only the two generated subtrees exist
+	# in this container — they are volumes written by the init service — and
+	# everything else is handed to PHP-FPM, which reads index.php from its own
+	# image.
+	root * /app/public
+
+	@static path /assets/* /bundles/*
+	handle @static {
+		file_server
+	}
+
+	handle {
+		php_fastcgi php:9000 {
+			root /app/public
+		}
+	}
+}

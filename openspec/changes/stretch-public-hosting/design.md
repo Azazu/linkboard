@@ -265,11 +265,22 @@ from the **committed** defaults while the check passed on values nobody used
 therefore written, everywhere it appears, as
 
 ```bash
-docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.prod.yml <command>
+docker compose --env-file .env.local -f docker-compose.prod.yml <command>
 ```
 
 — in the deploy document, in every task that brings the stack up, and in
-anything CI runs. The verification is `config` rendering the authoritative values
+anything CI runs.
+
+*And it is one file, not the development file with an override on top.*
+Measured rather than assumed: `docker compose -f a.yml -f b.yml config` **appends**
+volume lists rather than replacing them, so overlaying the production file on
+`docker-compose.yml` keeps its `.:/app` bind mount — the production stack would
+silently run with the working tree mounted over the image it was built to carry,
+defeating the self-contained image entirely. Compose's `!reset` tag can undo an
+inherited list, but hiding a guarantee that large inside tag syntax is worse than
+one self-contained `docker-compose.prod.yml` that a reviewer can read top to
+bottom. The development stack and the deployment are two contours by decision;
+this is where that stops being a slogan. The verification is `config` rendering the authoritative values
 into both the server settings and every derived connection string, so that "the
 interpolation source is the one we meant" is checked rather than assumed.
 
@@ -377,7 +388,7 @@ item delivered in `docs/explanation/requirements.md` §9.
 Nothing to migrate: the change adds files and settings whose defaults reproduce
 current behaviour. The deploy document is the forward path; the rollback for the
 demo instance is the documented invocation's own teardown —
-`docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.prod.yml down` —
+`docker compose --env-file .env.local -f docker-compose.prod.yml down` —
 plus the host, since it holds no data that the seed does not regenerate, except
 the JWT volume, whose loss only means re-issuing tokens. The flag matters for a
 teardown exactly as it does for a start: without it compose resolves a different

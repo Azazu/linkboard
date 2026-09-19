@@ -98,6 +98,7 @@ RUN set -eu; \
 
 COPY --chmod=0755 .docker/php/provision.sh /usr/local/bin/provision
 COPY --chmod=0755 .docker/php/entrypoint.sh /usr/local/bin/entrypoint
+COPY --chmod=0755 .docker/php/scheduler.sh /usr/local/bin/scheduler
 
 ENV APP_ENV=prod \
     APP_DEBUG=0
