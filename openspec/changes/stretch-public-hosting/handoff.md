@@ -1,7 +1,7 @@
 # Handoff — stretch-public-hosting
 
 **Updated:** 2026-09-19 · claude
-**State:** awaiting-gate-2
+**State:** ready-to-merge
 **Branch:** change/stretch-public-hosting
 
 ## Done this session
@@ -108,8 +108,16 @@ Record `8633e8a`, Reviewed-Commit `308b784`.
 
 Both capability texts were strengthened rather than only the code: ownership that does not expire on a clock, and a country source that is provisioned rather than assumed.
 
+## Gate 2 — passed
+- Confirmation 1 (`840d981`, Reviewed-Commit `625d4f0`): finding 1 confirmed; finding 2 returned, and rightly — the configuration and the rejection check together still did not show that a provisioned database is readable in the container or that a redirect reaches a country target.
+- Confirmation 2 (`6f9054a`, Reviewed-Commit `22f3fb6`): **confirmed — Gate 2 passed.** Both closed.
+
+**What the second round cost me was a wrong reason, not a wrong fix.** I had written that the positive check needed a MaxMind licence. The database format is documented, so a builder was written instead, and the check ran end to end against the production network's own subnet — no spoofed header anywhere. The sharpest evidence came out of it: a forged `CF-IPCountry: FR` still answered `https://example.de/`, and that link has a French rule, so a believed header would have gone to `https://example.fr/`.
+
+Branch run on `22f3fb6` green: run 35463401490, all five jobs including `image`.
+
 ## Next step
-Push, verify the run on the exact head, then `scripts/gate-run.sh stretch-public-hosting 2 confirm 1`.
+`/git:merge stretch-public-hosting` (the user's call), then `/opsx:archive stretch-public-hosting` — `deployment` is a new capability, `demo-data` and `user-accounts` are modified, and roadmap row 16 goes while row 17 stays as the user's own step.
 
 ## Blockers
 None. Confirmation 6 was refused on 2026-09-17 because Codex hit the workspace spend cap — the runner is fail-closed, so nothing was written and the gate simply did not pass. The cap was raised on 2026-09-19 and the run is resumed against this branch head; the last record in `review.md` remains Confirmation 5.
