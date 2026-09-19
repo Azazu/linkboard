@@ -113,3 +113,22 @@
 | 7 | confirmed |
 | 8 | confirmed |
 | 9 | confirmed |
+
+## Confirmation 6 · Gate 1 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-19
+**Reviewed-Commit:** 53c140d164b2992a0dbc141e6da82977488b9fc1
+**Verdict:** changes-requested
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | changes-requested — The deployment spec, design and tasks now consistently keep the demo credential stable across reloads and publish it on the sign-in page, but `handoff.md`'s current user-decision entry still says the README names the seed command that prints the credentials. That is the superseded publication mechanism this finding rejected. Reconcile that statement with the sign-in-page mechanism so the old contract does not survive in a sibling artifact. |
+| 2 | changes-requested — The build/runtime design itself is now coherent, but `handoff.md`'s round-1 resolution still says the application entrypoint compiles assets and generates keys at container start. Decisions 2–3 and tasks 2.1–2.3 instead assign both shared artefacts to the one-shot init service, while application entrypoints warm only private caches. Update the stale resolution statement so it does not direct implementation back to the contradictory lifecycle. |
+| 3 | confirmed |
+| 4 | changes-requested — The Applicability row now correctly names the fail/stop/repair mechanism and task 2.3 verifies interruption between the final moves. However, `handoff.md`'s round-1 resolution still asserts that the application entrypoint generates the keypair when absent. That conflicts with the single-writer init-service ordering required by the final design and is a live stale claim in the same sibling artifact confirmation 5 purported to sweep. Reconcile it with the one-shot init service; historical descriptions of rejected states may remain only where they are explicitly presented as such. |
+| 5 | confirmed |
+| 6 | confirmed |
+| 7 | confirmed |
+| 8 | confirmed |
+| 9 | confirmed |
