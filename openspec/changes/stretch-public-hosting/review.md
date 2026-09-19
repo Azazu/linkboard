@@ -175,3 +175,15 @@
 |---|------------|
 | 1 | confirmed |
 | 2 | changes-requested — The production default now uses the trusted GeoLite2 resolver, mounts its database directory read-only, and Caddy removes the configured country header supplied by a client; the recorded three-request check covers the rejection half. The required positive production-stack verification is still absent, however: task 13.6 explicitly says that matching a country rule through the real stack was not exercised. Because the supported missing-database state makes every country unknown, the configuration and negative check do not demonstrate that a provisioned database is readable in the PHP container or that a real redirect reaches the country target. Exercise a country-rule match through the production stack with a provisioned GeoLite2 database, while retaining the client-supplied-header rejection check. |
+
+## Confirmation 2 · Gate 2 · Round 1
+**Reviewer:** codex
+**Date:** 2026-09-19
+**Reviewed-Commit:** 22f3fb6375339baff5a766f4e7650fad17db5be4
+**Verdict:** confirmed
+
+### Findings
+| # | Resolution |
+|---|------------|
+| 1 | confirmed |
+| 2 | confirmed |
