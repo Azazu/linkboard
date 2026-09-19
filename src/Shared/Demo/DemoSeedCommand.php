@@ -20,7 +20,6 @@ use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactoryInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -35,6 +34,13 @@ use Symfony\Component\Uid\Uuid;
 #[AsCommand(name: 'app:demo:seed', description: 'Seed demo accounts, links and synthetic clicks (never in prod)')]
 final class DemoSeedCommand
 {
+    /**
+     * The advisory-lock key of the demo seed. Distinct from the click
+     * retention's (`ClickRetention::LOCK_KEY`): they protect different work
+     * and must never block each other.
+     */
+    public const int LOCK_KEY = 4_071_215_602;
+
     public function __construct(
         private readonly Connection $connection,
         private readonly EntityManagerInterface $em,
@@ -64,7 +70,6 @@ final class DemoSeedCommand
          */
         #[Autowire(env: 'DEMO_PASSWORD')]
         private readonly string $configuredPassword,
-        private readonly LockFactory $locks,
     ) {
     }
 
@@ -79,21 +84,12 @@ final class DemoSeedCommand
 
             return Command::FAILURE;
         }
-        // Non-blocking, and not blocking on purpose: on a scheduled instance a
-        // run that waited would still be there when the next one starts, and
-        // two runs would delete and recreate the same accounts (Gate 1 round
-        // 1, finding 6).
-        $lock = $this->locks->createLock('app:demo:seed', 3600.0, autoRelease: true);
-        if (!$lock->acquire()) {
+        try {
+            return $this->seed($io, $clicks, $days, $reset);
+        } catch (AnotherRunIsInProgress) {
             $io->error('Another app:demo:seed run is in progress. Nothing was written.');
 
             return Command::FAILURE;
-        }
-
-        try {
-            return $this->seed($io, $clicks, $days, $reset);
-        } finally {
-            $lock->release();
         }
     }
 
@@ -124,6 +120,28 @@ final class DemoSeedCommand
 
         try {
             $this->connection->transactional(function () use ($existing, $now, $passwords, $clicks, $days, &$formerLinkIds, &$links): void {
+                // The first thing the destructive transaction does, and the
+                // whole of the non-overlap guarantee (Gate 2 round 1, finding
+                // 1). It replaced a Symfony lock with a fixed 3 600-second
+                // TTL, which Symfony refreshes only on acquisition — and the
+                // shipped reload cadence is also 3 600 seconds, so a run that
+                // outlived its interval lost ownership while it was still
+                // deleting and recreating the accounts, which is precisely
+                // the case the requirement is about.
+                //
+                // A transaction-scoped advisory lock has no expiry at all: it
+                // is held for exactly as long as the work it protects and is
+                // released by the commit or the rollback, whichever comes.
+                // `try` rather than a wait, because on a scheduled instance a
+                // run that waited would still be there when the next starts.
+                $acquired = $this->connection->fetchOne('SELECT pg_try_advisory_xact_lock(?)', [self::LOCK_KEY]);
+                // pdo_pgsql hands back a PHP bool for a boolean column; the
+                // other spellings are listed so that a driver change cannot
+                // turn "not acquired" into a truthy string
+                if (!\in_array($acquired, [true, 't', 1, '1'], true)) {
+                    throw new AnotherRunIsInProgress();
+                }
+
                 if ([] !== $existing) {
                     $formerLinkIds = $this->linkIdsOf($existing);
                     foreach ($existing as $user) {
@@ -166,6 +184,12 @@ final class DemoSeedCommand
                     $this->seedClicks($link, $specs[$i], $share, $now->modify(\sprintf('-%d days', $days)), $now);
                 }
             });
+        } catch (AnotherRunIsInProgress $e) {
+            // a refusal, not a failure: the rollback is what makes "nothing
+            // was written" true, and the caller reports it in its own words
+            $this->em->clear();
+
+            throw $e;
         } catch (\Throwable $e) {
             // the transaction rolled back: the former dataset (if any) is intact, nothing new exists
             $this->em->clear();

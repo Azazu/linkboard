@@ -109,6 +109,35 @@ generated per run, because the administrator's address is a constant of this
 repository and a shared password would mean the sign-in page publishes
 administrator access.
 
+## Country routing needs a source you provision
+
+The routing rules can match on country, and on a directly exposed instance the
+only way to know one is a **GeoLite2 database**. Put
+`GeoLite2-Country.mmdb` in `var/geoip/` on the host (or point `GEOIP_DIR` at
+wherever you keep it) and the `geolite2` resolver picks it up. Obtaining it
+needs a free MaxMind account and a licence key, which is why it is a step here
+rather than something the stack does for you.
+
+**Without it the instance still works**: the resolver logs a warning once per
+process and every visit's country is unknown, so country rules fall through to
+the default. That is the honest state, and it is why the production default is
+`geolite2` rather than `header`.
+
+**`header` cannot work on a directly exposed instance**, and this is worth
+stating because it looks like it should. The application reads the country
+header only for a request that came from a trusted proxy — and with a FastCGI
+upstream the address it sees is the *visitor's*, not Caddy's, so no request
+qualifies. Caddy also strips whatever a client sends under that header, so a
+visitor cannot supply its own: measured, three requests carrying
+`CF-IPCountry: DE` were recorded with no country at all.
+
+**Behind an edge that resolves the country** — Cloudflare and the like — it
+does work, and the configuration is: set `COUNTRY_RESOLVERS=header`, set
+`TRUSTED_PROXIES` to that edge's ranges rather than the compose network, and
+remove the `header_up -{$COUNTRY_HEADER}` line from the Caddyfile so the edge's
+value reaches the application. **Not exercised here:** this deployment is the
+directly exposed one.
+
 ## Looking after it
 
 ```bash

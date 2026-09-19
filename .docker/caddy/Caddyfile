@@ -60,6 +60,16 @@ http://{$PUBLIC_HOST} {
 			# the real peer is what makes "a forwarded header from outside the
 			# proxy is not believed" true here.
 			header_up X-Forwarded-For {remote_host}
+			# Anything a client sends under the country header is deleted
+			# here, so it can never be mistaken for an edge's answer. On a
+			# directly exposed instance the application would not believe it
+			# anyway — the address it sees is the visitor's, not a trusted
+			# proxy's — but "would not believe it" is a property of two
+			# components agreeing, and this is one component refusing to carry
+			# it at all (Gate 2 round 1, finding 2). Behind an edge that DOES
+			# resolve the country, remove this line and name that edge in
+			# TRUSTED_PROXIES.
+			header_up -{$COUNTRY_HEADER}
 			header_up X-Forwarded-Proto {scheme}
 			header_up X-Forwarded-Host {host}
 

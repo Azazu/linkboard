@@ -100,8 +100,16 @@ Two more worth keeping: `docker kill` does not trigger `unless-stopped` (Docker 
 ## Left on the machine
 The scratch `.env.local` was removed (it would override the development stack's settings) and the production stack was torn down with its volumes; the development stack is back up. One `linkboard-prod` image remains locally.
 
+## Gate 2 round 1 — two findings, both real
+Record `8633e8a`, Reviewed-Commit `308b784`.
+
+1. **blocker — ownership that expired while the destructive work ran.** The seed's Symfony lock took a fixed 3 600-second TTL that Symfony refreshes only on acquisition, and the shipped reload cadence is also 3 600 seconds — so precisely the case the requirement is about, a run that outlives its interval, lost ownership mid-transaction and a second run could start deleting the accounts the first was recreating. Replaced with a **transaction-scoped PostgreSQL advisory lock**, the idiom this repository already uses for click retention: no TTL at all, ownership ends with the transaction, and a run that dies leaves nothing held. Two tests, one holding the lock on a second connection for an unbounded time.
+2. **major — no trusted country source in production.** The stack defaulted to the `header` resolver, which cannot work in this topology: the application reads that header only for a request from a trusted proxy, and with a FastCGI upstream the address it sees is the visitor's. Every country rule would have fallen through as unknown while the configuration looked deliberate. The default is now `geolite2`, which degrades honestly, with a read-only mount for the database; Caddy strips whatever a client sends under the country header. Measured: three redirects carrying `CF-IPCountry: DE` were recorded with no country at all.
+
+Both capability texts were strengthened rather than only the code: ownership that does not expire on a clock, and a country source that is provisioned rather than assumed.
+
 ## Next step
-Push `change/stretch-public-hosting`, verify the Actions run on the exact head — it now includes the new `image` job — then `scripts/gate-run.sh stretch-public-hosting 2 full`.
+Push, verify the run on the exact head, then `scripts/gate-run.sh stretch-public-hosting 2 confirm 1`.
 
 ## Blockers
 None. Confirmation 6 was refused on 2026-09-17 because Codex hit the workspace spend cap — the runner is fail-closed, so nothing was written and the gate simply did not pass. The cap was raised on 2026-09-19 and the run is resumed against this branch head; the last record in `review.md` remains Confirmation 5.

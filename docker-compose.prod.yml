@@ -56,8 +56,21 @@ x-app-environment: &app-environment
   RATE_LIMIT_REDIRECT_PER_IP: ${RATE_LIMIT_REDIRECT_PER_IP:-60}
   RATE_LIMIT_API_PER_KEY: ${RATE_LIMIT_API_PER_KEY:-600}
 
-  COUNTRY_RESOLVERS: ${COUNTRY_RESOLVERS:-header}
+  # `geolite2`, not `header`. The header resolver reads the country only when
+  # the request came from a trusted proxy — and with a FastCGI upstream the
+  # address the application sees is the VISITOR's, so on a directly exposed
+  # instance no request is ever from a trusted proxy and every country rule
+  # would fall through as unknown (Gate 2 round 1, finding 2). The GeoLite2
+  # resolver degrades honestly instead: with no database mounted it logs a
+  # warning once per process and answers "unknown", which is the truth.
+  #
+  # Behind an edge that resolves the country itself (Cloudflare and friends),
+  # set COUNTRY_RESOLVERS=header, name that edge's ranges in TRUSTED_PROXIES,
+  # and drop the header-stripping line from the Caddyfile — docs/how-to/
+  # deploy.md spells that out.
+  COUNTRY_RESOLVERS: ${COUNTRY_RESOLVERS:-geolite2}
   GEOIP_COUNTRY_HEADER: ${GEOIP_COUNTRY_HEADER:-CF-IPCountry}
+  GEOIP_DATABASE_PATH: /app/var/geoip/GeoLite2-Country.mmdb
   CLICK_RETENTION_MONTHS: ${CLICK_RETENTION_MONTHS:-13}
   CLICK_PARTITION_HORIZON_MONTHS: ${CLICK_PARTITION_HORIZON_MONTHS:-3}
 
@@ -97,6 +110,10 @@ services:
     environment: *app-environment
     volumes:
       - jwt:/app/config/jwt/prod:ro
+      # The country database, if the operator provisioned one. Read-only, and
+      # absent is a supported state: the resolver logs a warning and answers
+      # "unknown" rather than failing.
+      - ${GEOIP_DIR:-./var/geoip}:/app/var/geoip:ro
     depends_on:
       init:
         condition: service_completed_successfully
@@ -157,6 +174,9 @@ services:
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:?the host name this instance answers on}
       TLS_EMAIL: ${TLS_EMAIL:?the address Let's Encrypt writes to about this certificate}
+      # The header the country resolver would read. Named here so the proxy
+      # can strip whatever a client sends under it.
+      COUNTRY_HEADER: ${GEOIP_COUNTRY_HEADER:-CF-IPCountry}
     volumes:
       - ./.docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       # The compiled assets, written by init and served directly: PHP-FPM

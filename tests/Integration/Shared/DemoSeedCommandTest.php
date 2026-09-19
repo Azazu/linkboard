@@ -10,6 +10,7 @@ use App\Shared\Demo\DemoDataset;
 use App\Shared\Demo\DemoSeedCommand;
 use App\Tests\Fixture\FailingStatement;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -119,6 +120,62 @@ final class DemoSeedCommandTest extends WebTestCase
     {
         FailingStatement::reset();
         parent::tearDown();
+    }
+
+    public function testASecondRunIsRefusedWhileAnotherHoldsTheLockHoweverLongItRuns(): void
+    {
+        // Gate 2 round 1, finding 1. The first implementation took a Symfony
+        // lock with a fixed 3 600-second TTL that Symfony refreshes only on
+        // acquisition — and the shipped reload cadence is also 3 600 seconds,
+        // so a run that outlived its interval lost ownership while it was
+        // still deleting and recreating the accounts.
+        //
+        // The guarantee is now a transaction-scoped advisory lock, which has
+        // no TTL at all: ownership ends with the transaction and with nothing
+        // else. That is what this test demonstrates — the holder here has been
+        // holding for an unbounded time and the second run is still refused,
+        // which is the case no TTL-based lock can promise.
+        // the client first: `self::connection()` boots the kernel, and
+        // createClient() refuses a kernel that is already up
+        $client = self::createClient();
+        $client->disableReboot();
+        $kernel = self::$kernel;
+        self::assertInstanceOf(KernelInterface::class, $kernel);
+
+        $holder = DriverManager::getConnection(self::connection()->getParams());
+        $holder->beginTransaction();
+        $holder->executeStatement('SELECT pg_advisory_xact_lock(?)', [DemoSeedCommand::LOCK_KEY]);
+
+        try {
+            $tester = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+
+            self::assertSame(1, $tester->execute(['--clicks' => '10', '--days' => '2']));
+            self::assertStringContainsString('Another app:demo:seed run is in progress', preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '');
+            self::assertSame(0, Row::toInt(self::connection()->fetchOne('SELECT count(*) FROM users')), 'nothing was written');
+        } finally {
+            $holder->rollBack();
+            $holder->close();
+        }
+    }
+
+    public function testTheLockIsReleasedWithTheTransactionSoTheNextRunProceeds(): void
+    {
+        // the other half: ownership really does end with the transaction, so
+        // a refusal is not a stuck instance
+        $client = self::createClient();
+        $client->disableReboot();
+        $kernel = self::$kernel;
+        self::assertInstanceOf(KernelInterface::class, $kernel);
+
+        $holder = DriverManager::getConnection(self::connection()->getParams());
+        $holder->beginTransaction();
+        $holder->executeStatement('SELECT pg_advisory_xact_lock(?)', [DemoSeedCommand::LOCK_KEY]);
+        $holder->rollBack();
+        $holder->close();
+
+        $tester = new CommandTester(new Application($kernel)->find('app:demo:seed'));
+
+        self::assertSame(0, $tester->execute(['--clicks' => '10', '--days' => '2']), $tester->getDisplay());
     }
 
     public function testAConfiguredPasswordSurvivesAReset(): void

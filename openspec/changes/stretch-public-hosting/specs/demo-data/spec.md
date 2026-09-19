@@ -24,7 +24,7 @@ The console command `app:demo:seed` SHALL create, in one transaction, two accoun
 ### Requirement: Guards and re-runs
 `app:demo:seed` SHALL refuse to run in the `prod` environment (exit code 1, nothing written) **unless the instance explicitly declares itself a demo instance through a setting made for that purpose**, which is unset everywhere by default; the refusal is otherwise exactly as before, and no option of the command can lift it. When the demo accounts already exist it SHALL refuse (exit code 1, nothing written) unless `--reset` is given, in which case it SHALL first delete the two demo accounts — their links and click records follow through the deletion of a link (capability `links`), their counters and cached reports are dropped — and then seed anew. Deletion and seeding are one transaction: a failure at any point — after the former accounts were deleted, after replacement accounts, links or click records were written — SHALL leave no partial data: the exit code is 1 with the reason, a former dataset is intact (the same account ids, the same passwords still valid, the same links and click records) and no replacement account, link or record exists.
 
-Two runs SHALL NOT overlap. The command SHALL take a lock for its whole run and, when another run already holds it, SHALL exit without writing anything and say so, rather than waiting — because on a scheduled instance a waiting run would still be there when the next one starts. A scheduled reload that outlives its interval therefore delays the next reload rather than deleting the accounts a running one is recreating.
+Two runs SHALL NOT overlap. The command SHALL hold exclusive ownership for as long as its destructive work lasts, and that ownership SHALL NOT expire on a clock: a run that takes longer than the interval between scheduled runs — which is the case this exists for — must still be the owner when the next one starts, so a lock with a fixed lifetime is not sufficient however long that lifetime is. When another run already holds it the command SHALL exit without writing anything and say so, rather than waiting, because on a scheduled instance a waiting run would still be there when the next one starts. Ownership SHALL end with the work itself, so that a run which dies leaves nothing held.
 
 #### Scenario: Refuses in prod
 - **WHEN** the command runs with the `prod` environment and the demo-instance setting is unset
@@ -41,6 +41,14 @@ Two runs SHALL NOT overlap. The command SHALL take a lock for its whole run and,
 #### Scenario: A second run while the first is working is refused, not queued
 - **WHEN** a run is in progress and a second run of the command starts
 - **THEN** the second exits non-zero at once without writing anything, saying a run is in progress, and the first completes as if it had been alone
+
+#### Scenario: Ownership does not lapse because the first run is slow
+- **WHEN** the run in progress has been working for longer than the interval between scheduled runs
+- **THEN** a second run is still refused
+
+#### Scenario: A run that ends releases what it held
+- **WHEN** a run finishes or fails
+- **THEN** the next run acquires ownership and proceeds
 
 #### Scenario: Refuses to seed twice
 - **WHEN** the command runs a second time without `--reset`

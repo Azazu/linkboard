@@ -17,16 +17,14 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactoryInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 /**
  * Spec demo-data "Guards and re-runs": the guards run before anything is
- * touched — the `prod` refusal, the fact that no option of the command lifts
- * it, and the lock that keeps two runs from deleting and recreating the same
- * accounts (change stretch-public-hosting, design decision 7).
+ * touched — the `prod` refusal and the fact that no option of the command lifts
+ * it. The non-overlap guarantee is a PostgreSQL advisory lock and therefore
+ * lives in the integration test, where there is a database to hold it.
  */
 #[CoversClass(DemoSeedCommand::class)]
 final class DemoSeedCommandTest extends TestCase
@@ -61,21 +59,6 @@ final class DemoSeedCommandTest extends TestCase
         self::assertStringContainsString('No option of this command lifts that.', self::unwrapped($output));
     }
 
-    public function testASecondRunWhileTheFirstHoldsTheLockIsRefusedAtOnce(): void
-    {
-        // Not queued: on a scheduled instance a run that waited would still be
-        // there when the next one starts (Gate 1 round 1, finding 6).
-        $locks = new LockFactory(new InMemoryStore());
-        $held = $locks->createLock('app:demo:seed', 3600.0);
-        self::assertTrue($held->acquire(), 'the first run holds it');
-
-        $output = new BufferedOutput();
-        $exit = $this->command(demoInstance: true, environment: 'dev', locks: $locks)(new SymfonyStyle(new ArrayInput([]), $output));
-
-        self::assertSame(1, $exit);
-        self::assertStringContainsString('Another app:demo:seed run is in progress', self::unwrapped($output));
-    }
-
     /**
      * A command whose collaborators refuse to be used: `transactional` and
      * `findByEmail` are never expected, so any case that reaches the database
@@ -87,7 +70,7 @@ final class DemoSeedCommandTest extends TestCase
         return trim((string) preg_replace('/\s+/', ' ', $output->fetch()));
     }
 
-    private function command(bool $demoInstance, string $environment = 'prod', ?LockFactory $locks = null): DemoSeedCommand
+    private function command(bool $demoInstance, string $environment = 'prod'): DemoSeedCommand
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects(self::never())->method('transactional');
@@ -106,7 +89,6 @@ final class DemoSeedCommandTest extends TestCase
             $environment,
             $demoInstance,
             '',
-            $locks ?? new LockFactory(new InMemoryStore()),
         );
     }
 }
