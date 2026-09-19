@@ -1,7 +1,7 @@
 # Handoff — stretch-public-hosting
 
 **Updated:** 2026-09-19 · claude
-**State:** ready-to-merge
+**State:** merged
 **Branch:** change/stretch-public-hosting
 
 ## Done this session
@@ -116,8 +116,10 @@ Both capability texts were strengthened rather than only the code: ownership tha
 
 Branch run on `22f3fb6` green: run 35463401490, all five jobs including `image`.
 
+- Merged into `main` as `9d6a29b` (`merge --no-ff`, verifier green, no conflicts), 37 commits.
+
 ## Next step
-`/git:merge stretch-public-hosting` (the user's call), then `/opsx:archive stretch-public-hosting` — `deployment` is a new capability, `demo-data` and `user-accounts` are modified, and roadmap row 16 goes while row 17 stays as the user's own step.
+`/opsx:archive stretch-public-hosting` — sync `deployment` (new), `demo-data` and `user-accounts` (modified); roadmap row 16 goes, row 17 stays as the user's own step.
 
 ## Blockers
 None. Confirmation 6 was refused on 2026-09-17 because Codex hit the workspace spend cap — the runner is fail-closed, so nothing was written and the gate simply did not pass. The cap was raised on 2026-09-19 and the run is resumed against this branch head; the last record in `review.md` remains Confirmation 5.
