@@ -11,5 +11,5 @@
     <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
     <button type="submit">Log in</button>
 </form>
-<p><a href="{{ path('app_register') }}">Create an account</a></p>
+{% if registration_enabled %}<p><a href="{{ path('app_register') }}">Create an account</a></p>{% endif %}
 {% endblock %}

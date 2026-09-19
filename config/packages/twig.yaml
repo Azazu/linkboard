@@ -4,6 +4,12 @@ twig:
     # adds the [role=alert] errors the web tests select on and aria-invalid
     # (change add-web-ui, design decision 8).
     form_themes: ['form/pico_layout.html.twig']
+    globals:
+        # The same switch `App\Auth\Registration\ClosedRegistration` enforces,
+        # so the pages cannot offer a form the listener answers 404 for
+        # (change stretch-public-hosting, design decision 5). One source, two
+        # readers — the rule is not restated, it is read twice.
+        registration_enabled: '%env(bool:REGISTRATION_ENABLED)%'
 
 when@test:
     twig:

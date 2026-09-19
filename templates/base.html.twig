@@ -44,7 +44,7 @@
                         </li>
                     {% else %}
                         <li><a href="{{ path('app_login') }}">Log in</a></li>
-                        <li><a href="{{ path('app_register') }}">Register</a></li>
+                        {% if registration_enabled %}<li><a href="{{ path('app_register') }}">Register</a></li>{% endif %}
                     {% endif %}
                 </ul>
             </nav>

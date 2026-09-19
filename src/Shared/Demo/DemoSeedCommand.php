@@ -20,6 +20,7 @@ use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactoryInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -45,6 +46,25 @@ final class DemoSeedCommand
         private readonly LoggerInterface $logger,
         #[Autowire(param: 'kernel.environment')]
         private readonly string $environment,
+        /**
+         * Whether this instance is the public demo. It is the ONLY thing that
+         * lets this command run in `prod`, and it is a property of the
+         * instance rather than an option of the command on purpose: a
+         * `--force` flag would travel in somebody's shell history straight
+         * onto a real host, which is what the guard exists to prevent (change
+         * stretch-public-hosting, design decision 7).
+         */
+        #[Autowire(env: 'bool:DEMO_INSTANCE')]
+        private readonly bool $demoInstance,
+        /**
+         * The demo account's password on a demo instance. Empty everywhere
+         * else, and then one is generated per run as before. It exists so that
+         * a credential a visitor was given survives the scheduled reload —
+         * without it the first reload orphans whatever they were told.
+         */
+        #[Autowire(env: 'DEMO_PASSWORD')]
+        private readonly string $configuredPassword,
+        private readonly LockFactory $locks,
     ) {
     }
 
@@ -54,11 +74,31 @@ final class DemoSeedCommand
         #[Option(description: 'Spread the clicks over the last N days')] int $days = 60,
         #[Option(description: 'Delete the demo accounts (with their links and clicks) first and seed anew')] bool $reset = false,
     ): int {
-        if ('prod' === $this->environment) {
-            $io->error('app:demo:seed never runs in the prod environment.');
+        if ('prod' === $this->environment && !$this->demoInstance) {
+            $io->error('app:demo:seed does not run in the prod environment unless the instance declares itself the public demo (DEMO_INSTANCE). No option of this command lifts that.');
 
             return Command::FAILURE;
         }
+        // Non-blocking, and not blocking on purpose: on a scheduled instance a
+        // run that waited would still be there when the next one starts, and
+        // two runs would delete and recreate the same accounts (Gate 1 round
+        // 1, finding 6).
+        $lock = $this->locks->createLock('app:demo:seed', 3600.0, autoRelease: true);
+        if (!$lock->acquire()) {
+            $io->error('Another app:demo:seed run is in progress. Nothing was written.');
+
+            return Command::FAILURE;
+        }
+
+        try {
+            return $this->seed($io, $clicks, $days, $reset);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function seed(SymfonyStyle $io, int $clicks, int $days, bool $reset): int
+    {
         if ($clicks < 0 || $days < 1) {
             $io->error('--clicks must be 0 or more and --days at least 1.');
 
@@ -72,7 +112,7 @@ final class DemoSeedCommand
         }
 
         $now = new \DateTimeImmutable();
-        $passwords = [DemoDataset::USER_EMAIL => self::password(), DemoDataset::ADMIN_EMAIL => self::password()];
+        $passwords = [DemoDataset::USER_EMAIL => $this->demoPassword(), DemoDataset::ADMIN_EMAIL => $this->demoPassword()];
         $formerLinkIds = [];
         /** @var list<Link> $links */
         $links = [];
@@ -248,6 +288,22 @@ final class DemoSeedCommand
     }
 
     /** 24 hexadecimal characters from a CSPRNG — printed once, stored as a hash. */
+    /**
+     * The instance's own password when it has one, a fresh random one
+     * otherwise.
+     *
+     * A demo instance reloads its dataset on a schedule, so a password
+     * generated per run would invalidate whatever a visitor had been given
+     * the first time the schedule fired — and the console output nobody
+     * reads would be the only place the replacement appeared (Gate 1 round 1,
+     * finding 1). The value is never in this repository: the instance sets it
+     * and publishes it on its own sign-in page.
+     */
+    private function demoPassword(): string
+    {
+        return '' !== $this->configuredPassword ? $this->configuredPassword : self::password();
+    }
+
     private static function password(): string
     {
         return bin2hex(random_bytes(12));
